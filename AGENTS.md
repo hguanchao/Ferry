@@ -35,6 +35,8 @@
 
 1. **先想清楚再写。** 动手前明确职责边界、数据流与失败路径；想不清楚就说明白，不要边写边猜。
 2. **最小实现。** 只写当前需求需要的代码，不预留开关、不写无人调用的分支、不提前抽象；低耦合、高内聚。
+   改动优先做**最小增量**：能并进一个条件判断的不新增分支，能一次 SQL 解决的不加辅助方法，
+   能一行补全的不重排整个方法；已能工作的代码不为了「看起来更规范」而改写。
 3. **同一份规则只实现一次。** 后端能力上提到 `common-*`，前端上提到 `lib/`、`components/`；发现第二处复制就抽，
    而不是并排维护两份（树的根判定、错误提示去重、统一响应都是这么收敛的）。
 4. **失败路径必须明确。** 该拒绝就抛异常并给用户看得懂的中文提示；不静默降级、不用默认值兜底、不吞异常。
@@ -130,7 +132,11 @@ Controller 不写业务判断，Service 不拼 HTTP 响应，Wrapper 不做业�
 - **每个接口都要显式决定是否鉴权**：需要就标 `@PreAuthorize("模块:资源:动作")`，动作取方法名
   （`system:dept:pageList`、`system:dept:deleted`），必须与前端 `can()` 的判断串、菜单表 `perms` 同一口径；
   菜单按页面给通配 `system:dept:*`，按钮给具体动作。不标注等于不鉴权，属于评审必查项。
-- 入参用 `@RequestBody @Valid`，校验注解写在 DTO / Query 上，消息用中文；Controller 不重复写 if 判空。
+- 前端纯客户端动作（如导出 CSV）没有后端接口，权限串仍要落在某个菜单通配里，否则非超管永远看不到入口。
+- 确实要免登录的接口，才允许不标 `@PreAuthorize`：必须同时写进 `AuthConst.DEFAULT_EXCLUDE_PATH`，
+  并在方法上留下「为什么不鉴权」的注释（`/tenant/list` 是范例）；漏了任一项都属于评审必查项。
+- 写操作入参用 `@RequestBody @Valid`，校验注解写在 DTO 上、消息用中文；查询类入参都是可选条件，
+  不加必填校验。Controller 不重复写 if 判空。
 - 异常交给全局 `ExceptionAdviceHandler`，Controller 不 try-catch 后自行拼装错误响应。
 
 ### 业务与数据
@@ -141,6 +147,13 @@ Controller 不写业务判断，Service 不拼 HTTP 响应，Wrapper 不做业�
   实体继承 `BaseEntity`。
 - `create_user` / `create_time` / `update_user` / `update_time` / `tenant_id` / `is_deleted` 由填充器与
   逻辑删除统一维护，业务代码不手动赋值、不手动拼 `is_deleted` 条件。
+- **写侧 DTO 里不放 `tenantId`**：字段不存在才不会漏进来，比复制后置空可靠；租户由填充器按登录态写入。
+  唯一性校验不要手写 `tenant_id`（拦截器已追加，重复写会相与，让校验恒查不到重复数据）。
+  Jackson 已关闭 `FAIL_ON_UNKNOWN_PROPERTIES`，旧请求里仍带该字段会被忽略而不是报错。
+- 判断「一批 id 是否有关联数据」只发一条聚合查询：用 `in` 批量 `count`，不要逐个 id 查库
+  （`DeptMapper#selectUserCountByIds`、`PostMapper#selectUserCountByIds` 是范例）。
+- `sys_user_role` / `sys_role_menu` / `sys_role_dept` 没有公共字段，实体不继承 `BaseEntity`：
+  它们的 `remove` 是物理删除，手写 SQL 不要给这几张表加 `is_deleted` / `tenant_id` 条件。
 - 查询条件统一写在 `XxxWrapper#lambda(query)`；分页用 `Page.create(body)`；禁止在 Controller 里拼 `Wrappers`。
 - 实体与 VO 转换用 `BeanUtil.copy`，分页转换用 `wrapper.pageVo`；不手写逐字段 set。
 - 写操作加 `@Transactional(rollbackFor = Exception.class)`，只读不加。
@@ -155,15 +168,30 @@ Controller 不写业务判断，Service 不拼 HTTP 响应，Wrapper 不做业�
 - 根节点的 `parentId` 约定为 `0`（`SysConst.TOP_PARENT_ID`）；`null` 与 `0` 都表示「没有上级」。
 - 根判定**只允许**用 `TreeUtil.isRoot`：禁止 `getById(0)`，禁止自己写 `== 0L`、`!TOP_PARENT_ID.equals(...)` 这类分支。
 - 树构建统一用 `TreeUtil.build`，业务里不手写递归；前端对应能力在 `lib/tree.ts`，不要各页面自己再写一遍。
-- 新增/编辑时必须显式处理根：根节点跳过父级存在性校验，并把 `parentId` 归一成 `0`；带路径字段的
-  （如部门 `ancestors`）同步重算，不能只改 `parentId`。
-- 父级校验只在**非根**时执行，报错文案说清是哪条上级不存在。
+- 新增/编辑时必须显式处理根：根节点跳过父级存在性校验；带路径字段的（如部门 `ancestors`）同步重算，
+  不能只改 `parentId`。部门、字典、菜单的表单始终传 `parentId`，根节点要归一成 `0`；
+  **区域例外**：`null` 表示「本次不改父级」，归一成 `0` 会把区县悄悄提到省级，这是踩过的坑，
+  别按其它树的直觉改回去。
+- 父级校验只在**非根**时执行，报错文案说清是哪条上级不存在；同时必须排除「上级是自身或自身的后代」，
+  否则树里会出现环、整棵子树从根上脱节。有路径字段的复用 `selectSelfAndChildIds` 一次查完；
+  **无路径字段的（菜单）** 用一次只取 `id, parent_id` 两列的查询建父链映射，同时判上级存在，
+  再沿父链上溯判断是否绕回自身（父链判定 SQL 表达不了，不算把过滤条件搬到内存），
+  用已访问集合防住库里已有的环；只挡「上级 = 自身」不算防环。
+- 移动节点时，带路径字段的要用一条 `UPDATE ... REPLACE(ancestors, 旧前缀, 新前缀)` 同步改掉全部后代，
+  只改当前节点会让按路径算出的可见部门范围停在旧位置。
+- 删除树节点前统一用 `in(parent_id, ids)` 查一次直接下级并拦住（部门、菜单、区域），
+  否则下级会从树/懒加载里脱节变成孤儿；级联只清一层时，必须先由写入侧保证只有两层。
+- **字典固定两层**（分组 → 字典项）：`save` 在写入侧拦住「父级不是根分组」，
+  `deleted` 用 `in(parent_id, ids)` 一条语句连带清掉字典项，不做全表递归，也不把整张表捞进内存。
+  写入侧保证层级，删除侧才能只清一层；分组改 `code` 时用一条带 `ne(code, 新码)` 的 `lambdaUpdate`
+  同步改掉子项编码，否则按编码查询会漏掉仍挂旧码的字典项。
 
 ### 序列化
 
 - Long 与 BigDecimal 由 `JacksonConfiguration` 全局序列化为字符串，避免前端丢精度。
   **前端拿到的 id 一律是 string**，后端不要为了「看起来是数字」去改序列化配置。
 - 日期格式统一用 `DateUtil` 里的常量，不在注解里写死格式串。
+- VO 里不放 `password` 这类敏感字段：字段不存在才不会漏出去，不靠 Service 里逐个 `setXxx(null)` 兜底。
 
 ### SQL 与迁移
 
@@ -257,7 +285,7 @@ Controller 不写业务判断，Service 不拼 HTTP 响应，Wrapper 不做业�
 
 - 升级依赖、替换库、改构建配置，一律单独提交，并在提交信息里说明原因与影响面。
 - 修复用的临时兜底不允许留在主干：要么当次补成正式实现，要么明确记录待办并说明触发条件。
-- 重构与功能改动分开；重构只在不改变外部行为的前提下进行，改完必须重跑第三节的门禁。
+- 重构与功能改动分开；重构只在不改变外部行为的前提下进行，改完必须重跑第八节的三道门禁。
 
 ## 九、Git 提交规范
 
@@ -296,7 +324,10 @@ test(notify): 补充并发错误提示去重的冒烟用例
 - 接口漏标 `@PreAuthorize`，或前后端权限串不一致。
 - 把 `0`、`null` 当作真实主键去查库；树形结构绕过 `TreeUtil` 自己写判定。
 - Controller 里写业务逻辑、拼 `Wrappers`、try-catch 后自造错误响应。
-- 手动 set 公共字段、手动拼 `tenant_id` / `is_deleted` 条件，或直接 `SELECT *`。
+- 手动 set 公共字段、手动拼 `tenant_id` / `is_deleted` 条件、写侧 DTO 暴露 `tenantId`，或直接 `SELECT *`。
+- VO 暴露 `password` 等敏感字段，靠 Service 置 `null` 兜底。
+- 树形编辑不排除自身与自身后代、移动节点不重算后代路径、根节点 `parentId` 不归一为 `0`；
+  删树节点不拦下级、分组改码不同步子项编码。
 - 业务失败用 `null` / `false` 表达，或静默吞异常、用默认值兜底。
 - 在循环里逐条查库，或把过滤条件搬到内存里做。
 - 前端裸 `axios`、手拼 URL、`any`、`Number(id)`、`message.error` 绕过统一提示。
