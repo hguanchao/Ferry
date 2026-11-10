@@ -1,0 +1,28 @@
+server:
+  port: 9100
+
+spring:
+  application:
+    name: ferry-gateway
+  profiles:
+    active: dev
+  cloud:
+    nacos:
+      config:
+        server-addr: ${FERRY_NACOS_ADDR:127.0.0.1:8848}
+        namespace: ${FERRY_NACOS_NAMESPACE:${spring.profiles.active}}
+        username: ${FERRY_NACOS_USERNAME:nacos}
+        password: ${FERRY_NACOS_PASSWORD:123456}
+      discovery:
+        server-addr: ${FERRY_NACOS_ADDR:127.0.0.1:8848}
+        namespace: ${FERRY_NACOS_NAMESPACE:${spring.profiles.active}}
+        username: ${FERRY_NACOS_USERNAME:nacos}
+        password: ${FERRY_NACOS_PASSWORD:123456}
+  config:
+    import:
+      - nacos:application.yaml?group=DEFAULT_GROUP&refreshEnabled=true
+      - nacos:ferry-gateway.yaml?group=DEFAULT_GROUP&refreshEnabled=true
+
+logging:
+  file:
+    name: ${FERRY_LOG_DIR:./logs}/${spring.application.name}.log

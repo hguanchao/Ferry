@@ -1,0 +1,7 @@
+${AnsiColor.BRIGHT_BLUE}  ______  ______ ${AnsiColor.BRIGHT_MAGENTA} _____   _____  __     __
+${AnsiColor.BRIGHT_BLUE} |  ____||  ____|${AnsiColor.BRIGHT_MAGENTA}|  __ \ |  __ \ \ \   / /
+${AnsiColor.BRIGHT_BLUE} | |__   | |__   ${AnsiColor.BRIGHT_MAGENTA}| |__) || |__) | \ \_/ /
+${AnsiColor.BRIGHT_BLUE} |  __|  |  __|  ${AnsiColor.BRIGHT_MAGENTA}|  _  / |  _  /   \   /
+${AnsiColor.BRIGHT_BLUE} | |     | |____ ${AnsiColor.BRIGHT_MAGENTA}| | \ \ | | \ \    | |
+${AnsiColor.BRIGHT_BLUE} |_|     |______|${AnsiColor.BRIGHT_MAGENTA}|_|  \_\|_|  \_\   |_|
+${AnsiColor.BRIGHT_BLUE}==> Application：${AnsiColor.BRIGHT_MAGENTA}${spring.application.name}${AnsiColor.BRIGHT_BLUE} / Port：[${AnsiColor.BRIGHT_MAGENTA}${server.port}${AnsiColor.BRIGHT_BLUE}] / Env：[${AnsiColor.BRIGHT_MAGENTA}${spring.profiles.active}${AnsiColor.BRIGHT_BLUE}] / SpringBoot：[${AnsiColor.BRIGHT_MAGENTA}v ${spring-boot.version}${AnsiColor.BRIGHT_BLUE}] <==${AnsiColor.DEFAULT}

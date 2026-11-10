@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ferry.system.biz.mapper.UserRoleMapper">
+    <resultMap id="BaseResultMap" type="com.ferry.system.api.entity.UserRole">
+        <!--@mbg.generated-->
+        <!--@Table sys_user_role-->
+        <result column="user_id" jdbcType="BIGINT" property="userId"/>
+        <result column="role_id" jdbcType="BIGINT" property="roleId"/>
+    </resultMap>
+    <sql id="Base_Column_List">
+        <!--@mbg.generated-->
+        user_id, role_id
+    </sql>
+
+    <select id="selectRoleListByRoleIds" resultType="com.ferry.system.api.entity.Role">
+        SELECT id, tenant_id, code, name, status, data_scope, sort
+        FROM sys_role
+        <where>
+            status = 1
+              AND is_deleted = 0
+            <if test="roleIds != null and roleIds != ''">
+                AND FIND_IN_SET(id, #{roleIds})
+            </if>
+        </where>
+    </select>
+
+    <select id="selectUserRoleListByUserIds" resultType="com.ferry.system.api.entity.Role">
+        SELECT id, tenant_id, code, name, status, data_scope, sort
+        FROM sys_role
+        <where>
+            status = 1
+              AND is_deleted = 0
+            <if test="userIds != null and userIds != ''">
+                AND id IN (SELECT DISTINCT role_id FROM sys_user_role WHERE FIND_IN_SET(user_id, #{userIds}))
+            </if>
+        </where>
+    </select>
+
+    <update id="updateSuperUserByUserIds">
+        UPDATE sys_user
+        SET is_super = #{isSuper}
+        WHERE is_deleted = 0
+          AND id IN
+        <foreach collection="userIds" item="userId" open="(" separator="," close=")">
+            #{userId}
+        </foreach>
+    </update>
+</mapper>

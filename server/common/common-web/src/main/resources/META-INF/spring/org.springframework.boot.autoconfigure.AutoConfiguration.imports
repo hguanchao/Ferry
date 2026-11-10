@@ -1,0 +1,3 @@
+com.ferry.common.web.config.WebAutoConfiguration
+com.ferry.common.web.config.JacksonConfiguration
+com.ferry.common.web.config.SwaggerConfiguration

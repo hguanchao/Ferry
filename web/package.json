@@ -1,0 +1,32 @@
+{
+  "name": "ferry-web",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "渡口 Ferry — 持续交付编排平台前端",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc -b --noEmit"
+  },
+  "dependencies": {
+    "@ant-design/icons": "^6.3.4",
+    "@tanstack/react-query": "^5.107.1",
+    "antd": "^6.7.0",
+    "axios": "^1.12.2",
+    "dayjs": "^1.11.23",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "react-router-dom": "^7.18.5",
+    "zustand": "^5.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.3.0",
+    "typescript": "^5.9.3",
+    "vite": "^8.3.7"
+  }
+}

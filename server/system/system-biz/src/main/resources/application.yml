@@ -1,0 +1,38 @@
+server:
+  port: 9102
+
+spring:
+  application:
+    name: ferry-system
+  profiles:
+    active: dev
+  # 系统管理域（sys_*）的表结构由 system 迁移，交付域由 devops 各自迁移
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    # 各服务独立历史表，避免共用一张表时互相校验对方的脚本
+    table: flyway_system_history
+    # 存量库没有迁移历史，首次启动按 V0 打基线；V1 用 IF NOT EXISTS，已有表不会被重建
+    baseline-on-migrate: true
+    baseline-version: 0
+    validate-on-migrate: true
+  cloud:
+    nacos:
+      config:
+        server-addr: ${FERRY_NACOS_ADDR:127.0.0.1:8848}
+        namespace: ${FERRY_NACOS_NAMESPACE:${spring.profiles.active}}
+        username: ${FERRY_NACOS_USERNAME:nacos}
+        password: ${FERRY_NACOS_PASSWORD:123456}
+      discovery:
+        server-addr: ${FERRY_NACOS_ADDR:127.0.0.1:8848}
+        namespace: ${FERRY_NACOS_NAMESPACE:${spring.profiles.active}}
+        username: ${FERRY_NACOS_USERNAME:nacos}
+        password: ${FERRY_NACOS_PASSWORD:123456}
+  config:
+    import:
+      - nacos:application.yaml?group=DEFAULT_GROUP&refreshEnabled=true
+      - nacos:ferry-system.yaml?group=DEFAULT_GROUP&refreshEnabled=true
+
+logging:
+  file:
+    name: ${FERRY_LOG_DIR:./logs}/${spring.application.name}.log

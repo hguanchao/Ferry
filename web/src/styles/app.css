@@ -1,0 +1,1740 @@
+@import './tokens.css';
+
+/* ============================================================
+   基础重置
+   ============================================================ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+/*
+ * AntD 的 <App> 会在 #root 与 .ferry-shell 之间插入一层 div.ant-app。
+ * 该层默认没有高度，会把上面这条 100% 的百分比链截断：.ferry-shell 退化成
+ * 「由内容撑开」，于是侧栏只铺到菜单内容的高度（表现为底部留出一截灰底）。
+ * 补上 100% 让链条贯通，侧栏才能满屏。
+ */
+.ant-app {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: var(--fs-14);
+  line-height: var(--lh-normal);
+  color: var(--text-1);
+  background: var(--bg-page);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+p {
+  margin: 0;
+}
+
+a {
+  color: var(--color-primary);
+  text-decoration: none;
+}
+
+::selection {
+  background: rgba(22, 119, 255, 0.16);
+}
+
+/* 滚动条：细、低对比、hover 才明显 */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-2) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--border-2);
+  border-radius: var(--r-full);
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--border-3);
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* ============================================================
+   排版工具
+   ============================================================ */
+
+.ferry-mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+.ferry-muted {
+  color: var(--text-3);
+}
+
+.ferry-secondary {
+  color: var(--text-2);
+}
+
+.ferry-title {
+  font-size: var(--fs-20);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--text-1);
+}
+
+.ferry-caption {
+  font-size: var(--fs-12);
+  color: var(--text-3);
+  line-height: 1.5;
+}
+
+.ferry-ellipsis {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ferry-hstack {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.ferry-spacer {
+  flex: 1;
+}
+
+/* ============================================================
+   应用骨架
+   ============================================================ */
+
+.ferry-shell {
+  display: flex;
+  height: 100%;
+  min-width: 1080px;
+  background: var(--bg-page);
+  overflow: hidden;
+}
+
+/* ---------- 侧边导航 ---------- */
+
+.ferry-sider {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 auto;
+  width: var(--sider-width);
+  background: var(--bg-surface);
+  border-right: 1px solid var(--border-1);
+  transition: width var(--dur-base) var(--ease-out);
+  z-index: 30;
+}
+
+.ferry-sider[data-collapsed='true'] {
+  width: var(--sider-collapsed);
+}
+
+.ferry-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: var(--header-height);
+  padding: 0 16px;
+  border-bottom: 1px solid var(--border-1);
+  flex: 0 0 auto;
+  overflow: hidden;
+  cursor: pointer;
+  user-select: none;
+}
+
+.ferry-brand__mark {
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  background: linear-gradient(145deg, #1c4fd6 0%, #1677ff 52%, #35b6ff 100%);
+  box-shadow: 0 4px 10px rgba(22, 119, 255, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  display: grid;
+  place-items: center;
+}
+
+.ferry-brand__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.2;
+}
+
+.ferry-brand__name {
+  font-size: 15px;
+  font-weight: 650;
+  letter-spacing: 0.01em;
+  color: var(--text-1);
+  white-space: nowrap;
+}
+
+.ferry-brand__sub {
+  font-size: 10.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-4);
+  white-space: nowrap;
+}
+
+.ferry-sider__scroll {
+  flex: 1;
+  min-height: 0;
+  /*
+   * X 轴必须是 hidden 而不是 auto。收起态下 antd 会给 .ant-menu-inline-collapsed
+   * 写死 width: collapsedWidth（= controlHeightLG × 2 = 80px），比侧栏内容盒（72-16=56px）
+   * 宽，于是这里会冒出一条横向滚动条，把菜单往上挤、图标也跟着错位。
+   */
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 10px 8px 8px;
+}
+
+.ferry-sider[data-collapsed='true'] .ferry-sider__scroll {
+  padding: 10px 8px;
+}
+
+/*
+ * 收起态菜单宽度跟随容器。antd 默认用绝对 px（80px），与 --sider-collapsed(72px)
+ * 对不上；改成 100% 后图标才能真正居中，也顺带消除上述横向溢出。
+ */
+.ferry-sider[data-collapsed='true'] .ferry-menu.ant-menu-inline-collapsed {
+  width: 100%;
+}
+
+/* 图标居中依赖 antd 的 calc(50% - 半图标宽 - itemMarginInline)，容器宽度归一后即为 28px */
+.ferry-sider[data-collapsed='true'] .ferry-menu.ant-menu .ant-menu-item,
+.ferry-sider[data-collapsed='true'] .ferry-menu.ant-menu .ant-menu-submenu-title {
+  width: 100%;
+}
+
+.ferry-sider__footer {
+  flex: 0 0 auto;
+  padding: 10px 12px 12px;
+  border-top: 1px solid var(--border-1);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ferry-env-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fs-12);
+  color: var(--text-2);
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-1);
+  border-radius: var(--r-full);
+  padding: 3px 9px 3px 7px;
+  width: fit-content;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.ferry-env-chip__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-success);
+  box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.14);
+  flex: 0 0 auto;
+}
+
+.ferry-sider__version {
+  font-size: 11px;
+  color: var(--text-4);
+  letter-spacing: 0.04em;
+  padding-left: 2px;
+}
+
+/* 侧边菜单：在 AntD 底座上收紧视觉 */
+.ferry-menu.ant-menu {
+  border-inline-end: none !important;
+  background: transparent;
+  font-size: var(--fs-13);
+}
+
+.ferry-menu.ant-menu .ant-menu-item,
+.ferry-menu.ant-menu .ant-menu-submenu-title {
+  height: 38px;
+  line-height: 38px;
+  margin: 2px 0;
+  width: 100%;
+  border-radius: var(--r-md);
+  color: var(--text-2);
+  font-weight: 450;
+  transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+}
+
+.ferry-menu.ant-menu .ant-menu-item:hover,
+.ferry-menu.ant-menu .ant-menu-submenu-title:hover {
+  background: var(--bg-hover);
+  color: var(--text-1);
+}
+
+.ferry-menu.ant-menu .ant-menu-item-selected {
+  background: var(--color-primary-bg);
+  color: var(--color-primary-ink);
+  font-weight: 550;
+}
+
+.ferry-menu.ant-menu .ant-menu-item-selected::after {
+  display: none;
+}
+
+.ferry-menu.ant-menu .ant-menu-item .anticon,
+.ferry-menu.ant-menu .ant-menu-submenu-title .anticon {
+  font-size: 15px;
+}
+
+.ferry-menu.ant-menu .ant-menu-item-selected .anticon {
+  color: var(--color-primary);
+}
+
+.ferry-menu.ant-menu .ant-menu-item-group-title {
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-4);
+  padding: 12px 10px 6px;
+  line-height: 1.4;
+}
+
+/* ---------- 主区域 ---------- */
+
+.ferry-main {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+
+.ferry-header {
+  position: relative;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  height: var(--header-height);
+  flex: 0 0 auto;
+  padding: 0 20px 0 16px;
+  background: color-mix(in srgb, var(--bg-surface) 86%, transparent);
+  backdrop-filter: saturate(1.4) blur(10px);
+  border-bottom: 1px solid var(--border-1);
+}
+
+.ferry-header__collapse {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: var(--r-md);
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+}
+
+.ferry-header__collapse:hover {
+  background: var(--bg-hover);
+  color: var(--text-1);
+}
+
+.ferry-crumbs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: var(--fs-13);
+  color: var(--text-3);
+}
+
+.ferry-crumbs__item {
+  white-space: nowrap;
+}
+
+.ferry-crumbs__current {
+  color: var(--text-1);
+  font-weight: 550;
+}
+
+.ferry-crumbs__sep {
+  color: var(--text-4);
+  font-size: 11px;
+}
+
+/* 命令面板触发器：用搜索框外形，符合 2026 键盘优先习惯 */
+.ferry-search-trigger {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  min-width: 200px;
+  padding: 0 8px 0 10px;
+  border: 1px solid var(--border-1);
+  border-radius: var(--r-md);
+  background: var(--bg-subtle);
+  color: var(--text-3);
+  font-size: var(--fs-13);
+  cursor: pointer;
+  transition: border-color var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out);
+}
+
+.ferry-search-trigger:hover {
+  border-color: var(--border-2);
+  background: var(--bg-surface);
+}
+
+.ferry-kbd {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 20px;
+  padding: 0 5px;
+  border: 1px solid var(--border-1);
+  border-bottom-width: 2px;
+  border-radius: var(--r-xs);
+  background: var(--bg-surface);
+  color: var(--text-3);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  line-height: 1;
+}
+
+.ferry-icon-btn {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: var(--r-md);
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+}
+
+.ferry-icon-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-1);
+}
+
+.ferry-user-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 6px 0 4px;
+  border: 1px solid transparent;
+  border-radius: var(--r-full);
+  background: transparent;
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out);
+}
+
+.ferry-user-chip:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-1);
+}
+
+.ferry-user-chip__name {
+  font-size: var(--fs-13);
+  font-weight: 500;
+  color: var(--text-1);
+  max-width: 96px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ferry-user-chip__role {
+  font-size: 11px;
+  color: var(--text-3);
+  line-height: 1.2;
+}
+
+/* ---------- 内容区 ---------- */
+
+.ferry-content {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 18px 22px 32px;
+}
+
+.ferry-content__inner {
+  max-width: var(--content-max);
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  animation: ferry-fade-up var(--dur-slow) var(--ease-out) both;
+}
+
+@keyframes ferry-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 页面标题区 */
+.ferry-page-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  padding: 2px 2px 0;
+}
+
+.ferry-page-head__main {
+  min-width: 0;
+}
+
+.ferry-page-head__title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: var(--fs-20);
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  color: var(--text-1);
+  line-height: 1.3;
+}
+
+.ferry-page-head__desc {
+  margin-top: 5px;
+  font-size: var(--fs-13);
+  color: var(--text-3);
+  max-width: 760px;
+  line-height: 1.6;
+}
+
+.ferry-page-head__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex: 0 0 auto;
+  padding-top: 2px;
+}
+
+/* 面板：列表与表单的统一容器 */
+.ferry-panel {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-1);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-1);
+  overflow: hidden;
+}
+
+.ferry-panel__head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border-1);
+}
+
+.ferry-panel__title {
+  font-size: var(--fs-14);
+  font-weight: 600;
+  color: var(--text-1);
+}
+
+.ferry-panel__extra {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.ferry-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border-1);
+  background: var(--bg-surface);
+}
+
+.ferry-toolbar__spacer {
+  flex: 1;
+}
+
+.ferry-table-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  padding: 12px 18px;
+  border-top: 1px solid var(--border-1);
+  color: var(--text-3);
+  font-size: var(--fs-12);
+}
+
+/* ---------- 指标卡 ---------- */
+
+.ferry-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--sp-3);
+}
+
+.ferry-stat {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px 18px 15px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-1);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-1);
+  overflow: hidden;
+  transition: border-color var(--dur-base) var(--ease-out), box-shadow var(--dur-base) var(--ease-out),
+    transform var(--dur-base) var(--ease-out);
+}
+
+.ferry-stat:hover {
+  border-color: var(--border-2);
+  box-shadow: var(--shadow-2);
+  transform: translateY(-1px);
+}
+
+.ferry-stat__label {
+  font-size: var(--fs-12);
+  color: var(--text-3);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ferry-stat__value {
+  font-size: 27px;
+  font-weight: 620;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  color: var(--text-1);
+  font-variant-numeric: tabular-nums;
+}
+
+.ferry-stat__unit {
+  font-size: var(--fs-13);
+  font-weight: 500;
+  color: var(--text-3);
+  margin-left: 4px;
+}
+
+.ferry-stat__hint {
+  font-size: var(--fs-12);
+  color: var(--text-3);
+  line-height: 1.5;
+}
+
+.ferry-stat__stripe {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  background: var(--border-2);
+}
+
+.ferry-stat[data-tone='primary'] .ferry-stat__stripe {
+  background: linear-gradient(180deg, var(--brand-5), var(--brand-7));
+}
+.ferry-stat[data-tone='success'] .ferry-stat__stripe {
+  background: linear-gradient(180deg, #34d399, var(--color-success));
+}
+.ferry-stat[data-tone='warning'] .ferry-stat__stripe {
+  background: linear-gradient(180deg, #fbbf24, var(--color-warning));
+}
+.ferry-stat[data-tone='danger'] .ferry-stat__stripe {
+  background: linear-gradient(180deg, #f87171, var(--color-danger));
+}
+
+.ferry-delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: var(--fs-12);
+  font-weight: 500;
+}
+
+.ferry-delta--up {
+  color: var(--color-danger);
+}
+.ferry-delta--down {
+  color: var(--color-success);
+}
+
+/* ---------- 工作台 ---------- */
+
+.ferry-workbench {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: var(--sp-4);
+  align-items: start;
+}
+
+.ferry-kv {
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 24px;
+}
+
+.ferry-kv > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 11px 0;
+  border-bottom: 1px dashed var(--border-1);
+}
+
+.ferry-kv dt {
+  font-size: var(--fs-12);
+  color: var(--text-3);
+  white-space: nowrap;
+}
+
+.ferry-kv dd {
+  margin: 0;
+  font-size: var(--fs-13);
+  font-weight: 500;
+  color: var(--text-1);
+  text-align: right;
+}
+
+/* 侧边菜单里的「规划中」标记 */
+.ferry-menu__planned {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  justify-content: space-between;
+}
+
+.ferry-menu__planned-tag {
+  font-size: 10px;
+  line-height: 1;
+  padding: 2px 5px;
+  border-radius: var(--r-xs);
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-1);
+  color: var(--text-4);
+  letter-spacing: 0.02em;
+}
+
+/* ---------- 个人中心 ---------- */
+
+.ferry-profile {
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr);
+  gap: var(--sp-4);
+  align-items: start;
+}
+
+/* ---------- 两栏布局（左树右表） ---------- */
+
+.ferry-split {
+  display: grid;
+  grid-template-columns: 248px minmax(0, 1fr);
+  gap: var(--sp-3);
+  align-items: start;
+}
+
+.ferry-split__aside {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-1);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-1);
+  overflow: hidden;
+  position: sticky;
+  top: 0;
+}
+
+.ferry-split__aside-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border-1);
+  font-size: var(--fs-13);
+  font-weight: 600;
+  color: var(--text-1);
+}
+
+.ferry-tree-scroll {
+  padding: 8px 8px 12px;
+  max-height: calc(100vh - 260px);
+  overflow: auto;
+}
+
+/**
+ * 侧栏目录树的行距。
+ *
+ * antd 给每个 .ant-tree-treenode 加了 margin-bottom: treeNodePadding（= paddingXS/2 = 4px），
+ * 叠在行高之上把行节奏推到 34px，窄侧栏里既浪费纵向空间、又让层级多的树很快撑出滚动条。
+ * 这里只作用于 .ferry-tree-scroll（组织架构 / 行政区划 / 字典这类窄列筛选树），
+ * 保留 2px 缝隙让选中态色块之间还能看出分界；内容区里的权限树等不受影响。
+ */
+.ferry-tree-scroll .ant-tree .ant-tree-treenode {
+  margin-bottom: 2px;
+}
+
+/**
+ * TreeSelect 下拉（上级菜单 / 上级部门）里的树前缀是 ant-select-tree，不是 ant-tree，
+ * 上面那条行距规则覆盖不到它，这里补上同样的 2px。
+ * 行高与缩进由 theme.ts 的 TreeSelect token 与侧栏树对齐；
+ * 选择器多一层 list-holder-inner，避免被 antd 运行时注入的样式反覆盖。
+ */
+.ant-select-dropdown .ant-select-tree .ant-select-tree-list-holder-inner > .ant-select-tree-treenode {
+  margin-bottom: 2px;
+}
+
+/**
+ * 字典分组树：分组只有一层，节点全是叶子，switcher 恒为 noop（28px 空占位）。
+ * 这里把占位去掉，名称贴左、字典码贴右，窄侧栏里能多露出几个字符。
+ *
+ * 只作用于字典页侧栏：用户管理页的部门树同样用 .ferry-tree-scroll，但它有多级子节点，
+ * 全局隐藏 noop 会让子级少掉一层缩进、和父级文字齐平。
+ */
+.ferry-split__aside--dict .ferry-tree-scroll .ant-tree-switcher-noop {
+  display: none;
+}
+
+.ferry-split__aside--dict .ant-tree-node-content-wrapper {
+  min-width: 0;
+}
+
+.ferry-split__aside--dict .ant-tree-title {
+  display: block;
+  min-width: 0;
+}
+
+.ferry-dict-node {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+}
+
+.ferry-dict-node__label {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.ferry-dict-node__code {
+  flex: 0 0 auto;
+  margin-left: auto;
+  font-size: 10.5px;
+  color: var(--text-4);
+}
+
+/* ---------- 快捷入口卡 ---------- */
+
+.ferry-quick-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--sp-2);
+}
+
+.ferry-quick {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--border-1);
+  border-radius: var(--r-md);
+  background: var(--bg-surface);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out);
+}
+
+.ferry-quick:hover {
+  border-color: var(--color-primary-border);
+  background: var(--bg-subtle);
+}
+
+.ferry-quick__icon {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 auto;
+  border-radius: var(--r-md);
+  background: var(--color-primary-bg);
+  color: var(--color-primary);
+}
+
+.ferry-quick__text {
+  min-width: 0;
+}
+
+.ferry-quick__label {
+  font-size: var(--fs-13);
+  font-weight: 550;
+  color: var(--text-1);
+}
+
+.ferry-quick__desc {
+  font-size: var(--fs-12);
+  color: var(--text-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---------- 活动流 ---------- */
+
+.ferry-feed {
+  display: flex;
+  flex-direction: column;
+}
+
+.ferry-feed__item {
+  display: flex;
+  gap: 10px;
+  padding: 11px 0;
+  border-bottom: 1px dashed var(--border-1);
+}
+
+.ferry-feed__item:last-child {
+  border-bottom: none;
+}
+
+.ferry-feed__dot {
+  margin-top: 5px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+  background: var(--text-4);
+}
+
+.ferry-feed__dot[data-type='create'] {
+  background: var(--color-success);
+}
+.ferry-feed__dot[data-type='delete'] {
+  background: var(--color-danger);
+}
+.ferry-feed__dot[data-type='auth'] {
+  background: var(--color-warning);
+}
+.ferry-feed__dot[data-type='export'] {
+  background: #7c3aed;
+}
+.ferry-feed__dot[data-type='login'] {
+  background: var(--brand-6);
+}
+
+.ferry-feed__body {
+  min-width: 0;
+  flex: 1;
+}
+
+.ferry-feed__text {
+  font-size: var(--fs-13);
+  color: var(--text-1);
+  line-height: 1.5;
+}
+
+.ferry-feed__meta {
+  margin-top: 2px;
+  font-size: var(--fs-12);
+  color: var(--text-3);
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* ---------- 空状态 / 占位 ---------- */
+
+.ferry-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 56px 24px;
+  text-align: center;
+  color: var(--text-3);
+}
+
+.ferry-placeholder__title {
+  font-size: var(--fs-14);
+  font-weight: 550;
+  color: var(--text-2);
+}
+
+/* ---------- 命令面板 ---------- */
+
+.ferry-palette-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  background: rgba(10, 18, 32, 0.34);
+  backdrop-filter: blur(3px);
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding-top: 12vh;
+  animation: ferry-fade-in var(--dur-base) var(--ease-out);
+}
+
+@keyframes ferry-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.ferry-palette {
+  width: min(560px, calc(100vw - 48px));
+  background: var(--bg-surface);
+  border: 1px solid var(--border-1);
+  border-radius: var(--r-xl);
+  box-shadow: var(--shadow-3);
+  overflow: hidden;
+  animation: ferry-pop var(--dur-base) var(--ease-out);
+}
+
+@keyframes ferry-pop {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.ferry-palette__input {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border-1);
+  color: var(--text-3);
+}
+
+.ferry-palette__input input {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: var(--fs-14);
+  color: var(--text-1);
+  font-family: inherit;
+}
+
+.ferry-palette__list {
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 6px;
+}
+
+.ferry-palette__group {
+  padding: 8px 10px 4px;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-4);
+}
+
+.ferry-palette__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  border-radius: var(--r-md);
+  cursor: pointer;
+  color: var(--text-2);
+  font-size: var(--fs-13);
+}
+
+.ferry-palette__item[data-active='true'] {
+  background: var(--color-primary-bg);
+  color: var(--color-primary-ink);
+}
+
+.ferry-palette__item-icon {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--r-sm);
+  background: var(--bg-subtle);
+  color: var(--text-2);
+  flex: 0 0 auto;
+}
+
+.ferry-palette__item[data-active='true'] .ferry-palette__item-icon {
+  background: rgba(255, 255, 255, 0.7);
+  color: var(--color-primary);
+}
+
+[data-theme='dark'] .ferry-palette__item[data-active='true'] .ferry-palette__item-icon {
+  background: rgba(22, 119, 255, 0.2);
+}
+
+.ferry-palette__empty {
+  padding: 28px 16px;
+  text-align: center;
+  color: var(--text-3);
+  font-size: var(--fs-13);
+}
+
+.ferry-palette__foot {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 14px;
+  border-top: 1px solid var(--border-1);
+  background: var(--bg-subtle);
+  color: var(--text-3);
+  font-size: 11.5px;
+}
+
+/* ============================================================
+   登录页
+   ============================================================ */
+
+.ferry-login {
+  display: grid;
+  grid-template-columns: minmax(0, 1.08fr) minmax(440px, 0.92fr);
+  min-height: 100vh;
+  background: var(--bg-surface);
+}
+
+/* 左：品牌画布 */
+.ferry-login__brand {
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(120% 90% at 12% 8%, rgba(53, 182, 255, 0.28) 0%, transparent 55%),
+    radial-gradient(100% 80% at 88% 96%, rgba(83, 109, 254, 0.34) 0%, transparent 58%),
+    linear-gradient(148deg, #06152e 0%, #0a2450 42%, #0b3a74 78%, #0a4f96 100%);
+  color: #eaf2ff;
+  padding: 48px 56px 44px;
+  display: flex;
+  flex-direction: column;
+  isolation: isolate;
+}
+
+.ferry-login__grid {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  background-image: linear-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.045) 1px, transparent 1px);
+  background-size: 56px 56px;
+  mask-image: radial-gradient(80% 60% at 30% 20%, #000 10%, transparent 78%);
+}
+
+.ferry-login__waves {
+  position: absolute;
+  inset: auto 0 0 0;
+  z-index: -1;
+  height: 46%;
+  opacity: 0.9;
+  pointer-events: none;
+}
+
+.ferry-login__wave {
+  animation: ferry-wave 18s linear infinite;
+  transform-origin: center;
+}
+
+.ferry-login__wave--slow {
+  animation-duration: 26s;
+  animation-direction: reverse;
+  opacity: 0.55;
+}
+
+@keyframes ferry-wave {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-80px);
+  }
+}
+
+.ferry-login__brand-top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  position: relative;
+  z-index: 1;
+}
+
+.ferry-login__wordmark {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+}
+
+.ferry-login__wordmark strong {
+  font-size: 17px;
+  letter-spacing: 0.02em;
+  font-weight: 650;
+}
+
+.ferry-login__wordmark span {
+  font-size: 10.5px;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: rgba(234, 242, 255, 0.55);
+}
+
+.ferry-login__brand-body {
+  margin: auto 0;
+  position: relative;
+  z-index: 1;
+  max-width: 520px;
+  padding-bottom: 8px;
+}
+
+.ferry-login__eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: rgba(234, 242, 255, 0.72);
+  padding: 4px 10px 4px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: var(--r-full);
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(4px);
+}
+
+.ferry-login__eyebrow-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #4ade80;
+  box-shadow: 0 0 0 4px rgba(74, 222, 128, 0.16);
+}
+
+.ferry-login__headline {
+  margin-top: 20px;
+  font-size: clamp(30px, 3vw, 40px);
+  line-height: 1.22;
+  font-weight: 620;
+  letter-spacing: -0.02em;
+  color: #f4f8ff;
+}
+
+.ferry-login__headline em {
+  font-style: normal;
+  background: linear-gradient(96deg, #8fd4ff 0%, #c7e2ff 55%, #ffffff 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.ferry-login__lede {
+  margin-top: 16px;
+  font-size: 14px;
+  line-height: 1.8;
+  color: rgba(226, 238, 255, 0.72);
+  max-width: 460px;
+}
+
+.ferry-login__pillars {
+  margin-top: 28px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 20px;
+  max-width: 480px;
+}
+
+.ferry-login__pillar {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  font-size: 12.5px;
+  color: rgba(226, 238, 255, 0.82);
+  line-height: 1.5;
+}
+
+.ferry-login__pillar svg {
+  flex: 0 0 auto;
+  margin-top: 2px;
+  color: #8fd4ff;
+}
+
+.ferry-login__brand-foot {
+  margin-top: 36px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 11.5px;
+  color: rgba(226, 238, 255, 0.45);
+  position: relative;
+  z-index: 1;
+}
+
+.ferry-login__brand-foot span + span::before {
+  content: '·';
+  margin-right: 10px;
+  opacity: 0.6;
+}
+
+/* 右：表单区 */
+.ferry-login__panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  padding: 40px 48px 36px;
+  background: var(--bg-surface);
+}
+
+.ferry-login__panel-top {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  font-size: var(--fs-12);
+  color: var(--text-3);
+}
+
+.ferry-login__form-wrap {
+  margin: auto;
+  width: min(368px, 100%);
+  animation: ferry-fade-up 520ms var(--ease-out) both;
+}
+
+.ferry-login__title {
+  font-size: 26px;
+  font-weight: 620;
+  letter-spacing: -0.02em;
+  color: var(--text-1);
+  line-height: 1.25;
+}
+
+.ferry-login__form {
+  margin-top: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/*
+ * 表单项间距统一交给 flex gap，抵消 antd 默认 24px 下边距。
+ * antd 垂直布局给 label 元素强制 height=36px（单行文字仅 22px），会白占 14px，
+ * 这里一并压回 auto；选择器带 .ferry-login 前缀以压过 antd 运行时注入的同等优先级规则。
+ */
+.ferry-login .ferry-login__form .ant-form-item {
+  margin-bottom: 0;
+}
+
+.ferry-login .ferry-login__form .ant-form-item-label {
+  padding: 0 0 4px;
+}
+
+.ferry-login .ferry-login__form .ant-form-item-label > label {
+  height: auto;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.ferry-login .ferry-login__form .ant-form-item-extra {
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.ferry-login__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: -2px;
+}
+
+.ferry-login__captcha {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.ferry-login__captcha-img {
+  flex: 0 0 132px;
+  height: 40px;
+  border: 1px solid var(--border-1);
+  border-radius: var(--r-md);
+  overflow: hidden;
+  cursor: pointer;
+  background: var(--bg-subtle);
+  display: grid;
+  place-items: center;
+  transition: border-color var(--dur-fast) var(--ease-out);
+}
+
+.ferry-login__captcha-img:hover {
+  border-color: var(--color-primary-border);
+}
+
+.ferry-login__captcha-img img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.ferry-login__hint {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+  padding: 9px 12px;
+  border-radius: var(--r-md);
+  background: var(--bg-subtle);
+  border: 1px dashed var(--border-1);
+  font-size: var(--fs-12);
+  color: var(--text-3);
+  line-height: 1.5;
+}
+
+.ferry-login__hint code {
+  font-family: var(--font-mono);
+  color: var(--text-2);
+  background: var(--bg-surface);
+  padding: 1px 5px;
+  border-radius: var(--r-xs);
+  border: 1px solid var(--border-1);
+}
+
+.ferry-login__panel-foot {
+  margin-top: auto;
+  padding-top: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11.5px;
+  color: var(--text-4);
+}
+
+.ferry-login__error {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: var(--r-md);
+  background: var(--color-danger-bg);
+  border: 1px solid var(--color-danger-border);
+  color: #b42318;
+  font-size: var(--fs-13);
+  line-height: 1.5;
+  animation: ferry-shake 260ms var(--ease-out);
+}
+
+/* 服务不可用横幅：位于表单顶部，跨整行，不与某个具体字段绑定 */
+.ferry-login__error--banner {
+  margin-bottom: 16px;
+  align-items: flex-start;
+}
+
+.ferry-login__error--banner strong {
+  margin-bottom: 2px;
+}
+
+/* 验证码 / 错误块紧贴字段，去掉上边距避免撑高表单 */
+.ferry-login__error + .ant-form-item,
+.ant-form-item .ferry-login__error {
+  margin-top: 6px;
+}
+
+@keyframes ferry-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-4px);
+  }
+  75% {
+    transform: translateX(4px);
+  }
+}
+
+/* ============================================================
+   Ant Design 局部收敛（只改观感，不改交互）
+   ============================================================ */
+
+.ant-table-wrapper .ant-table {
+  font-size: var(--fs-13);
+}
+
+.ant-table-wrapper .ant-table-thead > tr > th {
+  font-weight: 550;
+  font-size: var(--fs-12);
+  letter-spacing: 0.02em;
+  text-transform: none;
+  white-space: nowrap;
+}
+
+.ant-table-wrapper .ant-table-tbody > tr > td {
+  border-bottom-color: var(--border-1);
+}
+
+.ant-table-wrapper .ant-table-tbody > tr:hover > td {
+  background: var(--bg-subtle) !important;
+}
+
+.ant-table-wrapper .ant-table-cell-fix-right,
+.ant-table-wrapper .ant-table-cell-fix-left {
+  background: var(--bg-surface);
+}
+
+.ant-table-wrapper .ant-pagination {
+  margin: 0 !important;
+}
+
+.ant-btn {
+  font-weight: 500;
+  box-shadow: none;
+}
+
+.ant-btn-primary {
+  box-shadow: 0 1px 2px rgba(22, 119, 255, 0.24);
+}
+
+.ant-modal .ant-modal-content {
+  padding: 0;
+  overflow: hidden;
+}
+
+.ant-modal .ant-modal-header {
+  margin: 0;
+  padding: 18px 22px 14px;
+  border-bottom: 1px solid var(--border-1);
+}
+
+.ant-modal .ant-modal-body {
+  padding: 20px 22px;
+}
+
+.ant-modal .ant-modal-footer {
+  margin: 0;
+  padding: 12px 22px 18px;
+  border-top: 1px solid var(--border-1);
+}
+
+.ant-drawer .ant-drawer-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border-1);
+}
+
+.ant-drawer .ant-drawer-body {
+  padding: 20px;
+}
+
+.ant-form-item-label > label {
+  font-size: var(--fs-13);
+  color: var(--text-2);
+  font-weight: 500;
+}
+
+.ant-tag {
+  border-radius: var(--r-sm);
+  font-size: var(--fs-12);
+  margin-inline-end: 0;
+}
+
+.ant-picker,
+.ant-input,
+.ant-input-affix-wrapper,
+.ant-select-selector {
+  font-size: var(--fs-13) !important;
+}
+
+.ant-descriptions .ant-descriptions-item-label {
+  color: var(--text-3);
+  font-size: var(--fs-12);
+}
+
+.ant-tabs .ant-tabs-tab {
+  font-size: var(--fs-13);
+}
+
+/* 状态点 */
+.ferry-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  font-size: var(--fs-12);
+  color: var(--text-2);
+}
+
+.ferry-status__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-4);
+}
+
+.ferry-status[data-tone='success'] .ferry-status__dot {
+  background: var(--color-success);
+  box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.12);
+}
+
+.ferry-status[data-tone='danger'] .ferry-status__dot {
+  background: var(--color-danger);
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.12);
+}
+
+.ferry-status[data-tone='warning'] .ferry-status__dot {
+  background: var(--color-warning);
+  box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.12);
+}
+
+/* 权限矩阵 */
+.ferry-matrix {
+  display: grid;
+  gap: 8px;
+}
+
+.ferry-matrix__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 190px;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 12px;
+  border: 1px solid var(--border-1);
+  border-radius: var(--r-md);
+  background: var(--bg-surface);
+}
+
+.ferry-matrix__row[data-active='false'] {
+  background: var(--bg-subtle);
+  color: var(--text-3);
+}
+
+.ferry-matrix__app {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ferry-matrix__code {
+  font-family: var(--font-mono);
+  font-size: var(--fs-12);
+  color: var(--text-3);
+}
+
+.ferry-matrix__envs {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+/* 差异对比 */
+.ferry-diff {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.ferry-diff__pane {
+  border: 1px solid var(--border-1);
+  border-radius: var(--r-md);
+  overflow: hidden;
+  background: var(--bg-surface);
+}
+
+.ferry-diff__head {
+  padding: 8px 12px;
+  font-size: var(--fs-12);
+  font-weight: 550;
+  color: var(--text-2);
+  background: var(--bg-subtle);
+  border-bottom: 1px solid var(--border-1);
+}
+
+.ferry-diff__body {
+  margin: 0;
+  padding: 12px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--text-2);
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 320px;
+  overflow: auto;
+}
+
+/* 响应式：1280 为设计下限，低于此值仅压缩留白 */
+@media (max-width: 1440px) {
+  .ferry-content {
+    padding: 16px 18px 28px;
+  }
+}
+
+@media (max-width: 1100px) {
+  .ferry-login {
+    grid-template-columns: 1fr;
+  }
+
+  .ferry-login__brand {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

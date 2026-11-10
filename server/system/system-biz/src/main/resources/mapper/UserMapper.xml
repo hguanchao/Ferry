@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ferry.system.biz.mapper.UserMapper">
+    <resultMap id="BaseResultMap" type="com.ferry.system.api.entity.User">
+        <!--@mbg.generated-->
+        <!--@Table sys_user-->
+        <id column="id" jdbcType="BIGINT" property="id"/>
+        <result column="tenant_id" jdbcType="VARCHAR" property="tenantId"/>
+        <result column="account" jdbcType="VARCHAR" property="account"/>
+        <result column="password" jdbcType="VARCHAR" property="password"/>
+        <result column="nickname" jdbcType="VARCHAR" property="nickname"/>
+        <result column="avatar" jdbcType="VARCHAR" property="avatar"/>
+        <result column="email" jdbcType="VARCHAR" property="email"/>
+        <result column="phone" jdbcType="VARCHAR" property="phone"/>
+        <result column="birthday" jdbcType="DATE" property="birthday"/>
+        <result column="gender" jdbcType="TINYINT" property="gender"/>
+        <result column="address" jdbcType="VARCHAR" property="address"/>
+        <result column="is_super" jdbcType="TINYINT" property="isSuper"/>
+        <result column="status" jdbcType="TINYINT" property="status"/>
+        <result column="dept_id" jdbcType="VARCHAR" property="deptId"/>
+        <result column="post_id" jdbcType="VARCHAR" property="postId"/>
+        <result column="oauth_id" jdbcType="VARCHAR" property="oauthId"/>
+        <result column="create_user" jdbcType="BIGINT" property="createUser"/>
+        <result column="create_time" jdbcType="TIMESTAMP" property="createTime"/>
+        <result column="update_user" jdbcType="BIGINT" property="updateUser"/>
+        <result column="update_time" jdbcType="TIMESTAMP" property="updateTime"/>
+        <result column="is_deleted" jdbcType="TINYINT" property="isDeleted"/>
+    </resultMap>
+    <sql id="Base_Column_List">
+        <!--@mbg.generated-->
+        id, tenant_id, account, password, nickname, avatar, email, phone, birthday, gender, address,
+        is_super, status, dept_id, post_id, oauth_id, create_user, create_time, update_user, update_time,
+        is_deleted
+    </sql>
+
+    <select id="selectByTenantIdAndUsername" resultType="com.ferry.system.api.entity.User">
+        SELECT id,
+               tenant_id AS tenantId,
+               account,
+               `password`,
+               nickname,
+               avatar,
+               is_super  AS isSuper,
+               `status`,
+               dept_id   AS deptId,
+               post_id   AS postId
+        FROM sys_user
+        WHERE is_deleted = 0
+          AND tenant_id = #{tenantId}
+          AND account = #{account}
+    </select>
+
+    <select id="selectPermissionsById" resultType="com.ferry.system.api.vo.tree.MenuTree">
+        SELECT DISTINCT m.id,
+                        m.tenant_id   AS tenantId,
+                        m.parent_id   AS parentId,
+                        m.`name`,
+                        m.type,
+                        m.icon,
+                        m.path,
+                        m.component,
+                        m.perms,
+                        m.is_show     AS isShow,
+                        m.is_frame    AS isFrame,
+                        m.is_cache    AS isCache,
+                        m.`status`,
+                        m.sort,
+                        m.create_time AS createTime
+        FROM sys_menu m
+                 LEFT JOIN sys_role_menu rm ON rm.menu_id = m.id
+                 LEFT JOIN sys_user_role ur ON ur.role_id = rm.role_id
+        <where>
+            m.is_deleted = 0
+              AND m.`status` = 1
+              AND m.tenant_id = #{tenantId}
+            <if test="isSuper == 0">
+                AND ur.user_id = #{id}
+            </if>
+        </where>
+    </select>
+</mapper>

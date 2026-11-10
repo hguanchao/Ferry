@@ -1,0 +1,149 @@
+/* ============================================================
+   渡口 Ferry · 设计令牌
+   基于 Ant Design 设计规范（8px 模度 / 24 栅格 / 克制色彩），
+   叠加 2026 企业级 SaaS 的「冷静极简」：单一品牌色、低饱和中性色、
+   极轻阴影、语义化层级。组件库只做底座，视觉判断在这里统一收口。
+   ============================================================ */
+
+:root {
+  /* ---------- 品牌色阶（Ant blue 1-9） ---------- */
+  --brand-1: #e6f4ff;
+  --brand-2: #bae0ff;
+  --brand-3: #91caff;
+  --brand-4: #69b1ff;
+  --brand-5: #4096ff;
+  --brand-6: #1677ff;
+  --brand-7: #0958d9;
+  --brand-8: #003eb3;
+  --brand-9: #001d66;
+
+  --color-primary: var(--brand-6);
+  --color-primary-hover: var(--brand-5);
+  --color-primary-active: var(--brand-7);
+  --color-primary-bg: var(--brand-1);
+  --color-primary-border: var(--brand-3);
+  --color-primary-ink: #0b4fc4;
+
+  /* ---------- 功能色：对信息语义负责，不参与装饰 ---------- */
+  --color-success: #16a34a;
+  --color-success-bg: #ecfdf3;
+  --color-success-border: #bbf7d0;
+  --color-warning: #d97706;
+  --color-warning-bg: #fffaeb;
+  --color-warning-border: #fde68a;
+  --color-danger: #dc2626;
+  --color-danger-hover: #ef4444;
+  --color-danger-bg: #fef2f2;
+  --color-danger-border: #fecaca;
+  --color-info: var(--brand-6);
+  --color-info-bg: var(--brand-1);
+
+  /* ---------- 文本：四级层次，正文与辅助文字均满足 WCAG AA ---------- */
+  --text-1: #101828;
+  --text-2: #475467;
+  --text-3: #7a8699;
+  --text-4: #a4aebd;
+  --text-inverse: #ffffff;
+
+  /* ---------- 背景与边框 ---------- */
+  --bg-page: #f4f6fa;
+  --bg-surface: #ffffff;
+  --bg-subtle: #f8fafc;
+  --bg-hover: #f2f5f9;
+  --bg-active: var(--brand-1);
+  --bg-mask: rgba(16, 24, 40, 0.45);
+  --bg-deep: #071a35;
+
+  --border-1: #e8ecf2;
+  --border-2: #d8dfe9;
+  --border-3: #c2cbd8;
+
+  /* ---------- 阴影：只做层级提示，不做装饰 ---------- */
+  --shadow-1: 0 1px 2px rgba(16, 24, 40, 0.04), 0 1px 3px rgba(16, 24, 40, 0.05);
+  --shadow-2: 0 4px 10px rgba(16, 24, 40, 0.06), 0 1px 3px rgba(16, 24, 40, 0.04);
+  --shadow-3: 0 16px 40px rgba(16, 24, 40, 0.12), 0 4px 10px rgba(16, 24, 40, 0.05);
+  --shadow-focus: 0 0 0 3px rgba(22, 119, 255, 0.14);
+
+  /* ---------- 圆角 ---------- */
+  --r-xs: 4px;
+  --r-sm: 6px;
+  --r-md: 8px;
+  --r-lg: 12px;
+  --r-xl: 16px;
+  --r-full: 999px;
+
+  /* ---------- 间距（8px 模度，4px 用于紧凑场景） ---------- */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 24px;
+  --sp-8: 32px;
+  --sp-10: 40px;
+  --sp-12: 48px;
+
+  /* ---------- 字体 ---------- */
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
+    'Hiragino Sans GB', 'Microsoft YaHei', 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: 'JetBrains Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+
+  --fs-12: 12px;
+  --fs-13: 13px;
+  --fs-14: 14px;
+  --fs-16: 16px;
+  --fs-18: 18px;
+  --fs-20: 20px;
+  --fs-24: 24px;
+  --fs-28: 28px;
+  --fs-32: 32px;
+
+  --lh-tight: 1.25;
+  --lh-normal: 1.5715;
+  --lh-relaxed: 1.7;
+
+  /* ---------- 布局 ---------- */
+  --sider-width: 232px;
+  --sider-collapsed: 72px;
+  --header-height: 56px;
+  --content-max: 1600px;
+
+  /* ---------- 动效：克制的 160-220ms ---------- */
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --dur-fast: 120ms;
+  --dur-base: 180ms;
+  --dur-slow: 320ms;
+}
+
+/* 深色模式：只翻转表面与文本，品牌色保持稳定 */
+[data-theme='dark'] {
+  --text-1: #eef2f8;
+  --text-2: #b6c0d0;
+  --text-3: #8b97a9;
+  --text-4: #6b7789;
+
+  --bg-page: #0b1220;
+  --bg-surface: #121a2a;
+  --bg-subtle: #172032;
+  --bg-hover: #1b2537;
+  --bg-active: rgba(22, 119, 255, 0.16);
+  --bg-mask: rgba(3, 8, 18, 0.6);
+
+  --border-1: #232e42;
+  --border-2: #2d3a51;
+  --border-3: #3b4a63;
+
+  --color-primary-bg: rgba(22, 119, 255, 0.16);
+  --color-primary-ink: #7cb3ff;
+  --color-success-bg: rgba(22, 163, 74, 0.16);
+  --color-success-border: rgba(22, 163, 74, 0.32);
+  --color-warning-bg: rgba(217, 119, 6, 0.16);
+  --color-warning-border: rgba(217, 119, 6, 0.34);
+  --color-danger-bg: rgba(220, 38, 38, 0.16);
+  --color-danger-border: rgba(220, 38, 38, 0.34);
+
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-2: 0 4px 12px rgba(0, 0, 0, 0.42);
+  --shadow-3: 0 18px 44px rgba(0, 0, 0, 0.5);
+}

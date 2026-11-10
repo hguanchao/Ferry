@@ -1,0 +1,287 @@
+/**
+ * 接口契约类型
+ *
+ * 与 server/system、server/auth 的 VO / DTO 一一对应；后端 Jackson 已把 Long 统一序列化为字符串，
+ * 因此前端所有 id 一律按 string 处理，避免 18 位主键在 JS 中丢精度。
+ */
+
+export type ID = string
+
+export interface ApiEnvelope<T> {
+  code: number
+  data: T
+  msg: string
+}
+
+export interface ApiPage<T> {
+  records: T[]
+  total: number
+  size: number
+  current: number
+  pages: number
+}
+
+export interface PageQuery {
+  current?: number
+  size?: number
+}
+
+/* ------------------------------ 认证 ------------------------------ */
+
+export interface AuthPerm {
+  id: ID
+  parentId: ID
+  name: string
+  /** 0 目录 / 1 菜单 / 2 按钮 */
+  type: number
+  icon?: string | null
+  path?: string | null
+  component?: string | null
+  perms?: string | null
+  isShow?: number | null
+  isFrame?: number | null
+  isCache?: number | null
+  sort?: number | null
+}
+
+export interface AuthInfo {
+  userId: ID
+  tenantId: string
+  account: string
+  nickname: string
+  avatar?: string | null
+  email?: string | null
+  phone?: string | null
+  isSuper: number
+  tokenHeader: string
+  tokenPrefix: string
+  accessToken: string
+  permissions: AuthPerm[]
+}
+
+export interface LoginPayload {
+  grantType: 'password' | 'captcha'
+  tenantId?: string
+  account: string
+  password: string
+}
+
+/* ------------------------------ 组织与权限 ------------------------------ */
+
+export type DataScopeMode = 'all' | 'custom'
+
+export interface AppEnvPair {
+  appId: ID
+  envIds: ID[]
+}
+
+export interface DataScope {
+  mode: DataScopeMode
+  pairs: AppEnvPair[]
+  /** 生产环境操作权限，PRD 功能 30：需二次确认并填写授权理由 */
+  prodOps: boolean
+  prodOpsReason?: string
+  prodOpsGrantedAt?: string
+}
+
+export interface MenuNode {
+  id: ID
+  parentId: ID
+  name: string
+  type: number
+  icon?: string | null
+  path?: string | null
+  component?: string | null
+  perms?: string | null
+  isShow?: number | null
+  isFrame?: number | null
+  isCache?: number | null
+  status?: number | null
+  sort?: number | null
+  createTime?: string | null
+  children?: MenuNode[]
+}
+
+export interface RoleRow {
+  id: ID
+  tenantId: string
+  code: string
+  name: string
+  status: number
+  sort: number
+  createTime: string
+  remark?: string
+  /** PRD 功能 30：预设角色不可删除 */
+  builtin?: boolean
+  /**
+   * 以下三项属于 PRD 规划、后端 RoleVO 尚未下发：
+   * 菜单授权在 sys_role_menu 里，成员数在 sys_user_role 里，都需单独统计。
+   * 因此按可选处理，渲染层必须能对「未接入」和「真的为 0」给出不同表达。
+   */
+  menuIds?: ID[]
+  dataScope?: DataScope
+  memberCount?: number
+}
+
+export interface DeptNode {
+  id: ID
+  parentId: ID
+  ancestors?: string | null
+  code: string
+  name: string
+  status: number
+  sort: number
+  createTime?: string | null
+  children?: DeptNode[]
+}
+
+export interface UserRow {
+  id: ID
+  tenantId: string
+  account: string
+  nickname: string
+  avatar?: string | null
+  email?: string | null
+  phone?: string | null
+  birthday?: string | null
+  gender?: number | null
+  address?: string | null
+  isSuper: number
+  status: number
+  deptId?: string | null
+  postId?: string | null
+  roleId?: string | null
+  createTime?: string | null
+  lastLoginTime?: string | null
+}
+
+export interface PostRow {
+  id: ID
+  code: string
+  name: string
+  status: number
+  sort: number
+  createTime?: string | null
+}
+
+export interface DictNode {
+  id: ID
+  parentId: ID
+  code: string
+  label: string
+  value?: string | null
+  sort: number
+  createTime?: string | null
+  children?: DictNode[]
+}
+
+export interface ConfigRow {
+  id: ID
+  name: string
+  code: string
+  value: string
+  isInternal: number
+  createTime?: string | null
+  updateTime?: string | null
+}
+
+export interface TenantRow {
+  id: ID
+  code: string
+  name: string
+  status: number
+  createUser?: string | null
+  createTime?: string | null
+}
+
+export interface RegionNode {
+  id: ID
+  parentId: ID
+  /** 层级路径码：省 6 位 / 市 6 位 / 区县 6 位 / 街道 12 位，前缀即父级编码 */
+  code: string
+  name: string
+  status: number
+  sort: number
+  /** 是否叶子节点（无下级区划），懒加载接口返回；为 false 时表格才渲染展开图标 */
+  isLeaf?: boolean
+  createTime?: string
+  /** 仅前端使用：已懒加载到的子级，undefined 表示尚未加载 */
+  children?: RegionNode[]
+}
+
+/* ------------------------------ 审计 ------------------------------ */
+
+export interface AuditRow {
+  id: ID
+  operateTime: string
+  operator: string
+  operatorAccount: string
+  /** 新增 / 修改 / 删除 / 授权 / 导出 / 登录 */
+  operateType: string
+  objectType: string
+  objectId: string
+  objectName: string
+  action: string
+  beforeValue?: string | null
+  afterValue?: string | null
+  ip: string
+  ticketNo?: string | null
+  result: '成功' | '失败'
+  remark?: string
+}
+
+/* ------------------------------ 应用与环境（数据权限矩阵用） ------------------------------ */
+
+export interface AppRow {
+  id: ID
+  code: string
+  name: string
+  team: string
+  owner: string
+  envIds: ID[]
+  core: boolean
+}
+
+export interface EnvRow {
+  id: ID
+  name: string
+  type: 'test' | 'staging' | 'prod'
+  short: string
+}
+
+/* ------------------------------ 工作台 ------------------------------ */
+
+export interface WorkbenchStat {
+  key: string
+  label: string
+  value: number
+  unit?: string
+  delta?: number
+  hint?: string
+  tone?: 'primary' | 'success' | 'warning' | 'danger' | 'default'
+}
+
+export interface WorkbenchActivity {
+  id: ID
+  time: string
+  operator: string
+  text: string
+  type: 'create' | 'update' | 'delete' | 'auth' | 'export' | 'login'
+  target: string
+}
+
+export interface WorkbenchOverview {
+  greeting: string
+  stats: WorkbenchStat[]
+  activities: WorkbenchActivity[]
+  shortcuts: Array<{ key: string; label: string; desc: string; path: string; perm?: string }>
+  system: {
+    version: string
+    env: string
+    accounts: number
+    roles: number
+    menus: number
+    auditRetention: string
+    lastBackup: string
+  }
+}
