@@ -22,10 +22,13 @@
         update_time, is_deleted
     </sql>
 
-    <select id="selectUserCountById" resultType="long">
+    <select id="selectUserCountByIds" resultType="long">
         SELECT COUNT(1)
         FROM sys_user
         WHERE is_deleted = 0
-          AND post_id = #{id}
+          AND post_id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
     </select>
 </mapper>

@@ -51,11 +51,9 @@ public class PostServiceImpl extends ServiceImpl<PostMapper, Post> implements IP
             throw new ServiceException("请选择要删除的岗位");
         }
         // 用户表按岗位id关联，删岗位后这些 id 会悬空，先拦住
-        for (Long id : ids) {
-            long userCount = baseMapper.selectUserCountById(id);
-            if (userCount > IntConst.ZERO) {
-                throw new ServiceException("岗位下存在用户，请先调整用户所在岗位");
-            }
+        long userCount = baseMapper.selectUserCountByIds(ids);
+        if (userCount > IntConst.ZERO) {
+            throw new ServiceException("岗位下存在用户，请先调整用户所在岗位");
         }
         return removeByIds(ids);
     }

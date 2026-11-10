@@ -21,9 +21,7 @@ import com.ferry.system.biz.wrapper.DictWrapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 
 import static com.ferry.common.core.constant.SysConst.TOP_PARENT_ID;
 
@@ -61,22 +59,28 @@ public class DictServiceImpl extends ServiceImpl<DictMapper, Dict> implements ID
         if (TreeUtil.isRoot(dict.getParentId())) {
             dict.setParentId(TOP_PARENT_ID);
             // 字典码属于分组：分组之间必须唯一，否则按编码取字典会命中多个分组
-            long count = count(Wrappers.<Dict>lambdaQuery()
-                    .eq(Dict::getParentId, TOP_PARENT_ID)
-                    .eq(Dict::getCode, dict.getCode())
-                    .ne(ObjUtil.isNotEmpty(dict.getId()), Dict::getId, dict.getId()));
+            long count = count(Wrappers.<Dict>lambdaQuery().eq(Dict::getParentId, TOP_PARENT_ID)
+                    .eq(Dict::getCode, dict.getCode()).ne(ObjUtil.isNotEmpty(dict.getId()), Dict::getId, dict.getId()));
             if (count > IntConst.ZERO) {
                 throw new ServiceException("字典编码[" + dict.getCode() + "]已存在");
             }
         } else {
             // 字典项没有独立字典码，统一继承所属分组；前端不再提供该字段
             Dict parent = getById(dict.getParentId());
-            if (ObjUtil.isEmpty(parent)) {
-                throw new ServiceException("所属字典分组不存在");
+            // 字典只有「分组 → 字典项」两层：父级本身也得挂在根上，否则第三层躲过删除
+            if (ObjUtil.isEmpty(parent) || !TreeUtil.isRoot(parent.getParentId())) {
+                throw new ServiceException("字典项只能挂在字典分组下");
             }
             dict.setCode(parent.getCode());
         }
-        return saveOrUpdate(dict);
+        boolean isSuccess = saveOrUpdate(dict);
+        boolean isGroupEdit = TreeUtil.isRoot(dict.getParentId()) && ObjUtil.isNotEmpty(dict.getId());
+        if (isSuccess && isGroupEdit) {
+            // 分组改码时字典项的 code 要跟着换，否则按编码查字典会漏掉仍挂旧码的子项
+            update(Wrappers.<Dict>lambdaUpdate().eq(Dict::getParentId, dict.getId())
+                    .ne(Dict::getCode, dict.getCode()).set(Dict::getCode, dict.getCode()));
+        }
+        return isSuccess;
     }
 
     @Override
@@ -85,24 +89,10 @@ public class DictServiceImpl extends ServiceImpl<DictMapper, Dict> implements ID
         if (CollUtil.isEmpty(ids)) {
             throw new ServiceException("请选择要删除的字典");
         }
-        List<Dict> allDictList = list();
-        List<Long> deleteIds = new ArrayList<>(ids);
-        collectChildren(deleteIds, allDictList, ids);
-        return removeByIds(deleteIds.stream().distinct().collect(Collectors.toList()));
-    }
-
-    private void collectChildren(List<Long> deleteIds, List<Dict> allDictList, List<Long> parentIds) {
-        if (CollUtil.isEmpty(parentIds)) {
-            return;
+        boolean isSuccess = removeByIds(ids);
+        if (isSuccess) {
+            remove(Wrappers.<Dict>lambdaQuery().in(Dict::getParentId, ids));
         }
-        List<Long> childIds = allDictList.stream()
-                .filter(item -> parentIds.contains(item.getParentId()))
-                .map(Dict::getId)
-                .collect(Collectors.toList());
-        if (CollUtil.isEmpty(childIds)) {
-            return;
-        }
-        deleteIds.addAll(childIds);
-        collectChildren(deleteIds, allDictList, childIds);
+        return isSuccess;
     }
 }

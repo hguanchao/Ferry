@@ -9,14 +9,14 @@ import org.springframework.format.annotation.DateTimeFormat;
 
 import java.util.Date;
 
+/**
+ * 用户保存入参。租户不在此接收：按登录态由填充器写入，采信请求体的值会造成跨租户写人。
+ */
 @Data
 public class UserDTO {
 
     @Schema(description = "用户id")
     private Long id;
-
-    @Schema(description = "租户编码")
-    private String tenantId;
 
     @Schema(description = "用户账号")
     @NotBlank(message = "账号不能为空")

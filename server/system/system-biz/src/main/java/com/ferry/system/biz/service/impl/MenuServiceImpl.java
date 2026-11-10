@@ -11,6 +11,7 @@ import com.ferry.common.jdbc.base.ServiceImpl;
 import com.ferry.system.api.dto.MenuDTO;
 import com.ferry.system.api.dto.query.MenuQuery;
 import com.ferry.system.api.entity.Menu;
+import com.ferry.system.api.entity.Region;
 import com.ferry.system.api.enums.MenuTypeEnum;
 import com.ferry.system.api.vo.tree.MenuTree;
 import com.ferry.system.biz.mapper.MenuMapper;
@@ -21,7 +22,11 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import static com.ferry.common.core.constant.SysConst.TOP_PARENT_ID;
 
@@ -49,11 +54,22 @@ public class MenuServiceImpl extends ServiceImpl<MenuMapper, Menu> implements IM
         if (TreeUtil.isRoot(parentId)) {
             body.setParentId(TOP_PARENT_ID);
         } else {
-            if (ObjUtil.equals(parentId, body.getId())) {
-                throw new ServiceException("上级菜单不能是自身");
+            // 菜单没有路径字段：一次取出全部 id→parentId，既判上级存在，也沿父链上溯判环
+            Map<Long, Long> parents = new HashMap<>();
+            for (Menu menu : list(Wrappers.<Menu>lambdaQuery().select(Menu::getId, Menu::getParentId))) {
+                parents.put(menu.getId(), menu.getParentId());
             }
-            if (ObjUtil.isEmpty(getById(parentId))) {
+            if (!parents.containsKey(parentId)) {
                 throw new ServiceException("上级菜单不存在");
+            }
+            Long cursor = parentId;
+            Set<Long> visited = new HashSet<>();
+            // 走过的节点不再走，库里已有环也不会卡死；命中自身说明上级落在自己的子树里
+            while (!TreeUtil.isRoot(cursor) && visited.add(cursor)) {
+                if (ObjUtil.equals(cursor, body.getId())) {
+                    throw new ServiceException("上级菜单不能是自身或自身的下级");
+                }
+                cursor = parents.get(cursor);
             }
         }
         return saveOrUpdate(BeanUtil.copy(body, Menu.class));
@@ -65,11 +81,10 @@ public class MenuServiceImpl extends ServiceImpl<MenuMapper, Menu> implements IM
         if (CollUtil.isEmpty(ids)) {
             throw new ServiceException("请选择要删除的菜单");
         }
-        // 父菜单被删除后子菜单会从树上脱节，先拦住
-        long childCount = count(Wrappers.<Menu>lambdaQuery().in(Menu::getParentId, ids));
-        if (childCount > IntConst.ZERO) {
-            throw new ServiceException("存在子菜单，请先删除子菜单");
+        boolean isSuccess = removeByIds(ids);
+        if (isSuccess) {
+            remove(Wrappers.<Menu>lambdaQuery().in(Menu::getParentId, ids));
         }
-        return removeByIds(ids);
+        return isSuccess;
     }
 }

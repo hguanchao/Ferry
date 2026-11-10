@@ -9,7 +9,6 @@ import com.ferry.common.core.utils.CollUtil;
 import com.ferry.common.core.utils.ObjUtil;
 import com.ferry.common.jdbc.base.ServiceImpl;
 import com.ferry.common.jdbc.provider.Page;
-import com.ferry.common.security.utils.AuthUtil;
 import com.ferry.system.api.dto.RoleAuthorize;
 import com.ferry.system.api.dto.RoleDTO;
 import com.ferry.system.api.dto.query.RoleQuery;
@@ -47,13 +46,11 @@ public class RoleServiceImpl extends ServiceImpl<RoleMapper, Role> implements IR
     @Transactional(rollbackFor = Exception.class)
     public boolean save(RoleDTO body) {
         Role role = BeanUtil.copy(body, Role.class);
-        long count = count(Wrappers.<Role>lambdaQuery()
-                .eq(Role::getCode, role.getCode())
+        long count = count(Wrappers.<Role>lambdaQuery().eq(Role::getCode, role.getCode())
                 .ne(ObjUtil.isNotEmpty(role.getId()), Role::getId, role.getId()));
         if (count > IntConst.ZERO) {
             throw new ServiceException("角色编码[" + role.getCode() + "]已存在");
         }
-        role.setTenantId(AuthUtil.getTenantId());
         return saveOrUpdate(role);
     }
 

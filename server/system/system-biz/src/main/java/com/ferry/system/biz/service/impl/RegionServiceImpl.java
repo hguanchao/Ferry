@@ -1,5 +1,7 @@
 package com.ferry.system.biz.service.impl;
 
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.ferry.common.core.constant.IntConst;
 import com.ferry.common.core.exception.ServiceException;
 import com.ferry.common.core.utils.BeanUtil;
 import com.ferry.common.core.utils.CollUtil;
@@ -47,9 +49,7 @@ public class RegionServiceImpl extends ServiceImpl<RegionMapper, Region> impleme
     @Transactional(rollbackFor = Exception.class)
     public boolean save(RegionDTO body) {
         Region region = BeanUtil.copy(body, Region.class);
-        // 省级区域的 parentId 固定为 0，0 不是真实区域id，不能拿去查库
         if (!TreeUtil.isRoot(region.getParentId())) {
-            // 父级被删或 id 传错时，新区域会挂在树上永远懒加载不出来
             if (ObjUtil.isEmpty(getById(region.getParentId()))) {
                 throw new ServiceException("上级区域不存在");
             }
@@ -63,7 +63,11 @@ public class RegionServiceImpl extends ServiceImpl<RegionMapper, Region> impleme
         if (CollUtil.isEmpty(ids)) {
             throw new ServiceException("请选择要删除的区域");
         }
-        return removeByIds(ids);
+        boolean isSuccess = removeByIds(ids);
+        if (isSuccess) {
+            remove(Wrappers.<Region>lambdaQuery().in(Region::getParentId, ids));
+        }
+        return isSuccess;
     }
 
 }

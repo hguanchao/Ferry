@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import jakarta.validation.Valid;
 import java.util.List;
 
 @RestController
@@ -35,7 +36,7 @@ public class ConfigController {
     @PostMapping("/save")
     @PreAuthorize("system:config:save")
     @Operation(summary = "配置管理-编辑信息", description = "传入表单数据")
-    public R<String> save(@RequestBody ConfigDTO body) {
+    public R<String> save(@RequestBody @Valid ConfigDTO body) {
         boolean isSuccess = service.save(body);
         String msg = ObjUtil.isEmpty(body.getId()) ? "新增" : "修改";
         return isSuccess ? R.success(msg + "成功") : R.fail(msg + "失败");

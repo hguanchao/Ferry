@@ -55,7 +55,6 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
             Map<Long, List<Long>> userRoleMap = userRoleService.list(Wrappers.<UserRole>lambdaQuery().in(UserRole::getUserId, userIds))
                     .stream().collect(Collectors.groupingBy(UserRole::getUserId, Collectors.mapping(UserRole::getRoleId, Collectors.toList())));
             for (UserVO record : pages.getRecords()) {
-                record.setPassword(null);
                 List<Long> roleIds = userRoleMap.get(record.getId());
                 if (CollUtil.isNotEmpty(roleIds)) {
                     record.setRoleId(StrUtil.join(roleIds));
@@ -75,7 +74,6 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         List<Long> roleIds = userRoleService.list(Wrappers.<UserRole>lambdaQuery()
                 .eq(UserRole::getUserId, id), UserRole::getRoleId);
         vo.setRoleId(StrUtil.join(roleIds, StrConst.COMMA));
-        vo.setPassword(null);
         return vo;
     }
 
@@ -83,9 +81,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
     @Transactional(rollbackFor = Exception.class)
     public boolean save(UserDTO body) {
         User user = BeanUtil.copy(body, User.class);
-        long count = count(Wrappers.<User>lambdaQuery()
-                .eq(User::getAccount, user.getAccount())
-                .eq(ObjUtil.isNotEmpty(user.getTenantId()), User::getTenantId, user.getTenantId())
+        long count = count(Wrappers.<User>lambdaQuery().eq(User::getAccount, user.getAccount())
                 .ne(ObjUtil.isNotEmpty(user.getId()), User::getId, user.getId()));
         if (count > IntConst.ZERO) {
             throw new ServiceException("账号[" + user.getAccount() + "]已存在");
@@ -110,8 +106,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
                 userRoleService.authorizeRole(roleAuthorize);
             }
             // 改密或禁用之后旧令牌必须失效，否则被停用的账号仍能凭既有会话继续访问
-            boolean revokeRequired = StrUtil.isNotBlank(body.getPassword())
-                    || SysConst.IS_DISABLE.equals(user.getStatus());
+            boolean revokeRequired = StrUtil.isNotBlank(body.getPassword()) || SysConst.IS_DISABLE.equals(user.getStatus());
             if (!isCreate && revokeRequired) {
                 AuthUtil.revokeAll(user.getId());
             }

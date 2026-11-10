@@ -37,7 +37,7 @@ public class RoleMenuServiceImpl extends ServiceImpl<RoleMenuMapper, RoleMenu> i
     }
 
     @Override
-    @Transactional(rollbackFor = {Exception.class})
+    @Transactional(rollbackFor = Exception.class)
     public boolean authorizeMenu(RoleAuthorize<Long, Long> body) {
         // 给角色挂菜单等同于分配权限，只允许超管执行
         if (!AuthUtil.isSuper()) {

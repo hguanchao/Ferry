@@ -24,11 +24,14 @@
         update_user, update_time, is_deleted
     </sql>
 
-    <select id="selectUserCountById" resultType="long">
+    <select id="selectUserCountByIds" resultType="long">
         SELECT COUNT(1)
         FROM sys_user
         WHERE is_deleted = 0
-          AND dept_id = #{id}
+          AND dept_id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
     </select>
 
     <select id="selectSelfAndChildIds" resultType="java.lang.Long">
@@ -37,4 +40,11 @@
         WHERE is_deleted = 0
           AND (id = #{deptId} OR FIND_IN_SET(#{deptId}, ancestors))
     </select>
+
+    <update id="updateChildrenAncestors">
+        UPDATE sys_dept
+        SET ancestors = REPLACE(ancestors, #{oldPrefix}, #{newPrefix})
+        WHERE is_deleted = 0
+          AND FIND_IN_SET(#{deptId}, ancestors)
+    </update>
 </mapper>

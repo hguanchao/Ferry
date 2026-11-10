@@ -5,14 +5,16 @@ import com.ferry.system.api.entity.Post;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
+import java.util.List;
+
 @Mapper
 public interface PostMapper extends BaseMapper<Post> {
 
     /**
-     * 统计关联该岗位的用户数量
+     * 统计关联这些岗位的用户数量
      *
-     * @param id 岗位id
+     * @param ids 岗位id集合
      * @return long 用户数量
      */
-    long selectUserCountById(@Param("id") Long id);
+    long selectUserCountByIds(@Param("ids") List<Long> ids);
 }
