@@ -3,9 +3,10 @@ import { lazy, type ComponentType, type LazyExoticComponent } from 'react'
 /**
  * 页面组件解析：约定优于配置
  *
- * 参考 hnc-ops 的动态路由做法——后端菜单只给 component（如 `/system/User`），
- * 前端用 import.meta.glob 建立懒加载映射，按「目录小写、文件名首字母大写」的约定
- * 直接定位到 `src/pages/system/User.tsx`。新增页面只需建文件 + 配菜单，不再改注册表。
+ * 后端菜单只给 component（如 `/system/User`、`/devops/App`），前端用 import.meta.glob
+ * 建立懒加载映射，按「目录小写、文件名首字母大写」的约定定位到
+ * `src/pages/<模块>/<页面>.tsx`。新增模块要在下方 glob 数组里登记目录，
+ * 之后该模块新增页面只需建文件 + 配菜单，不必再改注册表。
  *
  * 这里必须使用 glob 而不是变量拼 import 路径：Vite 需要在构建期分析出分包边界，
  * 动态字符串会让整站落进同一个 chunk。
@@ -13,7 +14,10 @@ import { lazy, type ComponentType, type LazyExoticComponent } from 'react'
 type PageComponent = LazyExoticComponent<ComponentType>
 type PageLoader = () => Promise<{ default: ComponentType }>
 
-const MODULES = import.meta.glob<{ default: ComponentType }>('../pages/system/*.tsx')
+const MODULES = import.meta.glob<{ default: ComponentType }>([
+  '../pages/system/*.tsx',
+  '../pages/devops/*.tsx',
+])
 
 const lazyCache = new Map<string, PageComponent>()
 

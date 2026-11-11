@@ -12,6 +12,35 @@ SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;
 
 -- ----------------------------
+-- Table structure for devops_app
+-- ----------------------------
+DROP TABLE IF EXISTS `devops_app`;
+CREATE TABLE `devops_app`  (
+  `id` bigint NOT NULL COMMENT '数据id',
+  `code` varchar(40) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '应用编码，小写字母/数字/中划线，创建后不可改',
+  `name` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '应用名称',
+  `dept_id` bigint NOT NULL COMMENT '所属团队',
+  `owner_ids` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '应用负责人id',
+  `owner_names` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '应用负责人名称',
+  `description` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '应用描述',
+  `is_core` tinyint(1) NOT NULL DEFAULT 0 COMMENT '核心链路 0：否 1：是',
+  `status` tinyint(1) NOT NULL DEFAULT 1 COMMENT '状态 0：停用 1：正常',
+  `repo_type` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '代码托管平台 GITLAB/GITHUB/GITEE',
+  `repo_url` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '仓库 Git 地址',
+  `repo_branch` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '默认分支',
+  `repo_commit_id` varchar(40) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '提交ID',
+  `repo_credential_id` bigint NULL DEFAULT NULL COMMENT '平台凭据id',
+  `create_user` bigint NULL DEFAULT NULL COMMENT '创建人',
+  `create_time` datetime NULL DEFAULT NULL COMMENT '创建时间',
+  `update_user` bigint NULL DEFAULT NULL COMMENT '更新人',
+  `update_time` datetime NULL DEFAULT NULL COMMENT '更新时间',
+  `is_deleted` tinyint(1) NOT NULL DEFAULT 0 COMMENT '是否删除 0：否 1：是',
+  PRIMARY KEY (`id`) USING BTREE,
+  UNIQUE INDEX `uk_code`(`code` ASC) USING BTREE,
+  INDEX `idx_dept`(`dept_id` ASC) USING BTREE
+) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '应用档案表' ROW_FORMAT = DYNAMIC;
+
+-- ----------------------------
 -- Table structure for sys_config
 -- ----------------------------
 DROP TABLE IF EXISTS `sys_config`;

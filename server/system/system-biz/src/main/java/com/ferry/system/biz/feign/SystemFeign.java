@@ -69,6 +69,7 @@ public class SystemFeign implements ISystemFeign {
      */
     private void fillDataScope(AuthUser authUser, Long deptId, List<Role> roles) {
         Set<Long> deptIds = new HashSet<>();
+        Set<Long> customDeptIds = new HashSet<>();
         boolean self = false;
         for (Role role : roles) {
             DataScopeEnum scope = DataScopeEnum.of(role.getDataScope());
@@ -83,12 +84,16 @@ public class SystemFeign implements ISystemFeign {
                     authUser.setDataDeptIds(Set.of());
                     return;
                 }
-                case CUSTOM -> deptIds.addAll(roleDeptService.listObjs(Wrappers.<RoleDept>lambdaQuery()
+                case CUSTOM -> customDeptIds.addAll(roleDeptService.listObjs(Wrappers.<RoleDept>lambdaQuery()
                         .select(RoleDept::getDeptId).eq(RoleDept::getRoleId, role.getId())));
                 case DEPT -> Optional.ofNullable(deptId).ifPresent(deptIds::add);
-                case DEPT_AND_CHILD -> Optional.ofNullable(deptId).ifPresent(id -> deptIds.addAll(deptService.selfAndChildIds(id)));
+                case DEPT_AND_CHILD -> Optional.ofNullable(deptId)
+                        .ifPresent(id -> deptIds.addAll(deptService.selfAndChildIds(List.of(id))));
                 case SELF -> self = true;
             }
+        }
+        if (!customDeptIds.isEmpty()) {
+            deptIds.addAll(deptService.selfAndChildIds(List.copyOf(customDeptIds)));
         }
         authUser.setDataAll(false);
         authUser.setDataSelf(self);

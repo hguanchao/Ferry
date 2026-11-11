@@ -15,8 +15,8 @@ public interface RegionMapper extends BaseMapper<Region> {
     /**
      * 根据条件查询懒加载列表数据
      *
-     * @param condition 查询条件
+     * @param query 查询条件
      * @return 区域列表数据
      */
-    List<RegionTree> selectLazyList(@Param("condition") RegionQuery condition);
+    List<RegionTree> selectLazyList(@Param("query") RegionQuery query);
 }

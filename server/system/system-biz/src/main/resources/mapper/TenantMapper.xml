@@ -19,37 +19,28 @@
         id, code, `name`, `status`, create_user, create_time, update_user, update_time, is_deleted
     </sql>
 
-    <resultMap id="PageListResultMap" type="com.ferry.system.api.vo.TenantVO">
-        <result column="id" jdbcType="BIGINT" property="id"/>
-        <result column="code" jdbcType="VARCHAR" property="code"/>
-        <result column="name" jdbcType="VARCHAR" property="name"/>
-        <result column="status" jdbcType="TINYINT" property="status"/>
-        <result column="create_user" jdbcType="BIGINT" property="createUser"/>
-        <result column="create_time" jdbcType="TIMESTAMP" property="createTime"/>
-    </resultMap>
-
-    <select id="selectPageList" resultMap="PageListResultMap">
+    <select id="selectPageList" resultType="com.ferry.system.api.vo.TenantVO">
         SELECT t1.id,
                t1.`code`,
                t1.`name`,
                t1.`status`,
-               t2.nickname AS create_user,
-               t1.create_time
+               t2.nickname    AS createUser,
+               t1.create_time AS createTime
         FROM sys_tenant t1
                  LEFT JOIN sys_user t2 ON t1.create_user = t2.id
         <where>
             t1.is_deleted = 0
-            <if test="condition.code != null and condition.code != ''">
-                AND t1.code LIKE CONCAT('%', CONCAT(#{condition.code}, '%'))
+            <if test="query.code != null and query.code != ''">
+                AND t1.code LIKE CONCAT('%', CONCAT(#{query.code}, '%'))
             </if>
-            <if test="condition.name != null and condition.name != ''">
-                AND t1.name LIKE CONCAT('%', CONCAT(#{condition.name}, '%'))
+            <if test="query.name != null and query.name != ''">
+                AND t1.name LIKE CONCAT('%', CONCAT(#{query.name}, '%'))
             </if>
-            <if test="condition.status != null">
-                AND t1.status = #{condition.status}
+            <if test="query.status != null">
+                AND t1.status = #{query.status}
             </if>
-            <if test="condition.createTime != null and condition.createTime.length >= 2">
-                AND t1.create_time BETWEEN #{condition.createTime[0]} AND #{condition.createTime[1]}
+            <if test="query.createTime != null and query.createTime.length >= 2">
+                AND t1.create_time BETWEEN #{query.createTime[0]} AND #{query.createTime[1]}
             </if>
         </where>
         ORDER BY t1.create_time

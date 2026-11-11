@@ -30,6 +30,8 @@ public interface AuthConst {
     Set<String> DEFAULT_EXCLUDE_PATH = CollUtil.asSet(
             "/login",
             "/**/captcha",
+            // 内部接口由网关挡住外部访问，这里放行是因为服务间调用不带令牌。
+            // 登记的是具体路径而不是 /internal/**：新增内部接口要显式加一行，避免一条通配把业务接口也放进来。
             "/internal/user/auth",
             "/tenant/list",
             "/actuator/health",

@@ -27,7 +27,7 @@ export const userApi = {
   detail: (id: string) => get<UserRow>('/ferry-system/user/detail', { id }),
   save: (body: Record<string, unknown>) => post<string>('/ferry-system/user/save', body),
   resetPassword: (id: string) => post<string>(`/ferry-system/user/resetPassword/${id}`),
-  deleted: (ids: string[]) => post<string>('/ferry-system/user/deleted', { ids }),
+  deleted: (ids: string[]) => post<string>('/ferry-system/user/deleted', ids),
   authorizeRole: (userId: string, roleId: string) =>
     post<string>('/ferry-system/user/authorizeRole', { authorizeIds: [userId], authorizedIds: [roleId] }),
 }
@@ -35,7 +35,7 @@ export const userApi = {
 export const roleApi = {
   pageList: (body: PageParams) => post<ApiPage<RoleRow>>('/ferry-system/role/pageList', body),
   save: (body: Record<string, unknown>) => post<string>('/ferry-system/role/save', body),
-  deleted: (ids: string[]) => post<string>('/ferry-system/role/deleted', { ids }),
+  deleted: (ids: string[]) => post<string>('/ferry-system/role/deleted', ids),
   /**
    * 该角色已授权的菜单：后端返回扁平 List<MenuTree>（BeanUtil.copy 自 sys_role_menu 关联结果），
    * 不是树。前端取 id 作为 Tree 的选中键。
@@ -68,7 +68,7 @@ export const roleApi = {
 export const menuApi = {
   treeList: (body: Record<string, unknown> = {}) => post<MenuNode[]>('/ferry-system/menu/treeList', body),
   save: (body: Record<string, unknown>) => post<string>('/ferry-system/menu/save', body),
-  deleted: (ids: string[]) => post<string>('/ferry-system/menu/deleted', { ids }),
+  deleted: (ids: string[]) => post<string>('/ferry-system/menu/deleted', ids),
 }
 
 export const deptApi = {
@@ -76,13 +76,13 @@ export const deptApi = {
   treeList: (body: Record<string, unknown> = {}) => post<DeptNode[]>('/ferry-system/dept/treeList', body),
   detail: (id: string) => get<DeptNode>('/ferry-system/dept/detail', { id }),
   save: (body: Record<string, unknown>) => post<string>('/ferry-system/dept/save', body),
-  deleted: (ids: string[]) => post<string>('/ferry-system/dept/deleted', { ids }),
+  deleted: (ids: string[]) => post<string>('/ferry-system/dept/deleted', ids),
 }
 
 export const postApi = {
   pageList: (body: PageParams) => post<ApiPage<PostRow>>('/ferry-system/post/pageList', body),
   save: (body: Record<string, unknown>) => post<string>('/ferry-system/post/save', body),
-  deleted: (ids: string[]) => post<string>('/ferry-system/post/deleted', { ids }),
+  deleted: (ids: string[]) => post<string>('/ferry-system/post/deleted', ids),
 }
 
 export const dictApi = {
@@ -90,13 +90,13 @@ export const dictApi = {
   pageList: (body: PageParams) => post<ApiPage<DictNode>>('/ferry-system/dict/pageList', body),
   detail: (id: string) => get<DictNode>('/ferry-system/dict/detail', { id }),
   save: (body: Record<string, unknown>) => post<string>('/ferry-system/dict/save', body),
-  deleted: (ids: string[]) => post<string>('/ferry-system/dict/deleted', { ids }),
+  deleted: (ids: string[]) => post<string>('/ferry-system/dict/deleted', ids),
 }
 
 export const configApi = {
   pageList: (body: PageParams) => post<ApiPage<ConfigRow>>('/ferry-system/config/pageList', body),
   save: (body: Record<string, unknown>) => post<string>('/ferry-system/config/save', body),
-  deleted: (ids: string[]) => post<string>('/ferry-system/config/deleted', { ids }),
+  deleted: (ids: string[]) => post<string>('/ferry-system/config/deleted', ids),
 }
 
 export const tenantApi = {
@@ -104,7 +104,7 @@ export const tenantApi = {
   list: (options?: { silent?: boolean }) => post<TenantRow[]>('/ferry-system/tenant/list', {}, options),
   pageList: (body: PageParams) => post<ApiPage<TenantRow>>('/ferry-system/tenant/pageList', body),
   save: (body: Record<string, unknown>) => post<string>('/ferry-system/tenant/save', body),
-  deleted: (ids: string[]) => post<string>('/ferry-system/tenant/deleted', { ids }),
+  deleted: (ids: string[]) => post<string>('/ferry-system/tenant/deleted', ids),
 }
 
 /**
@@ -130,7 +130,7 @@ export const regionApi = {
   lazyList: (body: RegionFilter) => post<RegionNode[]>('/ferry-system/region/lazyList', body),
   detail: (id: string) => get<RegionNode>('/ferry-system/region/detail', { id }),
   save: (body: Record<string, unknown>) => post<string>('/ferry-system/region/save', body),
-  deleted: (ids: string[]) => post<string>('/ferry-system/region/deleted', { ids }),
+  deleted: (ids: string[]) => post<string>('/ferry-system/region/deleted', ids),
 }
 
 export const auditApi = {

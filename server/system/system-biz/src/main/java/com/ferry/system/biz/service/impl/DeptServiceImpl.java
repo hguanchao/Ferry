@@ -85,7 +85,7 @@ public class DeptServiceImpl extends ServiceImpl<DeptMapper, Dept> implements ID
                 throw new ServiceException("上级部门不存在");
             }
             if (ObjUtil.isNotEmpty(id)
-                    && baseMapper.selectSelfAndChildIds(id).contains(parentId)) {
+                    && baseMapper.selectSelfAndChildIdsByDeptIds(List.of(id)).contains(parentId)) {
                 throw new ServiceException("上级部门不能是自身或自身的下级");
             }
             dept.setAncestors(StrUtil.isNotBlank(parent.getAncestors())
@@ -114,14 +114,6 @@ public class DeptServiceImpl extends ServiceImpl<DeptMapper, Dept> implements ID
             remove(Wrappers.<Dept>lambdaQuery().in(Dept::getParentId, ids));
         }
         return isSuccess;
-    }
-
-    @Override
-    public List<Long> selfAndChildIds(Long deptId) {
-        if (deptId == null) {
-            return Collections.emptyList();
-        }
-        return baseMapper.selectSelfAndChildIds(deptId);
     }
 
     @Override

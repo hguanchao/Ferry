@@ -34,13 +34,6 @@
         </foreach>
     </select>
 
-    <select id="selectSelfAndChildIds" resultType="java.lang.Long">
-        SELECT id
-        FROM sys_dept
-        WHERE is_deleted = 0
-          AND (id = #{id} OR FIND_IN_SET(#{id}, ancestors))
-    </select>
-
     <select id="selectSelfAndChildIdsByDeptIds" resultType="java.lang.Long">
         SELECT id
         FROM sys_dept

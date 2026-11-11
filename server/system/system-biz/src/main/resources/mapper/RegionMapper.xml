@@ -22,52 +22,33 @@
         update_user, update_time, is_deleted
     </sql>
 
-    <!--
-      懒加载列表：一次只返回「某个父级下的直接子节点」，前端展开到哪一层就拉到哪一层。
-
-      两种用法：
-        - 传 parentId：逐级展开，返回该父级下的直接子节点（parentId=0 即根节点）；
-        - 传 keyword：跨层级检索，返回全部命中名称或编码的区划，由前端平铺展示。
-
-      isLeaf 的语义是「是否叶子节点」，供前端判定是否渲染展开图标：
-        - 用 NOT EXISTS 判断有无下级，比「按 code 长度猜层级」这类编码规则可靠，
-          区划调整后新增层级不会失效；
-        - 子查询排除逻辑删除，但**不**排除停用：停用节点仍占着一个展开位，
-          否则「下级全部停用」的父节点会被误判成叶子，那批节点就再也没法展开。
-      注意：早先这里返回的是「是否存在子节点」，与字段名含义正好相反，
-      前端会把每个父节点当成叶子，永远不会触发懒加载。
-    -->
     <select id="selectLazyList" resultType="com.ferry.system.api.vo.tree.RegionTree">
         SELECT r.id,
-               r.parent_id AS parentId,
+               r.parent_id    AS parentId,
                r.`code`,
                r.name,
                r.sort,
                r.`status`,
                CASE
-                   WHEN EXISTS(SELECT 1 FROM sys_region c WHERE c.parent_id = r.id AND c.is_deleted = 0)
-                       THEN 0
-                   ELSE 1
-                   END      AS isLeaf,
-               r.create_time AS createTime
+                   WHEN EXISTS(SELECT 1 FROM sys_region c WHERE c.parent_id = r.id AND c.is_deleted = 0) THEN 0
+                   ELSE 1 END AS isLeaf,
+               r.create_time  AS createTime
         FROM sys_region r
         <where>
             r.is_deleted = 0
-            <if test="condition.parentId != null">
-                AND r.parent_id = #{condition.parentId}
+            <if test="query.parentId != null">
+                AND r.parent_id = #{query.parentId}
             </if>
-            <if test="condition.name != null and condition.name != ''">
-                AND r.name LIKE CONCAT('%', #{condition.name}, '%')
+            <if test="query.name != null and query.name != ''">
+                AND r.name LIKE CONCAT('%', #{query.name}, '%')
             </if>
-            <if test="condition.keyword != null and condition.keyword != ''">
-                AND (r.name LIKE CONCAT('%', #{condition.keyword}, '%')
-                     OR r.`code` LIKE CONCAT('%', #{condition.keyword}, '%'))
+            <if test="query.keyword != null and query.keyword != ''">
+                AND (r.name LIKE CONCAT('%', #{query.keyword}, '%') OR r.`code` LIKE CONCAT('%', #{query.keyword}, '%'))
             </if>
-            <if test="condition.status != null">
-                AND r.`status` = #{condition.status}
+            <if test="query.status != null">
+                AND r.`status` = #{query.status}
             </if>
         </where>
-        <!-- 区划编码是层级路径码，按编码排序等价于按「省 → 市 → 区县 → 街道」的行政区划顺序 -->
         ORDER BY r.`code` ASC
     </select>
 </mapper>

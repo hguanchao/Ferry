@@ -27,21 +27,11 @@ public interface DeptMapper extends BaseMapper<Dept> {
     long selectUserCountByIds(@Param("ids") List<Long> ids);
 
     /**
-     * 查询本部门及全部下级部门id
+     * 查询部门及各自全部下级部门id
      *
-     * <p>登录时还没有租户上下文，跳过拦截器；入参部门id本身已经限定了范围。
-     * 数据权限也必须跳过：这条语句算的就是可见范围，再按范围过滤等于拿结果去筛它的来源。
-     *
-     * @param id 部门id
-     * @return 部门id集合
-     */
-    @InterceptorIgnore(tenantLine = "true", dataPermission = "1")
-    List<Long> selectSelfAndChildIds(@Param("id") Long id);
-
-    /**
-     * 查询多个部门及各自全部下级部门id
-     *
-     * <p>一次算完某个角色勾选的全部部门，避免按部门逐个回表；跳过拦截器的原因同上。
+     * <p>一次算完全部入参部门，避免按部门逐个回表；单个部门传单元素集合即可。
+     * 登录时还没有租户上下文，跳过租户拦截器；数据权限也必须跳过：这条语句算的就是可见范围，
+     * 再按范围过滤等于拿结果去筛它的来源。
      *
      * @param ids 部门id集合
      * @return 部门id集合

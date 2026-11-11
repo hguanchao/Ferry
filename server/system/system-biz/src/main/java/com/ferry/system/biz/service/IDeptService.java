@@ -52,15 +52,9 @@ public interface IDeptService extends IService<Dept> {
     boolean deleted(List<Long> ids);
 
     /**
-     * 查询本部门及全部下级部门id
+     * 查询部门及各自全部下级部门id
      *
-     * @param deptId 部门id
-     * @return 部门id集合，入参为空时返回空集合
-     */
-    List<Long> selfAndChildIds(Long deptId);
-
-    /**
-     * 查询多个部门及各自全部下级部门id
+     * <p>单个部门传 List.of(id) 即可，与「本部门及以下」「自定义范围」共用同一条展开规则。
      *
      * @param deptIds 部门id集合
      * @return 部门id集合，入参为空时返回空集合

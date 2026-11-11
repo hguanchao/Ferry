@@ -269,3 +269,23 @@ export interface WorkbenchOverview {
     lastBackup: string
   }
 }
+
+export interface AppRow {
+  id: ID
+  code: string
+  name: string
+  deptId: ID
+  /** 逗号分隔的负责人id，前端按逗号拆成数组使用 */
+  ownerIds: string
+  /** 逗号分隔的负责人名称，与 ownerIds 顺序一致 */
+  ownerNames: string
+  description?: string | null
+  isCore: number
+  status: number
+  repoType?: string | null
+  repoUrl?: string | null
+  repoBranch?: string | null
+  repoCommitId?: string | null
+  repoCredentialId?: ID | null
+  createTime: string
+}
