@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useMutation } from '@tanstack/react-query'
 import { App, Alert, Avatar, Button, Form, Input, Tabs, Tag } from 'antd'
-import { CheckCircleFilled, LockOutlined, MailOutlined, PhoneOutlined, SafetyCertificateOutlined, UserOutlined } from '@ant-design/icons'
+import { CheckCircle2, Lock, Mail, Phone, ShieldCheck, User } from 'lucide-react'
 import PageHeader from '@/components/PageHeader'
 import { profileApi } from '@/api/system'
 import { useAuthStore } from '@/stores/auth'
@@ -87,7 +87,7 @@ export default function ProfilePage() {
               lineHeight: 1.7,
             }}
           >
-            <SafetyCertificateOutlined style={{ marginRight: 6, color: 'var(--color-success)' }} />
+            <ShieldCheck size={15} style={{ marginRight: 6, color: 'var(--color-success)' }} />
             账号安全策略：连续 5 次密码错误锁定 15 分钟；改密后所有在线会话立即失效。
           </div>
         </aside>
@@ -118,16 +118,16 @@ export default function ProfilePage() {
                       onFinish={(values) => profileMutation.mutate(values)}
                     >
                       <Form.Item label="账号">
-                        <Input value={user?.account} prefix={<UserOutlined />} disabled />
+                        <Input value={user?.account} prefix={<User size={15} />} disabled />
                       </Form.Item>
                       <Form.Item name="nickname" label="昵称" rules={[{ required: true, message: '请输入昵称' }]}>
                         <Input placeholder="真实姓名" maxLength={20} />
                       </Form.Item>
                       <Form.Item name="phone" label="手机号" rules={[{ pattern: /^1[3-9]\d{9}$/, message: '手机号格式不正确' }]}>
-                        <Input prefix={<PhoneOutlined />} placeholder="用于接收发布与告警通知" maxLength={11} />
+                        <Input prefix={<Phone size={15} />} placeholder="用于接收发布与告警通知" maxLength={11} />
                       </Form.Item>
                       <Form.Item name="email" label="邮箱" rules={[{ type: 'email', message: '邮箱格式不正确' }]}>
-                        <Input prefix={<MailOutlined />} placeholder="用于接收通知与导出链接" maxLength={60} />
+                        <Input prefix={<Mail size={15} />} placeholder="用于接收通知与导出链接" maxLength={60} />
                       </Form.Item>
                       <Button type="primary" htmlType="submit" loading={profileMutation.isPending}>
                         保存修改
@@ -164,7 +164,7 @@ export default function ProfilePage() {
                         label="当前密码"
                         rules={[{ required: true, message: '请输入当前密码' }]}
                       >
-                        <Input.Password prefix={<LockOutlined />} placeholder="请输入当前密码" autoComplete="current-password" />
+                        <Input.Password prefix={<Lock size={15} />} placeholder="请输入当前密码" autoComplete="current-password" />
                       </Form.Item>
                       <Form.Item
                         name="newPassword"
@@ -179,7 +179,7 @@ export default function ProfilePage() {
                         ]}
                         extra="至少 8 位，需同时包含字母与数字；避免使用姓名、工号与常见弱口令"
                       >
-                        <Input.Password prefix={<LockOutlined />} placeholder="设置新密码" autoComplete="new-password" />
+                        <Input.Password prefix={<Lock size={15} />} placeholder="设置新密码" autoComplete="new-password" />
                       </Form.Item>
                       <Form.Item
                         name="confirm"
@@ -195,7 +195,7 @@ export default function ProfilePage() {
                           }),
                         ]}
                       >
-                        <Input.Password prefix={<CheckCircleFilled />} placeholder="再次输入新密码" autoComplete="new-password" />
+                        <Input.Password prefix={<CheckCircle2 size={16} />} placeholder="再次输入新密码" autoComplete="new-password" />
                       </Form.Item>
                       <Button type="primary" htmlType="submit" loading={passwordMutation.isPending}>
                         更新密码

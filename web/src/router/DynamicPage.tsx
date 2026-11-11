@@ -1,6 +1,6 @@
 import { Suspense } from 'react'
 import { Skeleton, Tag } from 'antd'
-import { ToolOutlined } from '@ant-design/icons'
+import { Wrench } from 'lucide-react'
 import { REGISTERED_PAGES, resolvePage } from './componentMap'
 import type { MenuRoute } from './menu'
 
@@ -34,7 +34,7 @@ function UnregisteredMenu({ route }: { route: MenuRoute }) {
             fontSize: 22,
           }}
         >
-          <ToolOutlined />
+          <Wrench size={15} />
         </span>
         <span className="ferry-placeholder__title">「{route.name}」尚未注册前端组件</span>
         <span className="ferry-caption" style={{ maxWidth: 520 }}>

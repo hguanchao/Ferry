@@ -3,6 +3,8 @@ package com.ferry.system.api.dto;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
+import static com.ferry.common.core.constant.SysConst.TOP_PARENT_ID;
+
 @Data
 public class DeptDTO {
 
@@ -10,7 +12,7 @@ public class DeptDTO {
     private Long id;
 
     @Schema(description = "父部门id")
-    private Long parentId;
+    private Long parentId = TOP_PARENT_ID;
 
     @Schema(description = "部门编码")
     private String code;

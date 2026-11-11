@@ -97,6 +97,7 @@ export default function App() {
       theme={buildTheme(theme)}
       componentSize="middle"
       form={{ validateMessages: { required: '请填写${label}' } }}
+      modal={{ centered: true }}
     >
       <AntApp>
         <QueryClientProvider client={queryClient}>

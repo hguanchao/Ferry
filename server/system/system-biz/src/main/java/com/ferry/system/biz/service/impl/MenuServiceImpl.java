@@ -1,7 +1,6 @@
 package com.ferry.system.biz.service.impl;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
-import com.ferry.common.core.constant.IntConst;
 import com.ferry.common.core.exception.ServiceException;
 import com.ferry.common.core.utils.BeanUtil;
 import com.ferry.common.core.utils.CollUtil;
@@ -11,12 +10,10 @@ import com.ferry.common.jdbc.base.ServiceImpl;
 import com.ferry.system.api.dto.MenuDTO;
 import com.ferry.system.api.dto.query.MenuQuery;
 import com.ferry.system.api.entity.Menu;
-import com.ferry.system.api.entity.Region;
 import com.ferry.system.api.enums.MenuTypeEnum;
 import com.ferry.system.api.vo.tree.MenuTree;
 import com.ferry.system.biz.mapper.MenuMapper;
 import com.ferry.system.biz.service.IMenuService;
-import com.ferry.system.biz.service.IRoleMenuService;
 import com.ferry.system.biz.wrapper.MenuWrapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -49,30 +46,38 @@ public class MenuServiceImpl extends ServiceImpl<MenuMapper, Menu> implements IM
         if (!MenuTypeEnum.contains(body.getType())) {
             throw new ServiceException("菜单类型仅支持目录、菜单、按钮");
         }
+        Long id = body.getId();
         Long parentId = body.getParentId();
+        Menu menu = BeanUtil.copy(body, Menu.class);
         // 前端「根菜单」固定传 parentId=0，0 不是真实菜单id，不能拿去查库
         if (TreeUtil.isRoot(parentId)) {
-            body.setParentId(TOP_PARENT_ID);
+            menu.setParentId(TOP_PARENT_ID);
         } else {
-            // 菜单没有路径字段：一次取出全部 id→parentId，既判上级存在，也沿父链上溯判环
-            Map<Long, Long> parents = new HashMap<>();
-            for (Menu menu : list(Wrappers.<Menu>lambdaQuery().select(Menu::getId, Menu::getParentId))) {
-                parents.put(menu.getId(), menu.getParentId());
-            }
-            if (!parents.containsKey(parentId)) {
+            Menu parent = getById(parentId);
+            if (ObjUtil.isEmpty(parent)) {
                 throw new ServiceException("上级菜单不存在");
             }
-            Long cursor = parentId;
-            Set<Long> visited = new HashSet<>();
-            // 走过的节点不再走，库里已有环也不会卡死；命中自身说明上级落在自己的子树里
-            while (!TreeUtil.isRoot(cursor) && visited.add(cursor)) {
-                if (ObjUtil.equals(cursor, body.getId())) {
-                    throw new ServiceException("上级菜单不能是自身或自身的下级");
+            // 菜单没有路径字段，只能一次取出全部 id→parentId，再沿父链上溯判环
+            if (ObjUtil.isNotEmpty(id)) {
+                Map<Long, Long> parents = new HashMap<>();
+                for (Menu item : list(Wrappers.<Menu>lambdaQuery().select(Menu::getId, Menu::getParentId))) {
+                    parents.put(item.getId(), item.getParentId());
                 }
-                cursor = parents.get(cursor);
+                Set<Long> visited = new HashSet<>();
+                Long cursor = parentId;
+                while (!TreeUtil.isRoot(cursor)) {
+                    if (ObjUtil.equals(cursor, id)) {
+                        throw new ServiceException("上级菜单不能是自身或自身的下级");
+                    }
+                    // 走到走过的节点说明库里本来就有环，直接停，别让上溯死循环
+                    if (!visited.add(cursor)) {
+                        break;
+                    }
+                    cursor = parents.get(cursor);
+                }
             }
         }
-        return saveOrUpdate(BeanUtil.copy(body, Menu.class));
+        return saveOrUpdate(menu);
     }
 
     @Override

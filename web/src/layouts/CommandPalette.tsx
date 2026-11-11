@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { SearchOutlined } from '@ant-design/icons'
+import { Search } from 'lucide-react'
 import { FIXED_PAGES } from '@/router/nav'
 import { useMenuRoutes } from '@/router/useMenuRoutes'
 import { useUiStore } from '@/stores/ui'
@@ -112,7 +112,7 @@ export default function CommandPalette() {
     <div className="ferry-palette-mask" onMouseDown={() => setOpen(false)}>
       <div className="ferry-palette" onMouseDown={(event) => event.stopPropagation()}>
         <div className="ferry-palette__input">
-          <SearchOutlined />
+          <Search size={15} />
           <input
             ref={inputRef}
             value={keyword}

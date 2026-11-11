@@ -1,13 +1,14 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Alert, App, Button, Form, Input, Modal, Switch, Table, Tag, Tooltip, type TableColumnsType } from 'antd'
-import { DeleteOutlined, EditOutlined, PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
+import { Pencil, Plus, RotateCw, Search, Trash2 } from 'lucide-react'
 import PageHeader from '@/components/PageHeader'
 import { RoleTag } from '@/components/StatusTag'
 import { tenantApi } from '@/api/system'
 import type { TenantRow } from '@/api/types'
 import { useAuthStore } from '@/stores/auth'
 import { showError } from '@/lib/notify'
+import { COL } from '@/lib/table'
 
 export default function Tenant() {
   const { message, modal } = App.useApp()
@@ -53,13 +54,12 @@ export default function Tenant() {
     {
       title: '租户名称',
       dataIndex: 'name',
-      width: 172,
       render: (value: string) => <span style={{ fontWeight: 500, color: 'var(--text-1)' }}>{value}</span>,
     },
     {
       title: '租户编码',
       dataIndex: 'code',
-      width: 172,
+      width: COL.code,
 
       render: (value: string) => (
         <span className="ferry-mono" style={{ fontSize: 12 }}>
@@ -94,14 +94,14 @@ export default function Tenant() {
     {
       title: '创建人',
       dataIndex: 'createUser',
-      width: 172,
+      width: COL.creator,
 
       render: (value: string) => value || '—',
     },
     {
       title: '创建时间',
       dataIndex: 'createTime',
-      width: 172,
+      width: COL.time,
 
       render: (value: string) => (
         <span className="ferry-mono" style={{ fontSize: 12, color: 'var(--text-3)' }}>
@@ -121,7 +121,7 @@ export default function Tenant() {
             <Button
               type="link"
               size="small"
-              icon={<EditOutlined />}
+              icon={<Pencil size={14} />}
               onClick={() => {
                 setEditing(record)
                 form.resetFields()
@@ -139,7 +139,7 @@ export default function Tenant() {
                 size="small"
                 danger
                 disabled={record.code === '000000'}
-                icon={<DeleteOutlined />}
+                icon={<Trash2 size={14} />}
                 onClick={() =>
                   modal.confirm({
                     title: `删除租户「${record.name}」？`,
@@ -168,7 +168,7 @@ export default function Tenant() {
           can('system:tenant:save') && (
             <Button
               type="primary"
-              icon={<PlusOutlined />}
+              icon={<Plus size={14} />}
               onClick={() => {
                 setEditing(null)
                 form.resetFields()
@@ -194,7 +194,7 @@ export default function Tenant() {
         <div className="ferry-toolbar">
           <Input
             allowClear
-            prefix={<SearchOutlined style={{ color: 'var(--text-4)' }} />}
+            prefix={<Search size={15} style={{ color: 'var(--text-4)' }} />}
             placeholder="租户名称"
             style={{ width: 180 }}
             value={draft.name}
@@ -210,7 +210,7 @@ export default function Tenant() {
           />
           <Button
             type="primary"
-            icon={<SearchOutlined />}
+            icon={<Search size={15} />}
             onClick={() => {
               setFilters(draft)
               setPage((prev) => ({ ...prev, current: 1 }))
@@ -219,7 +219,7 @@ export default function Tenant() {
             查询
           </Button>
           <Button
-            icon={<ReloadOutlined />}
+            icon={<RotateCw size={15} />}
             onClick={() => {
               setDraft({})
               setFilters({})
@@ -236,7 +236,7 @@ export default function Tenant() {
             columns={columns}
             dataSource={query.data?.records ?? []}
             loading={query.isLoading || query.isFetching}
-            scroll={{ x: 1192 }}
+            scroll={{ x: 'max-content' }}
             pagination={{
               current: page.current,
               pageSize: page.size,

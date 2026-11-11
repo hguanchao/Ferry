@@ -58,4 +58,12 @@ public interface IDeptService extends IService<Dept> {
      * @return 部门id集合，入参为空时返回空集合
      */
     List<Long> selfAndChildIds(Long deptId);
+
+    /**
+     * 查询多个部门及各自全部下级部门id
+     *
+     * @param deptIds 部门id集合
+     * @return 部门id集合，入参为空时返回空集合
+     */
+    List<Long> selfAndChildIds(List<Long> deptIds);
 }

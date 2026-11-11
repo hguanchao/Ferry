@@ -11,28 +11,29 @@ import {
   Radio,
   Select,
   Table,
-  Tag,
   Tree,
   type MenuProps,
   type TableColumnsType,
 } from 'antd'
 import {
-  DeleteOutlined,
-  DownOutlined,
-  EditOutlined,
-  ExportOutlined,
-  KeyOutlined,
-  PlusOutlined,
-  ReloadOutlined,
-  SearchOutlined,
-  TeamOutlined,
-  UserSwitchOutlined,
-} from '@ant-design/icons'
+  ChevronDown,
+  Download,
+  KeyRound,
+  Pencil,
+  Plus,
+  RotateCw,
+  Search,
+  Trash2,
+  UserCog,
+  Users,
+} from 'lucide-react'
 import PageHeader from '@/components/PageHeader'
 import { EnabledTag, RoleTag } from '@/components/StatusTag'
 import { deptApi, roleApi, userApi } from '@/api/system'
 import type { DeptNode, RoleRow, UserRow } from '@/api/types'
 import { exportCsv } from '@/lib/export'
+import { dataScopeText } from '@/lib/dataScope'
+import { COL } from '@/lib/table'
 import { flattenTree } from '@/lib/tree'
 import { useAuthStore } from '@/stores/auth'
 import { showError } from '@/lib/notify'
@@ -94,17 +95,14 @@ export default function User() {
   const roleName = useMemo(() => new Map(roles.map((role) => [role.id, role.name])), [roles])
   const roleMap = useMemo(() => new Map(roles.map((role) => [role.id, role])), [roles])
 
-  /** 列表上的数据权限摘要：超管等同于全部应用；其余按角色下的「应用-环境」范围聚合 */
+  /** 列表上的数据权限摘要：超管等同于全部数据，其余取所属角色的数据范围 */
   const scopeOf = (record: UserRow) => {
-    if (record.isSuper === 1) return { label: '全部应用', prod: true }
+    if (record.isSuper === 1) return '全部数据'
     const role = record.roleId ? roleMap.get(record.roleId) : undefined
-    if (!role) return { label: '未分配角色', prod: false }
-    // 后端暂未下发 dataScope，此时不能假装是 0 个应用，明确标为待接入
-    if (!role.dataScope) return { label: '待接入', prod: false }
-    return {
-      label: role.dataScope.mode === 'all' ? '全部应用' : `${role.dataScope.pairs.length} 个应用`,
-      prod: role.dataScope.prodOps,
-    }
+    if (!role) return '未分配角色'
+    // 后端未下发时不能假装成「什么都看不到」，明确标为待接入
+    if (!role.dataScope) return '待接入'
+    return dataScopeText(role.dataScope)
   }
 
   const invalidate = () => {
@@ -244,7 +242,6 @@ export default function User() {
     {
       title: '用户',
       dataIndex: 'nickname',
-      width: 240,
 
       render: (_, record) => (
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -287,20 +284,15 @@ export default function User() {
     {
       title: '角色 / 数据权限',
       dataIndex: 'roleId',
-      width: 190,
+      width: 200,
 
       render: (value: string | null, record) => {
         const scope = scopeOf(record)
         return (
           <div style={{ lineHeight: 1.5 }}>
             {value ? <RoleTag>{roleName.get(value) ?? value}</RoleTag> : <span className="ferry-muted">未分配角色</span>}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
-              <span style={{ fontSize: 11.5, color: 'var(--text-3)' }}>{scope.label}</span>
-              {scope.prod && record.isSuper !== 1 && (
-                <Tag color="red" style={{ fontSize: 10, lineHeight: '15px' }}>
-                  含生产
-                </Tag>
-              )}
+            <div style={{ marginTop: 2 }}>
+              <span style={{ fontSize: 11.5, color: 'var(--text-3)' }}>{scope}</span>
             </div>
           </div>
         )
@@ -309,7 +301,7 @@ export default function User() {
     {
       title: '状态',
       dataIndex: 'status',
-      width: 150,
+      width: COL.status,
 
       render: (value: number) => <EnabledTag value={value} />,
     },
@@ -319,21 +311,21 @@ export default function User() {
     columns.push({
       title: '操作',
       key: 'action',
-      width: 150,
+      width: COL.actionWide,
 
       render: (_, record) => {
         const moreItems: MenuProps['items'] = [
           can('system:user:authorizeRole') && {
             key: 'role',
-            icon: <UserSwitchOutlined />,
+            icon: <UserCog size={15} />,
             label: '分配角色',
             disabled: record.isSuper === 1,
           },
-          can('system:user:resetPassword') && { key: 'reset', icon: <KeyOutlined />, label: '重置密码' },
+          can('system:user:resetPassword') && { key: 'reset', icon: <KeyRound size={14} />, label: '重置密码' },
           { type: 'divider' },
           can('system:user:deleted') && {
             key: 'delete',
-            icon: <DeleteOutlined />,
+            icon: <Trash2 size={14} />,
             label: '删除用户',
             danger: true,
             disabled: record.isSuper === 1 || record.id === currentUser?.userId,
@@ -343,7 +335,7 @@ export default function User() {
         return (
           <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
             {can('system:user:save') && (
-              <Button type="link" size="small" icon={<EditOutlined />} onClick={() => openEdit(record)}>
+              <Button type="link" size="small" icon={<Pencil size={14} />} onClick={() => openEdit(record)}>
                 编辑
               </Button>
             )}
@@ -362,7 +354,7 @@ export default function User() {
               }}
             >
               <Button type="link" size="small">
-                更多 <DownOutlined style={{ fontSize: 9 }} />
+                更多 <ChevronDown size={10} style={{ fontSize: 9 }} />
               </Button>
             </Dropdown>
           </div>
@@ -380,14 +372,14 @@ export default function User() {
         extra={
           <>
             {can('system:user:export') && (
-              <Button icon={<ExportOutlined />} onClick={() => void doExport()}>
+              <Button icon={<Download size={15} />} onClick={() => void doExport()}>
                 导出
               </Button>
             )}
             {can('system:user:deleted') && (
               <Button
                 danger
-                icon={<DeleteOutlined />}
+                icon={<Trash2 size={14} />}
                 disabled={!selected.length}
                 onClick={() => {
                   const records = (listQuery.data?.records ?? []).filter((item) => selected.includes(item.id))
@@ -398,7 +390,7 @@ export default function User() {
               </Button>
             )}
             {can('system:user:save') && (
-              <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
+              <Button type="primary" icon={<Plus size={14} />} onClick={openCreate}>
                 新增用户
               </Button>
             )}
@@ -409,7 +401,7 @@ export default function User() {
       <div className="ferry-split">
         <aside className="ferry-split__aside">
           <div className="ferry-split__aside-head">
-            <TeamOutlined style={{ color: 'var(--text-3)' }} />
+            <Users size={15} style={{ color: 'var(--text-3)' }} />
             组织架构
             {filters.deptId && (
               <Button
@@ -450,7 +442,7 @@ export default function User() {
           <div className="ferry-toolbar">
             <Input
               allowClear
-              prefix={<SearchOutlined style={{ color: 'var(--text-4)' }} />}
+              prefix={<Search size={15} style={{ color: 'var(--text-4)' }} />}
               placeholder="账号"
               style={{ width: 132 }}
               value={draft.account}
@@ -484,10 +476,10 @@ export default function User() {
                 { value: 0, label: '已停用' },
               ]}
             />
-            <Button type="primary" icon={<SearchOutlined />} onClick={applyFilters}>
+            <Button type="primary" icon={<Search size={15} />} onClick={applyFilters}>
               查询
             </Button>
-            <Button icon={<ReloadOutlined />} onClick={resetFilters}>
+            <Button icon={<RotateCw size={15} />} onClick={resetFilters}>
               重置
             </Button>
           </div>
@@ -498,7 +490,7 @@ export default function User() {
               columns={columns}
               dataSource={listQuery.data?.records ?? []}
               loading={listQuery.isLoading || listQuery.isFetching}
-              scroll={{ x: 910 }}
+              scroll={{ x: 'max-content' }}
               rowSelection={{
                 selectedRowKeys: selected,
                 onChange: (keys) => setSelected(keys.map(String)),

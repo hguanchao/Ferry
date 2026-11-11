@@ -65,6 +65,8 @@ export function buildTheme(mode: 'light' | 'dark'): ThemeConfig {
         cellPaddingBlock: 12,
         cellPaddingInline: 14,
         headerBorderRadius: 0,
+        /** 表体字号比页面基准小一号，密排时一屏能多放两行 */
+        cellFontSize: 13,
       },
       Menu: {
         itemBg: 'transparent',
@@ -127,14 +129,31 @@ export function buildTheme(mode: 'light' | 'dark'): ThemeConfig {
         defaultBg: dark ? '#172032' : '#f8fafc',
         defaultColor: dark ? '#b6c0d0' : '#475467',
       },
+      Form: {
+        /** 标签是辅助信息，比正文小一号、颜色降一级 */
+        labelColor: dark ? '#b6c0d0' : '#475467',
+        labelFontSize: 13,
+      },
       Tooltip: {
         colorBgSpotlight: dark ? '#1b2537' : 'rgba(16, 24, 40, 0.92)',
       },
       Descriptions: {
         labelBg: dark ? '#172032' : '#f8fafc',
+        labelColor: dark ? '#8593a8' : '#98a2b3',
       },
       Popover: {
         titleMinWidth: 120,
+      },
+      Pagination: {
+        /**
+         * 分页项高度。
+         *
+         * 默认取全局 controlHeight（36px），比表格 13px 的字号大出好几号，
+         * 一整页只有几条数据时那块页码会显得特别突兀。这里收窄到与表格行接近的尺寸，
+         * 视觉上分页退成页脚的一部分，不再抢主体内容。
+         */
+        itemSize: 28,
+        itemSizeSM: 24,
       },
     },
   }

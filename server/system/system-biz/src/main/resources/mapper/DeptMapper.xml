@@ -38,13 +38,21 @@
         SELECT id
         FROM sys_dept
         WHERE is_deleted = 0
-          AND (id = #{deptId} OR FIND_IN_SET(#{deptId}, ancestors))
+          AND (id = #{id} OR FIND_IN_SET(#{id}, ancestors))
     </select>
 
-    <update id="updateChildrenAncestors">
-        UPDATE sys_dept
-        SET ancestors = REPLACE(ancestors, #{oldPrefix}, #{newPrefix})
+    <select id="selectSelfAndChildIdsByDeptIds" resultType="java.lang.Long">
+        SELECT id
+        FROM sys_dept
         WHERE is_deleted = 0
-          AND FIND_IN_SET(#{deptId}, ancestors)
-    </update>
+          AND (
+            id IN
+            <foreach collection="ids" item="id" open="(" separator="," close=")">
+                #{id}
+            </foreach>
+            <foreach collection="ids" item="id">
+                OR FIND_IN_SET(#{id}, ancestors)
+            </foreach>
+          )
+    </select>
 </mapper>

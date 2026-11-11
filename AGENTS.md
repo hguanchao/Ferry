@@ -26,10 +26,10 @@
   | `common/common-cache` | Redis 封装 | — |
 
 - 前端在 `web/`，单页应用，源码 `src/`，构建产物 `dist/` 不入库；页面骨架、设计变量、请求层都在这一层收口。
-- 建表与种子数据、产品需求文档在 `docs/`；`docs/mysql` 只放全量建表与种子脚本，日常表结构变更走 Flyway。
+- 建表与种子数据、产品需求文档在 `docs/`；`docs/mysql` 只放全量建表与种子脚本，表结构变更直接改这里。
 - 配置与注册中心是 Nacos：各服务通过 `spring.config.import` 拉取 `nacos:<应用名>.yaml`，网关路由也在其中；
   本地默认值写在 `application.yml` 里并用 `${ENV:默认值}` 占位。
-- 数据访问只有一个 MySQL 实例，多租户按 `tenant_id` 行级隔离；`system` 域的表结构由 `system` 服务自己迁移。
+- 数据访问只有一个 MySQL 实例，多租户按 `tenant_id` 行级隔离。
 
 ## 二、开发铁律
 
@@ -66,7 +66,7 @@
 
 - Java 21、Spring Boot 4.0.9、Spring Cloud 2025.1.4（Alibaba/Nacos 2025.1.0.0）、MyBatis-Plus 3.5.18、
   **Jackson 3**（序列化 API 在 `tools.jackson.*`，注解仍在 `com.fasterxml.jackson.annotation`）、
-  Lombok、SpringDoc、Flyway、Log4j2（已排除 `spring-boot-starter-logging`）。
+  Lombok、SpringDoc、Log4j2（已排除 `spring-boot-starter-logging`）。
 - 版本统一在 `server/pom.xml` 的 `dependencyManagement` 管理（含各 BOM），**业务模块不写 `<version>`**。
 - `common-core` 只依赖模型与工具所需的最小集合，不引入 Web、持久层实现。
 - 编译参数 `-parameters` 不得移除：Spring 7 靠方法参数名反射解析 `@PathVariable` / `@RequestParam`，
@@ -193,15 +193,14 @@ Controller 不写业务判断，Service 不拼 HTTP 响应，Wrapper 不做业�
 - 日期格式统一用 `DateUtil` 里的常量，不在注解里写死格式串。
 - VO 里不放 `password` 这类敏感字段：字段不存在才不会漏出去，不靠 Service 里逐个 `setXxx(null)` 兜底。
 
-### SQL 与迁移
+### SQL 与表结构
 
 - 优先用 MyBatis-Plus 的 lambda 查询；XML 只写表达不了的（多表、子查询、聚合、复杂排序）。
 - 禁止 `SELECT *`：resultMap 与列清单显式列出字段。
 - 手写 SQL 必须自己带 `is_deleted = 0`（逻辑删除只作用于框架生成的 SQL）；租户条件由拦截器补，不要重复写。
 - 改查询前先打开对应 Mapper/XML 看清实际 `WHERE`：过滤条件能下推到 SQL 就不要全表捞出后在内存里筛。
 - 新增表：`sys_` 前缀、`bigint` 主键、公共字段齐全，字段与索引都要有注释；建表脚本归档在 `docs/mysql`。
-  `system` 服务已接入 Flyway（`classpath:db/migration`，历史表 `flyway_system_history`），
-  后续表结构变更以 `V{序号}__说明.sql` 追加，不手改线上库；脚本必须可重复执行或在基线内自洽。
+  表结构变更直接改全量建表脚本并归档，不引入迁移框架。
 
 ## 七、前端编码规范
 
@@ -240,7 +239,7 @@ Controller 不写业务判断，Service 不拼 HTTP 响应，Wrapper 不做业�
 ### 界面
 
 - 沿用现有视觉语言：浅色、克制、信息密度优先；不擅自改主题色、圆角、字号与间距体系。
-- 图标统一 `@ant-design/icons`；界面文案与代码里不出现表情符号。
+- 图标统一 `lucide-react`，尺寸按上下文取 14（表格行内）/ 15（按钮）/ 17-18（顶栏）；界面文案与代码里不出现表情符号。
 - 同一类交互只做一种：新增用右上主按钮、行内操作用 link 按钮、危险操作用 `danger` + 二次确认。
 
 ## 八、代码质量管理

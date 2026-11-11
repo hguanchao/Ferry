@@ -1,16 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { App, AutoComplete, Button, Checkbox, Form, Input, Tooltip } from 'antd'
-import {
-  ArrowRightOutlined,
-  CheckCircleFilled,
-  ExclamationCircleFilled,
-  LockOutlined,
-  ReloadOutlined,
-  SafetyCertificateOutlined,
-  ShopOutlined,
-  UserOutlined,
-} from '@ant-design/icons'
+import { AlertCircle, ArrowRight, CheckCircle2, Lock, RotateCw, ShieldCheck, Store, User } from 'lucide-react'
 import { authApi } from '@/api/auth'
 import { ApiError } from '@/api/client'
 import { tenantApi } from '@/api/system'
@@ -241,7 +232,7 @@ export default function LoginPage() {
           <div className="ferry-login__pillars">
             {PILLARS.map((item) => (
               <div className="ferry-login__pillar" key={item}>
-                <CheckCircleFilled />
+                <CheckCircle2 size={16} />
                 <span>{item}</span>
               </div>
             ))}
@@ -280,7 +271,7 @@ export default function LoginPage() {
 
           {serviceError && (
             <div className="ferry-login__error ferry-login__error--banner" role="alert">
-              <ExclamationCircleFilled style={{ marginTop: 2, flex: '0 0 auto' }} />
+              <AlertCircle size={16} style={{ marginTop: 2, flex: '0 0 auto' }} />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <strong style={{ display: 'block', fontWeight: 600 }}>后端服务暂不可用</strong>
                 <span>{serviceError}</span>
@@ -326,7 +317,7 @@ export default function LoginPage() {
               <AutoComplete
                 options={tenants.map((item) => ({ value: item.name, label: `${item.name}（${item.code}）` }))}
                 placeholder={tenantsLoading ? '正在加载租户…' : '选择或输入租户名称'}
-                suffixIcon={<ShopOutlined style={{ color: 'var(--text-4)' }} />}
+                suffixIcon={<Store size={16} style={{ color: 'var(--text-4)' }} />}
                 allowClear
                 filterOption={(input, option) => {
                   const keyword = input.trim().toLowerCase()
@@ -344,7 +335,7 @@ export default function LoginPage() {
               rules={[{ required: true, message: '请输入账号' }]}
             >
               <Input
-                prefix={<UserOutlined style={{ color: 'var(--text-4)' }} />}
+                prefix={<User size={15} style={{ color: 'var(--text-4)' }} />}
                 placeholder="请输入账号"
                 autoComplete="username"
                 autoFocus
@@ -360,7 +351,7 @@ export default function LoginPage() {
               ]}
             >
               <Input.Password
-                prefix={<LockOutlined style={{ color: 'var(--text-4)' }} />}
+                prefix={<Lock size={15} style={{ color: 'var(--text-4)' }} />}
                 placeholder="请输入密码"
                 autoComplete="current-password"
               />
@@ -377,7 +368,7 @@ export default function LoginPage() {
                   ]}
                 >
                   <Input
-                    prefix={<SafetyCertificateOutlined style={{ color: 'var(--text-4)' }} />}
+                    prefix={<ShieldCheck size={15} style={{ color: 'var(--text-4)' }} />}
                     placeholder="4 位验证码"
                     maxLength={4}
                     autoComplete="off"
@@ -407,7 +398,7 @@ export default function LoginPage() {
                   只有在「接口成功但内容为空」这类横幅覆盖不到的情况才就地提示 */}
               {captchaError && !serviceError && (
                 <div className="ferry-login__error" role="alert">
-                  <ExclamationCircleFilled style={{ marginTop: 2, flex: '0 0 auto' }} />
+                  <AlertCircle size={16} style={{ marginTop: 2, flex: '0 0 auto' }} />
                   <span>{captchaError}</span>
                 </div>
               )}
@@ -431,14 +422,14 @@ export default function LoginPage() {
                   gap: 4,
                 }}
               >
-                <ReloadOutlined style={{ fontSize: 11 }} />
+                <RotateCw size={15} style={{ fontSize: 11 }} />
                 刷新验证码
               </button>
             </div>
 
             {error && (
               <div className="ferry-login__error" role="alert">
-                <ExclamationCircleFilled style={{ marginTop: 2, flex: '0 0 auto' }} />
+                <AlertCircle size={16} style={{ marginTop: 2, flex: '0 0 auto' }} />
                 <span>{error}</span>
               </div>
             )}
@@ -452,7 +443,7 @@ export default function LoginPage() {
               style={{ height: 42, fontSize: 14, marginTop: 4 }}
             >
               {loading ? '正在验证…' : '登录'}
-              {!loading && <ArrowRightOutlined style={{ fontSize: 12 }} />}
+              {!loading && <ArrowRight size={14} style={{ fontSize: 12 }} />}
             </Button>
           </Form>
 

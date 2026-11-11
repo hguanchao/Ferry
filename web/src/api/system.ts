@@ -40,9 +40,29 @@ export const roleApi = {
    * 该角色已授权的菜单：后端返回扁平 List<MenuTree>（BeanUtil.copy 自 sys_role_menu 关联结果），
    * 不是树。前端取 id 作为 Tree 的选中键。
    */
-  menuList: (id: string) => get<Array<{ id: string; name?: string; type?: number }>>(`/ferry-system/role/menuList/${id}`),
-  authorizeMenu: (roleId: string, menuIds: string[], dataScope?: RoleRow['dataScope']) =>
-    post<string>('/ferry-system/role/authorizeMenu', { authorizeIds: [roleId], authorizedIds: menuIds, dataScope }),
+  /** 已授权菜单：后端是 @RequestParam 接收，必须走查询参数，拼成路径会 404 */
+  menuList: (id: string) => get<Array<{ id: string; name?: string; type?: number }>>('/ferry-system/role/menuList', { id }),
+  /**
+   * 角色授权菜单。
+   *
+   * 后端约定 authorizedIds 是「被授权对象」（角色），authorizeIds 是「授予的内容」（菜单），
+   * 与用户授权角色（authorizedIds=用户、authorizeIds=角色）保持同一语义。
+   * 两者写反会让 sys_role_menu 存成 (菜单id, 角色id)，查询按角色id反查永远为空。
+   */
+  authorizeMenu: (roleId: string, menuIds: string[]) =>
+    post<string>('/ferry-system/role/authorizeMenu', { authorizeIds: menuIds, authorizedIds: [roleId] }),
+  /** 已授权数据范围：数据范围取值 + 授权时勾选的原始部门（不含下级） */
+  dataScope: (id: string) =>
+    get<{ dataScope: number; deptIds: string[] }>('/ferry-system/role/dataScope', { id }),
+  /**
+   * 角色授权数据范围。
+   *
+   * 与菜单授权分开提交：数据范围带自定义部门，和菜单树塞进同一个接口会让两种授权互相覆盖。
+   * 后端把角色id与范围取值放在路径上、部门放在请求体里，取消自定义时传空数组即可清空。
+   * 保存只改库，不注销在线会话：已登录用户按旧范围继续用，重新登录后才按新范围过滤。
+   */
+  authorizeDataScope: (roleId: string, dataScope: number, deptIds: string[]) =>
+    post<string>(`/ferry-system/role/authorizeDataScope/${roleId}/${dataScope}`, deptIds),
 }
 
 export const menuApi = {

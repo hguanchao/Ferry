@@ -141,8 +141,6 @@
                     <include>**/*.xml</include>
                     <include>**/*.yml</include>
                     <include>**/*.txt</include>
-                    <!-- Flyway 迁移脚本 -->
-                    <include>**/*.sql</include>
                 </includes>
             </resource>
         </resources>

@@ -2,17 +2,17 @@ import { useMemo } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { App, Avatar, Badge, Dropdown, Popover, Tooltip, type MenuProps } from 'antd'
 import {
-  BellOutlined,
-  DownOutlined,
-  LogoutOutlined,
-  MenuFoldOutlined,
-  MenuUnfoldOutlined,
-  MoonOutlined,
-  QuestionCircleOutlined,
-  SearchOutlined,
-  SunOutlined,
-  UserOutlined,
-} from '@ant-design/icons'
+  Bell,
+  ChevronDown,
+  CircleHelp,
+  LogOut,
+  Moon,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Search,
+  Sun,
+  User,
+} from 'lucide-react'
 import { findMenuTrail } from '@/router/menu'
 import { FIXED_TRAILS } from '@/router/nav'
 import { useMenuRoutes } from '@/router/useMenuRoutes'
@@ -61,10 +61,10 @@ export default function TopBar() {
   }, [tree, location.pathname])
 
   const userMenu: MenuProps['items'] = [
-    { key: 'profile', icon: <UserOutlined />, label: '个人中心' },
-    { key: 'security', icon: <QuestionCircleOutlined />, label: '安全设置' },
+    { key: 'profile', icon: <User size={15} />, label: '个人中心' },
+    { key: 'security', icon: <CircleHelp size={17} />, label: '安全设置' },
     { type: 'divider' },
-    { key: 'logout', icon: <LogoutOutlined />, label: '退出登录', danger: true },
+    { key: 'logout', icon: <LogOut size={16} />, label: '退出登录', danger: true },
   ]
 
   const handleUserMenu: MenuProps['onClick'] = ({ key }) => {
@@ -96,7 +96,7 @@ export default function TopBar() {
         onClick={toggleCollapsed}
         aria-label={collapsed ? '展开导航' : '收起导航'}
       >
-        {collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
+        {collapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
       </button>
 
       <nav className="ferry-crumbs" aria-label="面包屑">
@@ -115,7 +115,7 @@ export default function TopBar() {
       <div className="ferry-spacer" />
 
       <button type="button" className="ferry-search-trigger" onClick={() => setPaletteOpen(true)}>
-        <SearchOutlined />
+        <Search size={15} />
         <span>搜索菜单或操作</span>
         <span className="ferry-spacer" />
         <span className="ferry-kbd">{shortcutKey}</span>
@@ -124,7 +124,7 @@ export default function TopBar() {
 
       <Tooltip title={theme === 'dark' ? '切换到浅色' : '切换到深色'}>
         <button type="button" className="ferry-icon-btn" onClick={toggleTheme} aria-label="切换主题">
-          {theme === 'dark' ? <SunOutlined /> : <MoonOutlined />}
+          {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
         </button>
       </Tooltip>
 
@@ -151,14 +151,14 @@ export default function TopBar() {
       >
         <button type="button" className="ferry-icon-btn" aria-label="通知">
           <Badge dot color="#1677ff" offset={[0, 2]}>
-            <BellOutlined />
+            <Bell size={18} />
           </Badge>
         </button>
       </Popover>
 
       <Tooltip title="接口文档">
         <a className="ferry-icon-btn" href="/api/swagger-ui.html" target="_blank" rel="noreferrer" aria-label="接口文档">
-          <QuestionCircleOutlined />
+          <CircleHelp size={17} />
         </a>
       </Tooltip>
 
@@ -179,7 +179,7 @@ export default function TopBar() {
             <span className="ferry-user-chip__name">{user?.nickname ?? '未登录'}</span>
             <span className="ferry-user-chip__role">{user?.isSuper === 1 ? '超级管理员' : '平台用户'}</span>
           </span>
-          <DownOutlined style={{ fontSize: 10, color: 'var(--text-3)' }} />
+          <ChevronDown size={10} style={{ fontSize: 10, color: 'var(--text-3)' }} />
         </button>
       </Dropdown>
     </header>

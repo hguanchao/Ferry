@@ -4,6 +4,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import java.util.List;
 
 @Data
@@ -25,4 +26,8 @@ public class RoleDTO {
 
     @Schema(description = "显示顺序")
     private Integer sort;
+
+    @Schema(description = "职责描述")
+    @Size(max = 255, message = "职责描述不能超过 255 个字符")
+    private String remark;
 }

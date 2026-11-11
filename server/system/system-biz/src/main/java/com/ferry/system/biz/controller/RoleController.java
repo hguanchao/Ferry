@@ -15,6 +15,7 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.AllArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -22,6 +23,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import jakarta.validation.Valid;
+
 import java.util.List;
 
 @RestController
@@ -69,6 +71,25 @@ public class RoleController {
     @Operation(summary = "角色管理-角色授权菜单", description = "传入角色id和菜单id")
     public R<String> authorizeMenu(@RequestBody RoleAuthorize<Long, Long> body) {
         boolean isSuccess = service.authorizeMenu(body);
+        return isSuccess ? R.success("授权成功") : R.fail("授权失败");
+    }
+
+    @GetMapping("/dataScope")
+    @PreAuthorize("system:role:dataScope")
+    @Operation(summary = "角色管理-角色数据范围详情", description = "传入角色id", parameters = {
+            @Parameter(name = "id", description = "角色id", required = true)
+    })
+    public R<RoleVO> dataScope(@RequestParam("id") Long id) {
+        return R.data(service.dataScope(id));
+    }
+
+    @PostMapping("/authorizeDataScope/{id}/{dataScope}")
+    @PreAuthorize("system:role:authorizeDataScope")
+    @Operation(summary = "角色管理-角色授权数据范围", description = "传入角色id、数据范围与自定义部门")
+    public R<String> authorizeDataScope(@PathVariable Long id,
+                                        @PathVariable Integer dataScope,
+                                        @RequestBody List<Long> deptIds) {
+        boolean isSuccess = service.authorizeDataScope(id, dataScope, deptIds);
         return isSuccess ? R.success("授权成功") : R.fail("授权失败");
     }
 }

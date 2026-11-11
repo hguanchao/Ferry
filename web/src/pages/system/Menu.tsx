@@ -16,7 +16,7 @@ import {
   TreeSelect,
   type TableColumnsType,
 } from 'antd'
-import { DeleteOutlined, EditOutlined, PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
+import { Pencil, Plus, RotateCw, Search, Trash2 } from 'lucide-react'
 import PageHeader from '@/components/PageHeader'
 import { useAutoExpandRows } from '@/hooks/useAutoExpandRows'
 import { MenuIcon, ICON_OPTIONS } from '@/components/MenuIcon'
@@ -25,6 +25,7 @@ import { menuApi } from '@/api/system'
 import type { MenuNode } from '@/api/types'
 import { useAuthStore } from '@/stores/auth'
 import { showError } from '@/lib/notify'
+import { COL } from '@/lib/table'
 
 const TYPE_LABEL: Record<number, { text: string; color: string }> = {
   0: { text: '目录', color: 'blue' },
@@ -116,7 +117,6 @@ export default function Menu() {
     {
       title: '菜单名称',
       dataIndex: 'name',
-      width: 165,
 
       render: (_, record) => (
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
@@ -129,7 +129,7 @@ export default function Menu() {
     {
       title: '类型',
       dataIndex: 'type',
-      width: 165,
+      width: 90,
 
       render: (value: number) => (
         <Tag color={TYPE_LABEL[value]?.color} style={{ fontSize: 11 }}>
@@ -140,7 +140,7 @@ export default function Menu() {
     {
       title: '路由地址',
       dataIndex: 'path',
-      width: 165,
+      width: 200,
 
       render: (value: string | null) =>
         value ? (
@@ -154,7 +154,7 @@ export default function Menu() {
     {
       title: '权限标识',
       dataIndex: 'perms',
-      width: 165,
+      width: 200,
 
       render: (value: string | null) =>
         value ? (
@@ -168,7 +168,7 @@ export default function Menu() {
     {
       title: '排序',
       dataIndex: 'sort',
-      width: 165,
+      width: COL.sort,
 
       align: 'right',
       render: (value: number) => <span className="ferry-mono">{value}</span>,
@@ -176,7 +176,7 @@ export default function Menu() {
     {
       title: '状态',
       dataIndex: 'status',
-      width: 165,
+      width: COL.status,
 
       render: (value: number) => (
         <span className="ferry-status" data-tone={value === 1 ? 'success' : 'default'}>
@@ -188,18 +188,18 @@ export default function Menu() {
     {
       title: '操作',
       key: 'action',
-      width: 200,
+      width: COL.actionWide,
 
       fixed: 'right',
       render: (_, record) => (
         <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
           {can('system:menu:save') && record.type !== 2 && (
             <Tooltip title="在该菜单下新增子项">
-              <Button type="link" size="small" icon={<PlusOutlined />} onClick={() => openEditor(null, record)} />
+              <Button type="link" size="small" icon={<Plus size={14} />} onClick={() => openEditor(null, record)} />
             </Tooltip>
           )}
           {can('system:menu:save') && (
-            <Button type="link" size="small" icon={<EditOutlined />} onClick={() => openEditor(record)}>
+            <Button type="link" size="small" icon={<Pencil size={14} />} onClick={() => openEditor(record)}>
               编辑
             </Button>
           )}
@@ -209,7 +209,7 @@ export default function Menu() {
                 type="link"
                 size="small"
                 danger
-                icon={<DeleteOutlined />}
+                icon={<Trash2 size={14} />}
                 onClick={() =>
                   modal.confirm({
                     title: `删除「${record.name}」？`,
@@ -236,7 +236,7 @@ export default function Menu() {
         tag={<RoleTag>{query.data?.length ?? 0} 个根节点</RoleTag>}
         extra={
           can('system:menu:save') && (
-            <Button type="primary" icon={<PlusOutlined />} onClick={() => openEditor(null)}>
+            <Button type="primary" icon={<Plus size={14} />} onClick={() => openEditor(null)}>
               新增菜单
             </Button>
           )
@@ -247,7 +247,7 @@ export default function Menu() {
         <div className="ferry-toolbar">
           <Input
             allowClear
-            prefix={<SearchOutlined style={{ color: 'var(--text-4)' }} />}
+            prefix={<Search size={15} style={{ color: 'var(--text-4)' }} />}
             placeholder="菜单名称"
             style={{ width: 180 }}
             value={keyword}
@@ -268,7 +268,7 @@ export default function Menu() {
           />
           <Button
             type="primary"
-            icon={<SearchOutlined />}
+            icon={<Search size={15} />}
             onClick={() => {
               setApplied(keyword)
               setAppliedType(type)
@@ -277,7 +277,7 @@ export default function Menu() {
             查询
           </Button>
           <Button
-            icon={<ReloadOutlined />}
+            icon={<RotateCw size={15} />}
             onClick={() => {
               setKeyword('')
               setType(undefined)
@@ -297,7 +297,7 @@ export default function Menu() {
             loading={query.isLoading || query.isFetching}
             pagination={false}
             expandable={expandProps}
-            scroll={{ x: 1190 }}
+            scroll={{ x: 'max-content' }}
           />
         </div>
       </section>
@@ -351,7 +351,20 @@ export default function Menu() {
               <Input placeholder="system:user:save" maxLength={100} />
             </Form.Item>
             <Form.Item name="icon" label="图标">
-              <Select allowClear showSearch placeholder="选择图标" options={ICON_OPTIONS} />
+              <Select
+                allowClear
+                showSearch
+                placeholder="选择图标"
+                options={ICON_OPTIONS}
+                optionRender={(option) => (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                    <MenuIcon name={String(option.value)} />
+                    <span className="ferry-mono" style={{ fontSize: 12 }}>
+                      {option.label}
+                    </span>
+                  </span>
+                )}
+              />
             </Form.Item>
             <Form.Item name="sort" label="显示顺序">
               <InputNumber min={1} max={999} style={{ width: '100%' }} />

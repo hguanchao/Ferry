@@ -1,24 +1,16 @@
 import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { App, Button, Empty, Tooltip } from 'antd'
-import {
-  ArrowRightOutlined,
-  FileSearchOutlined,
-  PlusOutlined,
-  ReloadOutlined,
-  SafetyCertificateOutlined,
-  SettingOutlined,
-  UserOutlined,
-} from '@ant-design/icons'
+import { ArrowRight, FileSearch, Plus, RotateCw, Settings, ShieldCheck, User } from 'lucide-react'
 import PageHeader from '@/components/PageHeader'
 import { useAuthStore } from '@/stores/auth'
 import type { WorkbenchOverview } from '@/api/types'
 
 const SHORTCUT_ICONS: Record<string, React.ReactNode> = {
-  user: <UserOutlined />,
-  role: <SafetyCertificateOutlined />,
-  audit: <FileSearchOutlined />,
-  config: <SettingOutlined />,
+  user: <User size={15} />,
+  role: <ShieldCheck size={15} />,
+  audit: <FileSearch size={15} />,
+  config: <Settings size={15} />,
 }
 
 /** 工作台接口（/ferry-system/workbench/overview）尚未提供，先用静态骨架 + 0 占位 */
@@ -74,7 +66,7 @@ export default function WorkbenchPage() {
               系统运行正常
             </span>
             <Tooltip title="工作台接口待接入，暂不刷新数据">
-              <Button icon={<ReloadOutlined />} onClick={() => message.info('工作台接口尚未接入，当前为空数据占位')}>
+              <Button icon={<RotateCw size={15} />} onClick={() => message.info('工作台接口尚未接入，当前为空数据占位')}>
                 刷新
               </Button>
             </Tooltip>
@@ -101,12 +93,12 @@ export default function WorkbenchPage() {
               <div className="ferry-quick-grid">
                 {PLACEHOLDER_SHORTCUTS.filter((item) => !item.perm || can(item.perm)).map((item) => (
                   <button type="button" className="ferry-quick" key={item.key} onClick={() => navigate(item.path)}>
-                    <span className="ferry-quick__icon">{SHORTCUT_ICONS[item.key] ?? <PlusOutlined />}</span>
+                    <span className="ferry-quick__icon">{SHORTCUT_ICONS[item.key] ?? <Plus size={14} />}</span>
                     <span className="ferry-quick__text">
                       <span className="ferry-quick__label">{item.label}</span>
                       <span className="ferry-quick__desc">{item.desc}</span>
                     </span>
-                    <ArrowRightOutlined style={{ marginLeft: 'auto', color: 'var(--text-4)', fontSize: 11 }} />
+                    <ArrowRight size={14} style={{ marginLeft: 'auto', color: 'var(--text-4)', fontSize: 11 }} />
                   </button>
                 ))}
               </div>

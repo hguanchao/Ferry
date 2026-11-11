@@ -12,13 +12,14 @@ import {
   Table,
   type TableColumnsType,
 } from 'antd'
-import { DeleteOutlined, EditOutlined, PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
+import { Pencil, Plus, RotateCw, Search, Trash2 } from 'lucide-react'
 import PageHeader from '@/components/PageHeader'
 import { RoleTag } from '@/components/StatusTag'
 import { postApi } from '@/api/system'
 import type { PostRow } from '@/api/types'
 import { useAuthStore } from '@/stores/auth'
 import { showError } from '@/lib/notify'
+import { COL } from '@/lib/table'
 
 export default function Post() {
   const { message, modal } = App.useApp()
@@ -64,7 +65,7 @@ export default function Post() {
     {
       title: '岗位编码',
       dataIndex: 'code',
-      width: 208,
+      width: COL.code,
 
       render: (value: string) => (
         <span className="ferry-mono" style={{ fontSize: 12, color: 'var(--text-2)' }}>
@@ -75,13 +76,12 @@ export default function Post() {
     {
       title: '岗位名称',
       dataIndex: 'name',
-      width: 208,
       render: (value: string) => <span style={{ fontWeight: 500, color: 'var(--text-1)' }}>{value}</span>,
     },
     {
       title: '排序',
       dataIndex: 'sort',
-      width: 208,
+      width: COL.sort,
 
       align: 'right',
       render: (value: number) => <span className="ferry-mono">{value}</span>,
@@ -89,7 +89,7 @@ export default function Post() {
     {
       title: '状态',
       dataIndex: 'status',
-      width: 208,
+      width: COL.status,
 
       render: (value: number) => (
         <span className="ferry-status" data-tone={value === 1 ? 'success' : 'default'}>
@@ -101,7 +101,7 @@ export default function Post() {
     {
       title: '创建时间',
       dataIndex: 'createTime',
-      width: 208,
+      width: COL.time,
 
       render: (value: string) => (
         <span className="ferry-mono" style={{ fontSize: 12, color: 'var(--text-3)' }}>
@@ -112,7 +112,7 @@ export default function Post() {
     {
       title: '操作',
       key: 'action',
-      width: 150,
+      width: COL.action,
 
       fixed: 'right',
       render: (_, record) => (
@@ -121,7 +121,7 @@ export default function Post() {
             <Button
               type="link"
               size="small"
-              icon={<EditOutlined />}
+              icon={<Pencil size={14} />}
               onClick={() => {
                 setEditing(record)
                 form.resetFields()
@@ -137,7 +137,7 @@ export default function Post() {
               type="link"
               size="small"
               danger
-              icon={<DeleteOutlined />}
+              icon={<Trash2 size={14} />}
               onClick={() =>
                 modal.confirm({
                   title: `删除岗位「${record.name}」？`,
@@ -165,7 +165,7 @@ export default function Post() {
           can('system:post:save') && (
             <Button
               type="primary"
-              icon={<PlusOutlined />}
+              icon={<Plus size={14} />}
               onClick={() => {
                 setEditing(null)
                 form.resetFields()
@@ -183,7 +183,7 @@ export default function Post() {
         <div className="ferry-toolbar">
           <Input
             allowClear
-            prefix={<SearchOutlined style={{ color: 'var(--text-4)' }} />}
+            prefix={<Search size={15} style={{ color: 'var(--text-4)' }} />}
             placeholder="岗位编码"
             style={{ width: 150 }}
             value={draft.code}
@@ -210,7 +210,7 @@ export default function Post() {
           />
           <Button
             type="primary"
-            icon={<SearchOutlined />}
+            icon={<Search size={15} />}
             onClick={() => {
               setFilters(draft)
               setPage((prev) => ({ ...prev, current: 1 }))
@@ -219,7 +219,7 @@ export default function Post() {
             查询
           </Button>
           <Button
-            icon={<ReloadOutlined />}
+            icon={<RotateCw size={15} />}
             onClick={() => {
               setDraft({})
               setFilters({})
@@ -236,7 +236,7 @@ export default function Post() {
             columns={columns}
             dataSource={query.data?.records ?? []}
             loading={query.isLoading || query.isFetching}
-            scroll={{ x: 1190 }}
+            scroll={{ x: 'max-content' }}
             pagination={{
               current: page.current,
               pageSize: page.size,

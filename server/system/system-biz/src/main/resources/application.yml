@@ -6,16 +6,6 @@ spring:
     name: ferry-system
   profiles:
     active: dev
-  # 系统管理域（sys_*）的表结构由 system 迁移，交付域由 devops 各自迁移
-  flyway:
-    enabled: true
-    locations: classpath:db/migration
-    # 各服务独立历史表，避免共用一张表时互相校验对方的脚本
-    table: flyway_system_history
-    # 存量库没有迁移历史，首次启动按 V0 打基线；V1 用 IF NOT EXISTS，已有表不会被重建
-    baseline-on-migrate: true
-    baseline-version: 0
-    validate-on-migrate: true
   cloud:
     nacos:
       config:

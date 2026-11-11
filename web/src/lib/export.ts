@@ -33,7 +33,7 @@ function timestamp() {
 /**
  * CSV 导出
  *
- * PRD 功能 34：导出与列表同源、受数据权限约束、首行带导出人与筛选条件摘要；
+ * 导出与列表同源、受数据权限约束、首行带导出人与筛选条件摘要；
  * 这里把水印写成以 # 开头的注释行，Excel 打开时可直接看到，不影响列结构。
  */
 export function exportCsv<T>({ filename, rows, columns, operator, filters }: ExportOptions<T>) {

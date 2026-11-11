@@ -4,16 +4,13 @@ import {
   App,
   Alert,
   Button,
-  Checkbox,
   Drawer,
-  Empty,
   Form,
   Input,
   InputNumber,
   Modal,
   Radio,
   Select,
-  Switch,
   Table,
   Tabs,
   Tag,
@@ -21,21 +18,14 @@ import {
   Tree,
   type TableColumnsType,
 } from 'antd'
-import {
-  CopyOutlined,
-  DeleteOutlined,
-  EditOutlined,
-  ExportOutlined,
-  PlusOutlined,
-  ReloadOutlined,
-  SafetyCertificateOutlined,
-  SearchOutlined,
-} from '@ant-design/icons'
+import { Copy, Download, Pencil, Plus, RotateCw, Search, ShieldCheck, Trash2 } from 'lucide-react'
 import PageHeader from '@/components/PageHeader'
 import { BuiltinTag, EnabledTag } from '@/components/StatusTag'
-import { appScopeApi, menuApi, roleApi } from '@/api/system'
-import type { AppRow, DataScope, EnvRow, MenuNode, RoleRow } from '@/api/types'
+import { deptApi, menuApi, roleApi } from '@/api/system'
+import type { DeptNode, MenuNode, RoleRow } from '@/api/types'
+import { DATA_SCOPE_OPTIONS, dataScopeText } from '@/lib/dataScope'
 import { exportCsv } from '@/lib/export'
+import { COL } from '@/lib/table'
 import { useAuthStore } from '@/stores/auth'
 import { showError } from '@/lib/notify'
 
@@ -49,6 +39,12 @@ interface MenuTreeNode {
   key: string
   title: React.ReactNode
   children?: MenuTreeNode[]
+}
+
+interface DeptTreeNode {
+  key: string
+  title: string
+  children?: DeptTreeNode[]
 }
 
 function toMenuTree(nodes: MenuNode[], depth = 0): MenuTreeNode[] {
@@ -66,6 +62,14 @@ function toMenuTree(nodes: MenuNode[], depth = 0): MenuTreeNode[] {
       </span>
     ),
     children: node.children?.length ? toMenuTree(node.children, depth + 1) : undefined,
+  }))
+}
+
+function toDeptTree(nodes: DeptNode[]): DeptTreeNode[] {
+  return nodes.map((node) => ({
+    key: node.id,
+    title: node.name,
+    children: node.children?.length ? toDeptTree(node.children) : undefined,
   }))
 }
 
@@ -88,12 +92,22 @@ export default function Role() {
   const [page, setPage] = useState({ current: 1, size: 30 })
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<RoleRow | null>(null)
-  const [tab, setTab] = useState('basic')
+
+  /** 授权抽屉：与新增/编辑完全独立，操作栏单独打开 */
+  const [grantRole, setGrantRole] = useState<RoleRow | null>(null)
+  const [grantTab, setGrantTab] = useState<'menu' | 'data'>('menu')
   const [checkedKeys, setCheckedKeys] = useState<string[]>([])
-  const [dataScope, setDataScope] = useState<DataScope>({ mode: 'custom', pairs: [], prodOps: false })
-  const [prodModal, setProdModal] = useState(false)
-  const [prodReason, setProdReason] = useState('')
-  const [prodConfirmed, setProdConfirmed] = useState(false)
+  /**
+   * 该角色的菜单授权是否已真正加载。
+   *
+   * 与「勾选列表为空」不是一回事：加载失败时列表同样为空，
+   * 此时点保存会以空集合覆盖授权，表现为「进去看了一眼，权限全没了」。
+   */
+  const [menuLoaded, setMenuLoaded] = useState(false)
+  /** 数据范围与已授权部门：同样要区分「没加载」与「就是空的」 */
+  const [dataScope, setDataScope] = useState(2)
+  const [deptKeys, setDeptKeys] = useState<string[]>([])
+  const [dataLoaded, setDataLoaded] = useState(false)
   const [form] = Form.useForm()
 
   const listQuery = useQuery({
@@ -103,40 +117,61 @@ export default function Role() {
 
   const menuQuery = useQuery({ queryKey: ['menu-tree'], queryFn: () => menuApi.treeList({}) })
 
-  const scopeQuery = useQuery({
-    queryKey: ['scope-options'],
-    queryFn: appScopeApi.options,
-    retry: false,
-    staleTime: 5 * 60_000,
-  })
-
   const menuTreeData = useMemo(() => toMenuTree(menuQuery.data ?? []), [menuQuery.data])
   const allMenuIds = useMemo(() => collectIds(menuQuery.data ?? []), [menuQuery.data])
-  const apps: AppRow[] = scopeQuery.data?.apps ?? []
-  const envs: EnvRow[] = scopeQuery.data?.envs ?? []
+
+  /** 部门树：授权范围只在超管手里配置，非超管看不到这个抽屉的保存按钮 */
+  const deptQuery = useQuery({
+    queryKey: ['dept-tree'],
+    queryFn: () => deptApi.treeList({}),
+    enabled: Boolean(grantRole),
+  })
+
+  const deptTreeData = useMemo(() => toDeptTree(deptQuery.data ?? []), [deptQuery.data])
 
   /**
-   * 已授权菜单需要单独拉：列表接口不下发 menuIds。
-   * 不拉就会拿空集合去覆盖授权（打开抽屉只改个名字，保存后权限被清空）。
+   * 已授权菜单单独拉：列表接口不下发 menuIds。
+   * 授权抽屉每次打开都要拿最新值，因此 staleTime 置 0 不做缓存。
    */
   const grantedQuery = useQuery({
-    queryKey: ['role-menus', editing?.id],
-    queryFn: () => roleApi.menuList(editing!.id),
-    enabled: Boolean(editing?.id) && !editing?.menuIds,
+    queryKey: ['role-menus', grantRole?.id],
+    queryFn: () => roleApi.menuList(grantRole!.id),
+    enabled: Boolean(grantRole?.id) && !grantRole?.menuIds,
+    staleTime: 0,
+    retry: false,
+  })
+
+  /** 数据范围每次打开都取最新值，同样不吃缓存 */
+  const dataScopeQuery = useQuery({
+    queryKey: ['role-data-scope', grantRole?.id],
+    queryFn: () => roleApi.dataScope(grantRole!.id),
+    enabled: Boolean(grantRole?.id),
     staleTime: 0,
     retry: false,
   })
 
   useEffect(() => {
-    if (!open || !editing) return
-    if (editing.menuIds) {
-      setCheckedKeys(editing.menuIds)
+    if (!grantRole) return
+    if (grantRole.menuIds) {
+      setCheckedKeys(grantRole.menuIds)
+      setMenuLoaded(true)
       return
     }
     if (grantedQuery.data) {
       setCheckedKeys(grantedQuery.data.map((menu) => String(menu.id)))
+      setMenuLoaded(true)
     }
-  }, [open, editing, grantedQuery.data])
+    // 加载失败时保持 false：此时勾选列表必然为空，提交上去等于把授权清空，
+    // 宁可让「保存」按钮不可用，也不要用一个假状态覆盖真实权限
+  }, [grantRole, grantedQuery.data])
+
+  useEffect(() => {
+    if (!dataScopeQuery.data) return
+    setDataScope(dataScopeQuery.data.dataScope)
+    setDeptKeys((dataScopeQuery.data.deptIds ?? []).map(String))
+    setDataLoaded(true)
+    // 同上：取不到真实值时不能放开保存，否则会把数据范围改成默认的空自定义
+  }, [dataScopeQuery.data])
 
   const invalidate = () => {
     void queryClient.invalidateQueries({ queryKey: ['roles'] })
@@ -146,18 +181,36 @@ export default function Role() {
 
   const saveMutation = useMutation({
     mutationFn: async (payload: { values: Record<string, unknown>; roleId?: string }) => {
-      const text = await roleApi.save({ ...payload.values, id: payload.roleId })
-      const roleId = payload.roleId ?? listQuery.data?.records.find((item) => item.code === payload.values.code)?.id
-      // 空集合一律不提交：既可能是「本来就没授权」，也可能是「授权还没加载回来」，
-      // 后端 authorizeMenu 是先删后插，误提交等于把角色权限清空
-      if (roleId && checkedKeys.length > 0) {
-        await roleApi.authorizeMenu(roleId, checkedKeys, dataScope)
-      }
-      return text
+      // 只提交角色主数据，菜单授权是独立操作，见 grantMutation
+      return roleApi.save({ ...payload.values, id: payload.roleId })
     },
     onSuccess: (text) => {
       message.success(text || '保存成功')
       setOpen(false)
+      invalidate()
+    },
+    onError: showError,
+  })
+
+  /** 菜单授权：与新增/编辑解耦，独立提交 */
+  const grantMutation = useMutation({
+    mutationFn: async (payload: { roleId: string; menuIds: string[] }) =>
+      roleApi.authorizeMenu(payload.roleId, payload.menuIds),
+    onSuccess: (text) => {
+      message.success(text || '授权成功')
+      setGrantRole(null)
+      invalidate()
+    },
+    onError: showError,
+  })
+
+  /** 数据权限授权：同样独立提交，不与菜单授权互相覆盖 */
+  const scopeMutation = useMutation({
+    mutationFn: async (payload: { id: string; dataScope: number; deptIds: string[] }) =>
+      roleApi.authorizeDataScope(payload.id, payload.dataScope, payload.deptIds),
+    onSuccess: (text) => {
+      message.success(text || '授权成功')
+      setGrantRole(null)
       invalidate()
     },
     onError: showError,
@@ -174,21 +227,24 @@ export default function Role() {
 
   const openEditor = (record: RoleRow | null) => {
     setEditing(record)
-    setTab('basic')
     form.resetFields()
     if (record) {
       form.setFieldsValue({ ...record })
-      // 授权菜单由 grantedQuery 拉回后回填（见上方 useEffect），这里只先清空避免串上一个角色的勾选
-      setCheckedKeys(record.menuIds ?? [])
-      // 后端暂未下发 dataScope 时用「按应用授权」的空集兜底：
-      // 若默认成 all，保存时会把本来受限的角色悄悄放大成全部应用
-      setDataScope(record.dataScope ?? { mode: 'custom', pairs: [], prodOps: false })
     } else {
       form.setFieldsValue({ status: 1, sort: 10 })
-      setCheckedKeys([])
-      setDataScope({ mode: 'custom', pairs: [], prodOps: false })
     }
     setOpen(true)
+  }
+
+  /** 打开授权抽屉：先清空上一轮的勾选，等查询拉回真实授权后回填 */
+  const openGrant = (record: RoleRow) => {
+    setGrantRole(record)
+    setGrantTab('menu')
+    setCheckedKeys([])
+    setMenuLoaded(false)
+    setDataScope(2)
+    setDeptKeys([])
+    setDataLoaded(false)
   }
 
   const submitBasic = async () => {
@@ -199,7 +255,7 @@ export default function Role() {
   const copyRole = (record: RoleRow) => {
     modal.confirm({
       title: `复制角色「${record.name}」？`,
-      content: '复制后生成独立角色，功能权限与数据权限与源角色一致，互不影响。',
+      content: '复制后生成独立角色，功能权限与源角色一致，之后各自维护、互不影响。',
       okText: '复制',
       cancelText: '取消',
       onOk: async () => {
@@ -210,7 +266,6 @@ export default function Role() {
           sort: record.sort + 1,
           remark: `复制自 ${record.name}`,
           menuIds: record.menuIds ?? [],
-          dataScope: record.dataScope ?? { mode: 'custom', pairs: [], prodOps: false },
         })
         message.success('已复制角色')
         invalidate()
@@ -233,7 +288,6 @@ export default function Role() {
     {
       title: '角色名称',
       dataIndex: 'name',
-      width: 204,
       render: (_, record) => (
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <span style={{ fontWeight: 550, color: 'var(--text-1)' }}>{record.name}</span>
@@ -244,7 +298,7 @@ export default function Role() {
     {
       title: '角色编码',
       dataIndex: 'code',
-      width: 204,
+      width: COL.code,
       render: (value: string) => (
         <span className="ferry-mono" style={{ fontSize: 12 }}>
           {value}
@@ -254,20 +308,28 @@ export default function Role() {
     {
       title: '排序',
       dataIndex: 'sort',
-      width: 204,
+      width: COL.sort,
       align: 'right',
       render: (value: number) => <span className="ferry-mono">{value ?? '—'}</span>,
     },
     {
       title: '状态',
       dataIndex: 'status',
-      width: 204,
+      width: COL.status,
       render: (value: number) => <EnabledTag value={value} />,
+    },
+    {
+      title: '数据范围',
+      dataIndex: 'dataScope',
+      width: 130,
+      render: (value?: number) => (
+        <span style={{ fontSize: 12.5, color: 'var(--text-2)' }}>{dataScopeText(value)}</span>
+      ),
     },
     {
       title: '创建时间',
       dataIndex: 'createTime',
-      width: 204,
+      width: COL.time,
       render: (value: string) => (
         <span className="ferry-mono" style={{ fontSize: 12, color: 'var(--text-3)' }}>
           {value || '—'}
@@ -279,13 +341,16 @@ export default function Role() {
   columns.push({
     title: '操作',
     key: 'action',
-    width: 170,
+    width: COL.actionWide,
     render: (_, record) => (
       <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-        <Button type="link" size="small" icon={<EditOutlined />} onClick={() => openEditor(record)}>
+        <Button type="link" size="small" icon={<Pencil size={14} />} onClick={() => openEditor(record)}>
           编辑
         </Button>
-        <Button type="link" size="small" icon={<CopyOutlined />} onClick={() => copyRole(record)}>
+        <Button type="link" size="small" icon={<ShieldCheck size={14} />} onClick={() => openGrant(record)}>
+          授权
+        </Button>
+        <Button type="link" size="small" icon={<Copy size={14} />} onClick={() => copyRole(record)}>
           复制
         </Button>
         <Tooltip
@@ -303,7 +368,7 @@ export default function Role() {
             type="link"
             size="small"
             danger
-            icon={<DeleteOutlined />}
+            icon={<Trash2 size={14} />}
             disabled={Boolean(record.builtin) || (record.memberCount ?? 0) > 0}
             onClick={() => confirmDelete(record)}
           />
@@ -311,12 +376,6 @@ export default function Role() {
       </div>
     ),
   })
-
-  const prodGrant = () => {
-    setProdReason('')
-    setProdConfirmed(false)
-    setProdModal(true)
-  }
 
   return (
     <>
@@ -326,7 +385,7 @@ export default function Role() {
         extra={
           <>
             <Button
-              icon={<ExportOutlined />}
+              icon={<Download size={15} />}
               onClick={() => {
                 const rows = listQuery.data?.records ?? []
                 exportCsv<RoleRow>({
@@ -347,7 +406,7 @@ export default function Role() {
               导出
             </Button>
             {can('system:role:save') && (
-              <Button type="primary" icon={<PlusOutlined />} onClick={() => openEditor(null)}>
+              <Button type="primary" icon={<Plus size={14} />} onClick={() => openEditor(null)}>
                 新增角色
               </Button>
             )}
@@ -359,7 +418,7 @@ export default function Role() {
         <div className="ferry-toolbar">
           <Input
             allowClear
-            prefix={<SearchOutlined style={{ color: 'var(--text-4)' }} />}
+            prefix={<Search size={15} style={{ color: 'var(--text-4)' }} />}
             placeholder="角色名称"
             style={{ width: 180 }}
             value={draft.name}
@@ -389,7 +448,7 @@ export default function Role() {
           />
           <Button
             type="primary"
-            icon={<SearchOutlined />}
+            icon={<Search size={15} />}
             onClick={() => {
               setFilters(draft)
               setPage((prev) => ({ ...prev, current: 1 }))
@@ -398,7 +457,7 @@ export default function Role() {
             查询
           </Button>
           <Button
-            icon={<ReloadOutlined />}
+            icon={<RotateCw size={15} />}
             onClick={() => {
               setDraft({})
               setFilters({})
@@ -415,7 +474,7 @@ export default function Role() {
             columns={columns}
             dataSource={listQuery.data?.records ?? []}
             loading={listQuery.isLoading || listQuery.isFetching}
-            scroll={{ x: 1190 }}
+            scroll={{ x: 'max-content' }}
             pagination={{
               current: page.current,
               pageSize: page.size,
@@ -429,98 +488,134 @@ export default function Role() {
         </div>
       </section>
 
-      <Drawer
+      <Modal
         open={open}
-        size={760}
         title={editing ? `编辑角色 · ${editing.name}` : '新增角色'}
-        onClose={() => setOpen(false)}
+        width={560}
+        okText="保存"
+        cancelText="取消"
+        confirmLoading={saveMutation.isPending}
+        onCancel={() => setOpen(false)}
+        onOk={() => void submitBasic()}
+        destroyOnHidden
+      >
+        <Form form={form} layout="vertical" requiredMark="optional">
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '0 16px' }}>
+            <Form.Item name="name" label="角色名称" rules={[{ required: true, message: '请输入角色名称' }]}>
+              <Input placeholder="例如 发布经理" maxLength={20} />
+            </Form.Item>
+            <Form.Item
+              name="code"
+              label="角色编码"
+              rules={[
+                { required: true, message: '请输入角色编码' },
+                { pattern: /^[a-z][a-z0-9-]{1,19}$/, message: '小写字母开头，可含数字与中划线' },
+              ]}
+              extra={editing?.builtin ? '内置角色编码不可修改' : '用于接口鉴权与审计，创建后建议不改'}
+            >
+              <Input placeholder="例如 release" disabled={editing?.builtin} />
+            </Form.Item>
+            <Form.Item name="sort" label="显示顺序">
+              <InputNumber min={1} max={999} style={{ width: '100%' }} />
+            </Form.Item>
+            <Form.Item name="status" label="状态">
+              <Radio.Group
+                options={[
+                  { value: 1, label: '正常' },
+                  { value: 0, label: '停用' },
+                ]}
+              />
+            </Form.Item>
+          </div>
+          <Form.Item name="remark" label="职责描述">
+            <Input.TextArea rows={3} placeholder="说明该角色的职责边界，便于审计与交接" maxLength={200} showCount />
+          </Form.Item>
+          {editing?.builtin && (
+            <Alert
+              type="info"
+              showIcon
+              message="系统预置角色"
+              description="五个预置角色可复制、可修改权限，但不可删除。这是审计与应急恢复的兜底。"
+            />
+          )}
+        </Form>
+      </Modal>
+
+      <Drawer
+        open={Boolean(grantRole)}
+        size={620}
+        title={`授权 · ${grantRole?.name ?? ''}`}
+        onClose={() => setGrantRole(null)}
         destroyOnHidden
         footer={
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-            <Button onClick={() => setOpen(false)}>取消</Button>
-            <Button type="primary" loading={saveMutation.isPending} onClick={() => void submitBasic()}>
-              保存
-            </Button>
+            <Button onClick={() => setGrantRole(null)}>取消</Button>
+            {/* 两个 Tab 各自提交：一次点击只改一种授权，避免菜单与数据范围互相覆盖 */}
+            {grantTab === 'menu' ? (
+              <Button
+                type="primary"
+                loading={grantMutation.isPending}
+                // 授权还没加载回来就点保存，会用空勾选覆盖掉真实授权
+                disabled={!menuLoaded}
+                onClick={() => {
+                  if (!grantRole) return
+                  grantMutation.mutate({ roleId: grantRole.id, menuIds: checkedKeys })
+                }}
+              >
+                保存功能权限
+              </Button>
+            ) : (
+              <Button
+                type="primary"
+                loading={scopeMutation.isPending}
+                disabled={!dataLoaded}
+                onClick={() => {
+                  if (!grantRole) return
+                  // 非自定义范围不提交部门，避免旧勾选留在库里，切回自定义时悄悄生效
+                  scopeMutation.mutate({
+                    id: grantRole.id,
+                    dataScope,
+                    deptIds: dataScope === 2 ? deptKeys : [],
+                  })
+                }}
+              >
+                保存数据权限
+              </Button>
+            )}
           </div>
         }
       >
         <Tabs
-          activeKey={tab}
-          onChange={setTab}
+          activeKey={grantTab}
+          onChange={(key) => setGrantTab(key as 'menu' | 'data')}
           items={[
             {
-              key: 'basic',
-              label: '基本信息',
-              children: (
-                <Form form={form} layout="vertical" requiredMark="optional">
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '0 16px' }}>
-                    <Form.Item name="name" label="角色名称" rules={[{ required: true, message: '请输入角色名称' }]}>
-                      <Input placeholder="例如 发布经理" maxLength={20} />
-                    </Form.Item>
-                    <Form.Item
-                      name="code"
-                      label="角色编码"
-                      rules={[
-                        { required: true, message: '请输入角色编码' },
-                        { pattern: /^[a-z][a-z0-9-]{1,19}$/, message: '小写字母开头，可含数字与中划线' },
-                      ]}
-                      extra={editing?.builtin ? '内置角色编码不可修改' : '用于接口鉴权与审计，创建后建议不改'}
-                    >
-                      <Input placeholder="例如 release" disabled={editing?.builtin} />
-                    </Form.Item>
-                    <Form.Item name="sort" label="显示顺序">
-                      <InputNumber min={1} max={999} style={{ width: '100%' }} />
-                    </Form.Item>
-                    <Form.Item name="status" label="状态">
-                      <Radio.Group
-                        options={[
-                          { value: 1, label: '正常' },
-                          { value: 0, label: '停用' },
-                        ]}
-                      />
-                    </Form.Item>
-                  </div>
-                  <Form.Item name="remark" label="职责描述">
-                    <Input.TextArea rows={3} placeholder="说明该角色的职责边界，便于审计与交接" maxLength={200} showCount />
-                  </Form.Item>
-                  {editing?.builtin && (
-                    <Alert
-                      type="info"
-                      showIcon
-                      message="系统预置角色"
-                      description="五个预置角色可复制、可修改权限，但不可删除。这是审计与应急恢复的兜底。"
-                    />
-                  )}
-                </Form>
-              ),
-            },
-            {
               key: 'menu',
-              label: `功能权限（${checkedKeys.length}）`,
+              label: '功能权限',
               children: (
-                <div>
-                  <Alert
-                    type="info"
-                    showIcon
-                    style={{ marginBottom: 12 }}
-                    message="勾选菜单即授予页面访问权，勾选按钮即授予操作权。父级菜单会自动保留，用于渲染导航。"
-                  />
-                  <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+                <>
+                  <div className="ferry-toolbar" style={{ padding: '0 0 10px', borderBottom: 'none' }}>
+                    <span className="ferry-caption">
+                      已选 {checkedKeys.length} / {allMenuIds.length} 个权限点
+                    </span>
+                    <div className="ferry-toolbar__spacer" />
                     <Button size="small" onClick={() => setCheckedKeys(allMenuIds)}>
                       全选
                     </Button>
                     <Button size="small" onClick={() => setCheckedKeys([])}>
                       清空
                     </Button>
-                    <span className="ferry-spacer" />
-                    <span className="ferry-caption">共 {allMenuIds.length} 个权限点</span>
+                  </div>
+                  <div className="ferry-caption" style={{ marginBottom: 10 }}>
+                    勾选菜单即授予页面访问权，勾选按钮即授予操作权；父级菜单会自动保留，用于渲染导航。
                   </div>
                   <div
                     style={{
                       border: '1px solid var(--border-1)',
                       borderRadius: 8,
                       padding: 12,
-                      maxHeight: 460,
+                      minHeight: 420,
+                      maxHeight: 'calc(100vh - 360px)',
                       overflow: 'auto',
                     }}
                   >
@@ -537,177 +632,72 @@ export default function Role() {
                       }}
                     />
                   </div>
-                </div>
+                </>
               ),
             },
             {
               key: 'data',
               label: '数据权限',
               children: (
-                <div>
+                <>
+                  <div className="ferry-caption" style={{ marginBottom: 12 }}>
+                    数据范围决定该角色能看到哪些部门的数据；能进哪个页面由「功能权限」决定，两者互不影响。
+                  </div>
+                  <Radio.Group
+                    value={dataScope}
+                    onChange={(event) => setDataScope(event.target.value)}
+                    style={{ display: 'flex', flexDirection: 'column', gap: 10 }}
+                  >
+                    {DATA_SCOPE_OPTIONS.map((item) => (
+                      <Radio key={item.value} value={item.value}>
+                        {item.label}
+                      </Radio>
+                    ))}
+                  </Radio.Group>
+                  {dataScope === 2 && (
+                    <>
+                      <div className="ferry-caption" style={{ margin: '16px 0 8px' }}>
+                        勾选的部门会自动包含其全部下级；父级与子级独立勾选，不会互相带选。
+                      </div>
+                      <div
+                        style={{
+                          border: '1px solid var(--border-1)',
+                          borderRadius: 8,
+                          padding: 12,
+                          minHeight: 240,
+                          maxHeight: 'calc(100vh - 460px)',
+                          overflow: 'auto',
+                        }}
+                      >
+                        <Tree
+                          checkable
+                          checkStrictly
+                          selectable={false}
+                          defaultExpandAll
+                          treeData={deptTreeData}
+                          checkedKeys={{ checked: deptKeys, halfChecked: [] }}
+                          onCheck={(checked) => {
+                            const keys = Array.isArray(checked) ? checked : checked.checked
+                            setDeptKeys(keys.map(String))
+                          }}
+                        />
+                      </div>
+                    </>
+                  )}
                   <Alert
+                    style={{ marginTop: 16 }}
                     type="info"
                     showIcon
-                    style={{ marginBottom: 14 }}
-                    message="数据权限按「应用-环境」二元组生效"
-                    description="未授权的组合既不展示也不可操作，接口层强制校验。生产环境操作需单独授予，且提交时要求操作人与确认人非同一人。"
+                    message="保存后不会踢人，已登录用户仍是旧范围"
+                    description="数据范围在登录时算好并缓存在会话里，保存只改库、不动在线会话。被授权人重新登录后才会按新范围过滤；期间他自己退出即可刷新。"
                   />
-                  <Radio.Group
-                    value={dataScope.mode}
-                    onChange={(event) => setDataScope((prev) => ({ ...prev, mode: event.target.value }))}
-                    style={{ marginBottom: 14 }}
-                  >
-                    <Radio.Button value="all">全部应用</Radio.Button>
-                    <Radio.Button value="custom">按应用授权</Radio.Button>
-                  </Radio.Group>
-
-                  {dataScope.mode === 'all' ? (
-                    <div className="ferry-placeholder" style={{ padding: 32, border: '1px dashed var(--border-1)', borderRadius: 10 }}>
-                      <SafetyCertificateOutlined style={{ fontSize: 22, color: 'var(--color-primary)' }} />
-                      <span className="ferry-placeholder__title">已授予全部应用与环境的可见范围</span>
-                      <span className="ferry-caption">谨慎使用。生产环境的写操作权限仍需下方单独开启。</span>
-                    </div>
-                  ) : (
-                    <div className="ferry-matrix">
-                      {apps.length === 0 && (
-                        <Empty
-                          image={Empty.PRESENTED_IMAGE_SIMPLE}
-                          description="应用主数据尚未接入（应用管理模块规划中），当前无可授权对象"
-                        />
-                      )}
-                      {apps.map((app) => {
-                        const pair = dataScope.pairs.find((item) => item.appId === app.id)
-                        return (
-                          <div className="ferry-matrix__row" key={app.id} data-active={!!pair}>
-                            <div className="ferry-matrix__app">
-                              <span style={{ fontWeight: 500, color: 'var(--text-1)' }}>{app.name}</span>
-                              <span className="ferry-matrix__code">{app.code}</span>
-                              {app.core && <Tag color="red">核心链路</Tag>}
-                              <span className="ferry-caption" style={{ marginLeft: 'auto' }}>
-                                {app.team}
-                              </span>
-                            </div>
-                            <div className="ferry-matrix__envs">
-                              {envs.map((env) => {
-                                const checked = pair?.envIds.includes(env.id) ?? false
-                                return (
-                                  <Checkbox
-                                    key={env.id}
-                                    checked={checked}
-                                    onChange={(event) => {
-                                      setDataScope((prev) => {
-                                        const exists = prev.pairs.find((item) => item.appId === app.id)
-                                        let pairs = [...prev.pairs]
-                                        if (!exists) {
-                                          if (!event.target.checked) return prev
-                                          pairs.push({ appId: app.id, envIds: [env.id] })
-                                        } else {
-                                          const envIds = event.target.checked
-                                            ? Array.from(new Set([...exists.envIds, env.id]))
-                                            : exists.envIds.filter((id) => id !== env.id)
-                                          pairs = pairs
-                                            .map((item) => (item.appId === app.id ? { ...item, envIds } : item))
-                                            .filter((item) => item.envIds.length > 0)
-                                        }
-                                        return { ...prev, pairs }
-                                      })
-                                    }}
-                                  >
-                                    <span style={{ fontSize: 12 }}>{env.short}</span>
-                                  </Checkbox>
-                                )
-                              })}
-                            </div>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  )}
-
-                  <div
-                    style={{
-                      marginTop: 18,
-                      padding: 14,
-                      border: '1px solid var(--border-1)',
-                      borderRadius: 10,
-                      background: 'var(--bg-subtle)',
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <Switch
-                        checked={dataScope.prodOps}
-                        onChange={(checked) => {
-                          if (checked) prodGrant()
-                          else
-                            setDataScope((prev) => ({
-                              ...prev,
-                              prodOps: false,
-                              prodOpsReason: undefined,
-                              prodOpsGrantedAt: undefined,
-                            }))
-                        }}
-                      />
-                      <div>
-                        <div style={{ fontSize: 13, fontWeight: 550, color: 'var(--text-1)' }}>生产环境操作权限</div>
-                        <div className="ferry-caption">
-                          {dataScope.prodOps
-                            ? `已授予${dataScope.prodOpsReason ? `：${dataScope.prodOpsReason}` : ''}`
-                            : '未授予。开启需二次确认并填写授权理由，记录进入审计。'}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                </>
               ),
             },
           ]}
         />
       </Drawer>
 
-      <Modal
-        open={prodModal}
-        title="授予生产环境操作权限"
-        okText="确认授予"
-        cancelText="取消"
-        width={520}
-        okButtonProps={{ disabled: !prodConfirmed || prodReason.trim().length < 8 }}
-        onCancel={() => setProdModal(false)}
-        onOk={() => {
-          setDataScope((prev) => ({
-            ...prev,
-            prodOps: true,
-            prodOpsReason: prodReason.trim(),
-            prodOpsGrantedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
-          }))
-          setProdModal(false)
-          message.success('已授予生产操作权限，保存后生效')
-        }}
-        destroyOnHidden
-      >
-        <Alert
-          type="warning"
-          showIcon
-          style={{ marginBottom: 14 }}
-          message="这是高风险授权"
-          description="获得该权限的角色可执行生产回滚、生产发布等高危动作。授权理由与时间将写入审计，请确保有对应的变更单或保障任务。"
-        />
-        <div style={{ marginBottom: 8, fontSize: 13, color: 'var(--text-2)' }}>授权理由（不少于 8 个字）</div>
-        <Input.TextArea
-          rows={3}
-          value={prodReason}
-          onChange={(event) => setProdReason(event.target.value)}
-          placeholder="例如：双十一保障期间，SRE 值班需要执行生产回滚"
-          maxLength={200}
-          showCount
-        />
-        <Checkbox
-          style={{ marginTop: 12 }}
-          checked={prodConfirmed}
-          onChange={(event) => setProdConfirmed(event.target.checked)}
-        >
-          我已确认该授权的风险，并已获得对应负责人批准
-        </Checkbox>
-      </Modal>
     </>
   )
 }

@@ -94,27 +94,10 @@ a {
   color: var(--text-3);
 }
 
-.ferry-secondary {
-  color: var(--text-2);
-}
-
-.ferry-title {
-  font-size: var(--fs-20);
-  font-weight: 600;
-  letter-spacing: -0.01em;
-  color: var(--text-1);
-}
-
 .ferry-caption {
   font-size: var(--fs-12);
   color: var(--text-3);
   line-height: 1.5;
-}
-
-.ferry-ellipsis {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .ferry-hstack {
@@ -687,21 +670,6 @@ a {
   background: linear-gradient(180deg, #f87171, var(--color-danger));
 }
 
-.ferry-delta {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  font-size: var(--fs-12);
-  font-weight: 500;
-}
-
-.ferry-delta--up {
-  color: var(--color-danger);
-}
-.ferry-delta--down {
-  color: var(--color-success);
-}
-
 /* ---------- 工作台 ---------- */
 
 .ferry-workbench {
@@ -829,45 +797,9 @@ a {
 }
 
 /**
- * 字典分组树：分组只有一层，节点全是叶子，switcher 恒为 noop（28px 空占位）。
- * 这里把占位去掉，名称贴左、字典码贴右，窄侧栏里能多露出几个字符。
- *
- * 只作用于字典页侧栏：用户管理页的部门树同样用 .ferry-tree-scroll，但它有多级子节点，
- * 全局隐藏 noop 会让子级少掉一层缩进、和父级文字齐平。
+ * 字典页侧栏已改为表格列表，树节点相关的样式（switcher 占位、分组删除按钮的 hover 显形）
+ * 随之移除；用户管理页的部门树仍走 .ferry-tree-scroll 的通用行距规则。
  */
-.ferry-split__aside--dict .ferry-tree-scroll .ant-tree-switcher-noop {
-  display: none;
-}
-
-.ferry-split__aside--dict .ant-tree-node-content-wrapper {
-  min-width: 0;
-}
-
-.ferry-split__aside--dict .ant-tree-title {
-  display: block;
-  min-width: 0;
-}
-
-.ferry-dict-node {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  min-width: 0;
-}
-
-.ferry-dict-node__label {
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
-.ferry-dict-node__code {
-  flex: 0 0 auto;
-  margin-left: auto;
-  font-size: 10.5px;
-  color: var(--text-4);
-}
 
 /* ---------- 快捷入口卡 ---------- */
 
@@ -922,69 +854,6 @@ a {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-/* ---------- 活动流 ---------- */
-
-.ferry-feed {
-  display: flex;
-  flex-direction: column;
-}
-
-.ferry-feed__item {
-  display: flex;
-  gap: 10px;
-  padding: 11px 0;
-  border-bottom: 1px dashed var(--border-1);
-}
-
-.ferry-feed__item:last-child {
-  border-bottom: none;
-}
-
-.ferry-feed__dot {
-  margin-top: 5px;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  flex: 0 0 auto;
-  background: var(--text-4);
-}
-
-.ferry-feed__dot[data-type='create'] {
-  background: var(--color-success);
-}
-.ferry-feed__dot[data-type='delete'] {
-  background: var(--color-danger);
-}
-.ferry-feed__dot[data-type='auth'] {
-  background: var(--color-warning);
-}
-.ferry-feed__dot[data-type='export'] {
-  background: #7c3aed;
-}
-.ferry-feed__dot[data-type='login'] {
-  background: var(--brand-6);
-}
-
-.ferry-feed__body {
-  min-width: 0;
-  flex: 1;
-}
-
-.ferry-feed__text {
-  font-size: var(--fs-13);
-  color: var(--text-1);
-  line-height: 1.5;
-}
-
-.ferry-feed__meta {
-  margin-top: 2px;
-  font-size: var(--fs-12);
-  color: var(--text-3);
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
 }
 
 /* ---------- 空状态 / 占位 ---------- */
@@ -1504,47 +1373,114 @@ a {
 }
 
 /* ============================================================
-   Ant Design 局部收敛（只改观感，不改交互）
+   Ant Design 覆盖
+   ------------------------------------------------------------
+   只保留 token 表达不了的三类，其余（字号、颜色、内边距、圆角）一律写进
+   theme.ts 的 components：那边由 antd 自己计算优先级，不会随版本改类名失效。
+
+   1) 结构定位：把分页并进面板页脚这类「跨组件」的布局调整
+   2) 第三方包裹层：antd <App> 插入的 div、Table 的 sticky 单元格
+   3) 组件内 DOM 钩子：菜单选中态的竖条这类只能贴 ::after 的细节
    ============================================================ */
 
-.ant-table-wrapper .ant-table {
-  font-size: var(--fs-13);
-}
-
-.ant-table-wrapper .ant-table-thead > tr > th {
-  font-weight: 550;
-  font-size: var(--fs-12);
-  letter-spacing: 0.02em;
-  text-transform: none;
-  white-space: nowrap;
-}
-
-.ant-table-wrapper .ant-table-tbody > tr > td {
-  border-bottom-color: var(--border-1);
-}
-
+/* antd Table 的 hover 背景写在行内，只能靠 !important 压过去 */
 .ant-table-wrapper .ant-table-tbody > tr:hover > td {
   background: var(--bg-subtle) !important;
 }
 
+/**
+ * 表头排版。
+ *
+ * 字号走不了 token：表格只有 cellFontSize 一个值，表头与表体共用它，
+ * 但这里表头需要比表体小一号。nowrap 同样没有对应 token，四字标题在窄列会折行。
+ */
+.ant-table-wrapper .ant-table-thead > tr > th {
+  font-weight: 550;
+  font-size: var(--fs-12);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+/* 固定列要盖住横向滚动时穿过去的内容，背景必须与表格一致 */
 .ant-table-wrapper .ant-table-cell-fix-right,
 .ant-table-wrapper .ant-table-cell-fix-left {
   background: var(--bg-surface);
 }
 
-.ant-table-wrapper .ant-pagination {
+/**
+ * 树表展开按钮
+ *
+ * 把 antd 表头那套 37px 带边框的方块整个让掉，只留一个裸箭头：
+ * 无背景、无边框、无最小宽度，箭头本身按 expanded 旋转 90°。
+ * 尺寸与 .ferry-row-indent 的缩进节奏对齐，展开后文字不会左右跳动。
+ */
+.ferry-tree-expand {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: none;
+  border-radius: var(--r-xs);
+  background: transparent;
+  color: var(--text-3);
+  cursor: pointer;
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+
+.ferry-tree-expand svg {
+  transition: transform 0.18s ease;
+}
+
+.ferry-tree-expand[data-expanded='true'] svg {
+  transform: rotate(90deg);
+}
+
+.ferry-tree-expand:hover {
+  color: var(--text-1);
+  background: var(--bg-hover);
+}
+
+/**
+ * 分页属于页脚：和工具栏一样有 18px 内边距与一条上分隔线。
+ *
+ * antd 默认给分页 margin: 16px 0 让它脱离表格；本项目面板是「工具栏 / 表格 / 页脚」
+ * 三段式，分页需要落在页脚这一段里，所以清掉外边距、改用内边距，
+ * 左右才能与工具栏、单元格对齐。
+ *
+ * 只作用于 .ferry-panel 内的列表，弹窗里的小表格（字典项）不受影响。
+ */
+.ferry-panel .ant-table-wrapper .ant-pagination {
   margin: 0 !important;
+  padding: 12px 18px;
+  border-top: 1px solid var(--border-1);
 }
 
-.ant-btn {
-  font-weight: 500;
-  box-shadow: none;
+/**
+ * 表格最后一行不画底边。
+ *
+ * 分页紧跟在表格下方（渲染在同一个 .ant-table-wrapper 里），自己已经有一条 border-top
+ * 作分隔，最后一行再带一条底边就会出现两条相距 26px 的平行线。
+ * 只清「同容器内有分页」的那张表，无分页的表格仍需底边收口。
+ */
+.ferry-panel .ant-table-wrapper:has(.ant-pagination) .ant-table-tbody > tr:last-child > td {
+  border-bottom: none;
 }
 
-.ant-btn-primary {
-  box-shadow: 0 1px 2px rgba(22, 119, 255, 0.24);
+/* 分页与文字页脚同时存在时（审计、字典），分隔线由分页那条负责，避免叠成双线 */
+.ferry-table-wrap:has(.ant-pagination) + .ferry-table-footer {
+  border-top: none;
 }
 
+/**
+ * 弹窗的三段式留白。
+ *
+ * antd 的 Modal 内边距是内部派生值（contentPadding / headerPadding / bodyPadding 等
+ * 由 paddingMD、paddingContentHorizontalLG 算出来），不在公开 token 里，
+ * 想压成「标题栏—正文—按钮区」各自成段只能走 CSS。footerMarginTop 与
+ * header 的默认 margin 也要一起清掉，否则分隔线与内容之间会多出一道缝。
+ */
 .ant-modal .ant-modal-content {
   padding: 0;
   overflow: hidden;
@@ -1566,6 +1502,7 @@ a {
   border-top: 1px solid var(--border-1);
 }
 
+/* Drawer 同理：header 与 body 的间距也由内部派生值控制 */
 .ant-drawer .ant-drawer-header {
   padding: 16px 20px;
   border-bottom: 1px solid var(--border-1);
@@ -1575,18 +1512,10 @@ a {
   padding: 20px;
 }
 
-.ant-form-item-label > label {
-  font-size: var(--fs-13);
-  color: var(--text-2);
-  font-weight: 500;
-}
-
-.ant-tag {
-  border-radius: var(--r-sm);
-  font-size: var(--fs-12);
-  margin-inline-end: 0;
-}
-
+/**
+ * 输入类控件的字号。antd 的 Input / Select 没有暴露 fontSize 组件 token，
+ * 只能读全局 fontSize，而全局 14px 对 13px 的表格与工具栏偏大，这里统一降一号。
+ */
 .ant-picker,
 .ant-input,
 .ant-input-affix-wrapper,
@@ -1594,16 +1523,19 @@ a {
   font-size: var(--fs-13) !important;
 }
 
-.ant-descriptions .ant-descriptions-item-label {
-  color: var(--text-3);
+/**
+ * 标签圆角与字号。
+ *
+ * Tag 的公开 token 只有三种背景/文字色，tagFontSize 属于内部派生值，
+ * 圆角读的是全局 borderRadiusSM（6px），而这里的标签需要更方的 4px。
+ */
+.ant-tag {
+  border-radius: var(--r-xs);
   font-size: var(--fs-12);
+  margin-inline-end: 0;
 }
 
-.ant-tabs .ant-tabs-tab {
-  font-size: var(--fs-13);
-}
-
-/* 状态点 */
+/* ---------- 状态点 ---------- */
 .ferry-status {
   display: inline-flex;
   align-items: center;

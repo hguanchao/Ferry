@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { DashboardOutlined, LockOutlined, RocketOutlined } from '@ant-design/icons'
+import { LayoutDashboard, Lock, Rocket } from 'lucide-react'
 
 /**
  * 固定导航项
@@ -20,7 +20,7 @@ export interface NavNode {
 export const WORKBENCH_NAV: NavNode = {
   key: 'workbench',
   label: '工作台',
-  icon: <DashboardOutlined />,
+  icon: <LayoutDashboard size={15} />,
   path: '/workbench',
 }
 
@@ -34,7 +34,7 @@ export const PROFILE_NAV: NavNode = {
 export const ROADMAP_NAV: NavNode = {
   key: 'roadmap',
   label: '交付域（规划中）',
-  icon: <RocketOutlined />,
+  icon: <Rocket size={15} />,
   children: [
     { key: 'roadmap:app', label: '应用管理', path: '/roadmap/app', disabled: true, tag: '规划中' },
     { key: 'roadmap:pipeline', label: '流水线管理', path: '/roadmap/pipeline', disabled: true, tag: '规划中' },
@@ -61,4 +61,4 @@ export function plannedLabel(node: NavNode) {
   )
 }
 
-export const LOCK_ICON = <LockOutlined />
+export const LOCK_ICON = <Lock size={15} />

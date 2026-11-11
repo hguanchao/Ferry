@@ -68,22 +68,6 @@ export interface LoginPayload {
 
 /* ------------------------------ 组织与权限 ------------------------------ */
 
-export type DataScopeMode = 'all' | 'custom'
-
-export interface AppEnvPair {
-  appId: ID
-  envIds: ID[]
-}
-
-export interface DataScope {
-  mode: DataScopeMode
-  pairs: AppEnvPair[]
-  /** 生产环境操作权限，PRD 功能 30：需二次确认并填写授权理由 */
-  prodOps: boolean
-  prodOpsReason?: string
-  prodOpsGrantedAt?: string
-}
-
 export interface MenuNode {
   id: ID
   parentId: ID
@@ -111,15 +95,15 @@ export interface RoleRow {
   sort: number
   createTime: string
   remark?: string
-  /** PRD 功能 30：预设角色不可删除 */
+  /** 预置角色不可删除，作为审计与应急恢复的兜底 */
   builtin?: boolean
   /**
-   * 以下三项属于 PRD 规划、后端 RoleVO 尚未下发：
-   * 菜单授权在 sys_role_menu 里，成员数在 sys_user_role 里，都需单独统计。
+   * 菜单授权与成员数不在列表里下发：前者在 sys_role_menu、后者在 sys_user_role，都需要单独统计。
    * 因此按可选处理，渲染层必须能对「未接入」和「真的为 0」给出不同表达。
    */
   menuIds?: ID[]
-  dataScope?: DataScope
+  /** 数据范围 1：全部 2：自定义 3：本部门 4：本部门及以下 5：仅本人 */
+  dataScope?: number
   memberCount?: number
 }
 

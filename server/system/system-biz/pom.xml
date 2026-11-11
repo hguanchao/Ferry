@@ -33,15 +33,6 @@
             <artifactId>system-api</artifactId>
             <version>${revision}</version>
         </dependency>
-        <!-- 表结构由 system 统一迁移：其他服务不引 Flyway，避免多实例并发迁移与版本校验冲突 -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-flyway</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.flywaydb</groupId>
-            <artifactId>flyway-mysql</artifactId>
-        </dependency>
     </dependencies>
 
     <build>

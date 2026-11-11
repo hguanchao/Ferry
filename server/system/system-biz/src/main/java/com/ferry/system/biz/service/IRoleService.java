@@ -8,6 +8,8 @@ import com.ferry.system.api.dto.query.RoleQuery;
 import com.ferry.system.api.entity.Role;
 import com.ferry.system.api.vo.RoleVO;
 import com.ferry.system.api.vo.tree.MenuTree;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestBody;
 
 import java.util.List;
 
@@ -52,4 +54,20 @@ public interface IRoleService extends IService<Role> {
      * @return true 成功 || false 失败
      */
     boolean authorizeMenu(RoleAuthorize<Long, Long> body);
+
+    /**
+     * 角色管理-角色数据范围详情
+     *
+     * @param id 角色id
+     * @return 数据范围与已授权的部门
+     */
+    RoleVO dataScope(Long id);
+
+    /**
+     * 角色管理-角色授权数据范围
+     *
+     * @param body 表单数据
+     * @return true 成功 || false 失败
+     */
+    boolean authorizeDataScope(Long id, Integer dataScope, List<Long> deptIds);
 }

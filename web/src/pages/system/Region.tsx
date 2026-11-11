@@ -14,13 +14,15 @@ import {
   Tooltip,
   type TableColumnsType,
 } from 'antd'
-import { DeleteOutlined, EditOutlined, PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
+import { Pencil, Plus, RotateCw, Search, Trash2 } from 'lucide-react'
 import PageHeader from '@/components/PageHeader'
 import { RoleTag } from '@/components/StatusTag'
+import { TreeExpandIcon } from '@/components/TreeExpandIcon'
 import { regionApi } from '@/api/system'
 import type { RegionNode } from '@/api/types'
 import { useAuthStore } from '@/stores/auth'
 import { showError } from '@/lib/notify'
+import { COL } from '@/lib/table'
 
 /** 展开后子级尚未返回时插入的占位行，仅用于给出可见的加载反馈 */
 const LOADING_ID_SUFFIX = '::loading'
@@ -45,7 +47,6 @@ const columnsBase: TableColumnsType<RegionRow> = [
   {
     title: '区域名称',
     dataIndex: 'name',
-    width: 280,
     render: (value: string, record) =>
       record._loading ? (
         <span className="ferry-muted">加载中…</span>
@@ -83,14 +84,14 @@ const columnsBase: TableColumnsType<RegionRow> = [
   {
     title: '排序',
     dataIndex: 'sort',
-    width: 90,
+    width: COL.sort,
     align: 'right',
     render: (value: number, record) => (record._loading ? null : <span className="ferry-mono">{value}</span>),
   },
   {
     title: '状态',
     dataIndex: 'status',
-    width: 120,
+    width: COL.status,
     render: (value: number, record) =>
       record._loading ? null : (
         <span className="ferry-status" data-tone={value === 1 ? 'success' : 'default'}>
@@ -258,19 +259,18 @@ export default function Region() {
     {
       title: '操作',
       key: 'action',
-      width: 190,
-      fixed: 'right',
+      width: COL.actionWide,
       render: (_, record) => {
         if (record._loading) return null
         return (
           <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
             {can('system:region:save') && (
               <Tooltip title="新增下级区域">
-                <Button type="link" size="small" icon={<PlusOutlined />} onClick={() => openEditor(null, record)} />
+                <Button type="link" size="small" icon={<Plus size={14} />} onClick={() => openEditor(null, record)} />
               </Tooltip>
             )}
             {can('system:region:save') && (
-              <Button type="link" size="small" icon={<EditOutlined />} onClick={() => openEditor(record)}>
+              <Button type="link" size="small" icon={<Pencil size={14} />} onClick={() => openEditor(record)}>
                 编辑
               </Button>
             )}
@@ -279,7 +279,7 @@ export default function Region() {
                 type="link"
                 size="small"
                 danger
-                icon={<DeleteOutlined />}
+                icon={<Trash2 size={14} />}
                 onClick={() =>
                   modal.confirm({
                     title: `删除区域「${record.name}」？`,
@@ -306,7 +306,7 @@ export default function Region() {
         tag={<RoleTag>{searchActive ? `${searchQuery.data?.length ?? 0} 条匹配` : `${rootsQuery.data?.length ?? 0} 个一级区域`}</RoleTag>}
         extra={
           can('system:region:save') && (
-            <Button type="primary" icon={<PlusOutlined />} onClick={() => openEditor(null)}>
+            <Button type="primary" icon={<Plus size={14} />} onClick={() => openEditor(null)}>
               新增区域
             </Button>
           )
@@ -317,7 +317,7 @@ export default function Region() {
         <div className="ferry-toolbar">
           <Input
             allowClear
-            prefix={<SearchOutlined style={{ color: 'var(--text-4)' }} />}
+            prefix={<Search size={15} style={{ color: 'var(--text-4)' }} />}
             placeholder="区域名称或编码"
             style={{ width: 200 }}
             value={keyword}
@@ -340,7 +340,7 @@ export default function Region() {
           />
           <Button
             type="primary"
-            icon={<SearchOutlined />}
+            icon={<Search size={15} />}
             onClick={() => {
               setPage(1)
               setApplied({ keyword, status })
@@ -349,7 +349,7 @@ export default function Region() {
             查询
           </Button>
           <Button
-            icon={<ReloadOutlined />}
+            icon={<RotateCw size={15} />}
             onClick={() => {
               setKeyword('')
               setStatus(undefined)
@@ -392,6 +392,7 @@ export default function Region() {
                 if (expanded) void loadChildren(record)
               },
             }}
+            components={{ ExpandIcon: TreeExpandIcon }}
             locale={{
               emptyText: (
                 <Empty
@@ -400,7 +401,7 @@ export default function Region() {
                 />
               ),
             }}
-            scroll={{ x: 1000 }}
+            scroll={{ x: 'max-content' }}
           />
         </div>
       </section>

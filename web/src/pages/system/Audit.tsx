@@ -14,7 +14,7 @@ import {
   Tooltip,
   type TableColumnsType,
 } from 'antd'
-import { ExportOutlined, FileSearchOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
+import { Download, FileSearch, RotateCw, Search } from 'lucide-react'
 import dayjs, { type Dayjs } from 'dayjs'
 import PageHeader from '@/components/PageHeader'
 import { RoleTag } from '@/components/StatusTag'
@@ -171,7 +171,6 @@ export default function Audit() {
     {
       title: '动作',
       dataIndex: 'action',
-      width: 258,
       ellipsis: true,
       render: (value: string) => <span style={{ color: 'var(--text-2)' }}>{value}</span>,
     },
@@ -223,11 +222,11 @@ export default function Audit() {
         extra={
           <>
             <Tooltip title="按当前筛选条件导出，文件首行带导出人与时间水印">
-              <Button icon={<ExportOutlined />} disabled={!can('system:audit:export')} onClick={() => void doExport()}>
+              <Button icon={<Download size={15} />} disabled={!can('system:audit:export')} onClick={() => void doExport()}>
                 导出
               </Button>
             </Tooltip>
-            <Button icon={<ReloadOutlined />} loading={query.isFetching} onClick={() => void query.refetch()}>
+            <Button icon={<RotateCw size={15} />} loading={query.isFetching} onClick={() => void query.refetch()}>
               刷新
             </Button>
           </>
@@ -237,7 +236,7 @@ export default function Audit() {
       <Alert
         type="info"
         showIcon
-        icon={<FileSearchOutlined />}
+        icon={<FileSearch size={15} />}
         message="审计不可篡改"
         description="凭据类字段仅记录「已变更」，不落明文；导出文件带水印，导出动作本身也会写入审计。超期数据归档至冷存储，不物理删除。"
       />
@@ -254,7 +253,7 @@ export default function Audit() {
           />
           <Input
             allowClear
-            prefix={<SearchOutlined style={{ color: 'var(--text-4)' }} />}
+            prefix={<Search size={15} style={{ color: 'var(--text-4)' }} />}
             placeholder="操作人或账号"
             style={{ width: 160 }}
             value={draft.operator}
@@ -300,7 +299,7 @@ export default function Audit() {
           />
           <Button
             type="primary"
-            icon={<SearchOutlined />}
+            icon={<Search size={15} />}
             onClick={() => {
               setFilters(draft)
               setPage((prev) => ({ ...prev, current: 1 }))
@@ -309,7 +308,7 @@ export default function Audit() {
             查询
           </Button>
           <Button
-            icon={<ReloadOutlined />}
+            icon={<RotateCw size={15} />}
             onClick={() => {
               setDraft({})
               setFilters({})
@@ -327,7 +326,7 @@ export default function Audit() {
             columns={columns}
             dataSource={query.data?.records ?? []}
             loading={query.isLoading || query.isFetching}
-            scroll={{ x: 1192 }}
+            scroll={{ x: 'max-content' }}
             onRow={(record) => ({
               onClick: () => setDetail(record),
               style: { cursor: 'pointer' },

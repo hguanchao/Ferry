@@ -14,10 +14,11 @@ import {
   TreeSelect,
   type TableColumnsType,
 } from 'antd'
-import { DeleteOutlined, EditOutlined, PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
+import { Pencil, Plus, RotateCw, Search, Trash2 } from 'lucide-react'
 import PageHeader from '@/components/PageHeader'
 import { useAutoExpandRows } from '@/hooks/useAutoExpandRows'
 import { RoleTag } from '@/components/StatusTag'
+import { TreeExpandIcon } from '@/components/TreeExpandIcon'
 import { countTree } from '@/lib/tree'
 import { deptApi } from '@/api/system'
 import type { DeptNode } from '@/api/types'
@@ -150,11 +151,11 @@ export default function Dept() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
           {can('system:dept:save') && (
             <Tooltip title="新增下级部门">
-              <Button type="link" size="small" icon={<PlusOutlined />} onClick={() => openEditor(null, record)} />
+              <Button type="link" size="small" icon={<Plus size={14} />} onClick={() => openEditor(null, record)} />
             </Tooltip>
           )}
           {can('system:dept:save') && (
-            <Button type="link" size="small" icon={<EditOutlined />} onClick={() => openEditor(record)}>
+            <Button type="link" size="small" icon={<Pencil size={14} />} onClick={() => openEditor(record)}>
               编辑
             </Button>
           )}
@@ -163,7 +164,7 @@ export default function Dept() {
               type="link"
               size="small"
               danger
-              icon={<DeleteOutlined />}
+              icon={<Trash2 size={14} />}
               onClick={() =>
                 modal.confirm({
                   title: `删除部门「${record.name}」？`,
@@ -189,7 +190,7 @@ export default function Dept() {
         tag={<RoleTag>{countTree(query.data ?? [])} 个部门</RoleTag>}
         extra={
           can('system:dept:save') && (
-            <Button type="primary" icon={<PlusOutlined />} onClick={() => openEditor(null)}>
+            <Button type="primary" icon={<Plus size={14} />} onClick={() => openEditor(null)}>
               新增部门
             </Button>
           )
@@ -200,7 +201,7 @@ export default function Dept() {
         <div className="ferry-toolbar">
           <Input
             allowClear
-            prefix={<SearchOutlined style={{ color: 'var(--text-4)' }} />}
+            prefix={<Search size={15} style={{ color: 'var(--text-4)' }} />}
             placeholder="部门名称或编码"
             style={{ width: 200 }}
             value={keyword}
@@ -220,7 +221,7 @@ export default function Dept() {
           />
           <Button
             type="primary"
-            icon={<SearchOutlined />}
+            icon={<Search size={15} />}
             onClick={() => {
               setApplied(keyword)
               setAppliedStatus(status)
@@ -229,7 +230,7 @@ export default function Dept() {
             查询
           </Button>
           <Button
-            icon={<ReloadOutlined />}
+            icon={<RotateCw size={15} />}
             onClick={() => {
               setKeyword('')
               setStatus(undefined)
@@ -249,7 +250,8 @@ export default function Dept() {
             loading={query.isLoading || query.isFetching}
             pagination={false}
             expandable={expandProps}
-            scroll={{ x: 1190 }}
+            components={{ ExpandIcon: TreeExpandIcon }}
+            scroll={{ x: 'max-content' }}
           />
         </div>
       </section>

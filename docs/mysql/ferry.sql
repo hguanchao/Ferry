@@ -151,6 +151,7 @@ CREATE TABLE `sys_role`  (
   `status` tinyint(1) NULL DEFAULT 1 COMMENT '角色状态 0：停用 1：正常',
   `data_scope` tinyint NULL DEFAULT 1 COMMENT '数据范围 1：全部 2：自定义 3：本部门 4：本部门及以下 5：仅本人',
   `sort` int NULL DEFAULT 1 COMMENT '显示顺序',
+  `remark` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '职责描述',
   `create_user` bigint NULL DEFAULT NULL COMMENT '创建人',
   `create_time` datetime NULL DEFAULT NULL COMMENT '创建时间',
   `update_user` bigint NULL DEFAULT NULL COMMENT '更新人',
