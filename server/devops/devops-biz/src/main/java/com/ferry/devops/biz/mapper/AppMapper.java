@@ -16,7 +16,7 @@ import org.apache.ibatis.annotations.Param;
  * <p>按所属团队过滤：可见范围取自登录会话快照，业务 SQL 不重复拼部门条件。
  */
 @Mapper
-@DataScope(value = "devops_app", deptColumn = "dept_id")
+@DataScope(value = "dev_app", deptColumn = "dept_id")
 public interface AppMapper extends BaseMapper<App> {
 
     /**

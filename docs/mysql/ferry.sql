@@ -12,10 +12,10 @@ SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;
 
 -- ----------------------------
--- Table structure for devops_app
+-- Table structure for dev_app
 -- ----------------------------
-DROP TABLE IF EXISTS `devops_app`;
-CREATE TABLE `devops_app`  (
+DROP TABLE IF EXISTS `dev_app`;
+CREATE TABLE `dev_app`  (
   `id` bigint NOT NULL COMMENT '数据id',
   `code` varchar(40) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '应用编码，小写字母/数字/中划线，创建后不可改',
   `name` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '应用名称',

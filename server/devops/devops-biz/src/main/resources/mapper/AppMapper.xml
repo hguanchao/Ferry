@@ -3,7 +3,7 @@
 <mapper namespace="com.ferry.devops.biz.mapper.AppMapper">
     <resultMap id="BaseResultMap" type="com.ferry.devops.api.entity.App">
         <!--@mbg.generated-->
-        <!--@Table devops_app-->
+        <!--@Table dev_app-->
         <id column="id" jdbcType="BIGINT" property="id"/>
         <result column="code" jdbcType="VARCHAR" property="code"/>
         <result column="name" jdbcType="VARCHAR" property="name"/>
@@ -34,7 +34,7 @@
 
     <select id="selectCodeCount" resultType="long">
         SELECT COUNT(1)
-        FROM devops_app
+        FROM dev_app
         <where>
             code = #{code}
             <if test="id != null">
@@ -59,7 +59,7 @@
                repo_commit_id     AS repoCommitId,
                repo_credential_id AS repoCredentialId,
                create_time        AS createTime
-        FROM devops_app
+        FROM dev_app
         <where>
             is_deleted = 0
             <if test="query.keyword != null and query.keyword != ''">

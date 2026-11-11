@@ -16,7 +16,7 @@ import java.io.Serializable;
  * 因此编码创建后不允许修改，逻辑删除后编码也不再复用。
  */
 @Data
-@TableName(value = "devops_app")
+@TableName(value = "dev_app")
 @EqualsAndHashCode(callSuper = true)
 public class App extends BaseEntity implements Serializable {
 
