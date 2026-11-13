@@ -29,7 +29,7 @@ public class PasswordAuthServiceImpl implements IAuthService {
         }
         AuthUtil.checkLoginLock(tenantId, account);
         AuthUser authUser = systemFeign.userAuth(tenantId, account);
-        if (authUser == null || !CryptoUtil.matchesPassword(password, authUser.getPassword())) {
+        if (authUser == null || !CryptoUtil.bcryptMatches(password, authUser.getPassword())) {
             AuthUtil.loginLock(tenantId, account);
             throw new AuthException("账号或密码错误");
         }

@@ -88,9 +88,9 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         }
         if (ObjUtil.isEmpty(user.getId())) {
             user.setAvatar(GenderEnum.getAvatar(user.getGender()));
-            user.setPassword(CryptoUtil.encodePassword(SysConst.DEFAULT_PASSWORD));
+            user.setPassword(CryptoUtil.bcryptEncode(SysConst.DEFAULT_PASSWORD));
         } else if (StrUtil.isNotBlank(body.getPassword())) {
-            user.setPassword(CryptoUtil.encodePassword(body.getPassword()));
+            user.setPassword(CryptoUtil.bcryptEncode(body.getPassword()));
         } else {
             user.setPassword(null);
         }
@@ -124,7 +124,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         if (ObjUtil.isEmpty(getById(id))) {
             throw new ServiceException("用户不存在");
         }
-        String password = CryptoUtil.encodePassword(SysConst.DEFAULT_PASSWORD);
+        String password = CryptoUtil.bcryptEncode(SysConst.DEFAULT_PASSWORD);
         boolean isSuccess = update(Wrappers.<User>lambdaUpdate().set(User::getPassword, password).eq(User::getId, id));
         if (isSuccess) {
             // 重置密码等同于接管账号，旧会话不能继续有效
