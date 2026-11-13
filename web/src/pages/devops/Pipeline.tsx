@@ -7,26 +7,34 @@ import {
   Form,
   Input,
   Modal,
+  Select,
   Table,
   Tag,
+  Tooltip,
   type MenuProps,
   type TableColumnsType,
 } from 'antd'
-import { History, MoreHorizontal, Pencil, Plus, RotateCw, Search, Settings2, Trash2 } from 'lucide-react'
+import {
+  Download,
+  History,
+  MoreHorizontal,
+  Pencil,
+  Plus,
+  RotateCw,
+  Search,
+  Settings2,
+  Trash2,
+} from 'lucide-react'
 import PageHeader from '@/components/PageHeader'
 import AppSelect from '@/components/AppSelect'
 import PipelineEditorDrawer from '@/components/PipelineEditorDrawer'
 import PipelineVersionPanel from '@/components/PipelineVersionPanel'
-import { pipelineApi } from '@/api/devops'
+import { pipelineApi, type PipelineFilter } from '@/api/devops'
+import { userApi } from '@/api/system'
 import type { PipelineDetail, PipelineRow } from '@/api/types'
 import { COL } from '@/lib/table'
 import { showError } from '@/lib/notify'
 import { useAuthStore } from '@/stores/auth'
-
-interface Filters {
-  keyword?: string
-  appIds?: string[]
-}
 
 interface MetaFormValues {
   appId: string
@@ -44,9 +52,10 @@ export default function Pipeline() {
   const queryClient = useQueryClient()
   const can = useAuthStore((state) => state.can)
 
-  const [filters, setFilters] = useState<Filters>({})
-  const [draft, setDraft] = useState<Filters>({})
+  const [filters, setFilters] = useState<PipelineFilter>({})
+  const [draft, setDraft] = useState<PipelineFilter>({})
   const [page, setPage] = useState({ current: 1, size: 30 })
+  const [selected, setSelected] = useState<string[]>([])
   const [editor, setEditor] = useState<EditorState | null>(null)
   const [metaTarget, setMetaTarget] = useState<PipelineRow | null>(null)
   const [metaOpen, setMetaOpen] = useState(false)
@@ -58,6 +67,17 @@ export default function Pipeline() {
     queryKey: ['pipelines', filters, page],
     queryFn: () => pipelineApi.pageList({ ...filters, ...page }),
   })
+
+  // 负责人候选来自用户列表；没有用户列表权限时下拉为空，筛选仍可用其它条件
+  const userQuery = useQuery({
+    queryKey: ['user-options'],
+    queryFn: () => userApi.pageList({ current: 1, size: 200 }),
+    retry: false,
+  })
+  const ownerOptions = useMemo(
+    () => (userQuery.data?.records ?? []).map((user) => ({ value: user.id, label: user.nickname || user.account })),
+    [userQuery.data],
+  )
 
   // 编辑基本信息时应用不允许改，下拉只需要把当前应用名称显示出来
   const metaAppOption = useMemo(
@@ -89,20 +109,30 @@ export default function Pipeline() {
     mutationFn: (ids: string[]) => pipelineApi.deleted(ids),
     onSuccess: (text) => {
       message.success(text || '删除成功')
+      setSelected([])
       invalidate()
     },
+    onError: showError,
+  })
+
+  const exportMutation = useMutation({
+    mutationFn: () => pipelineApi.export({ ...filters, ids: selected }),
+    onSuccess: () => message.success(selected.length ? `已导出勾选的 ${selected.length} 条` : '已按当前筛选条件导出'),
     onError: showError,
   })
 
   const applyFilters = () => {
     setFilters(draft)
     setPage((prev) => ({ ...prev, current: 1 }))
+    // 筛选条件变了，原勾选项可能已不在结果里，继续保留会让「导出勾选」导出看不见的数据
+    setSelected([])
   }
 
   const resetFilters = () => {
     setDraft({})
     setFilters({})
     setPage({ current: 1, size: 30 })
+    setSelected([])
   }
 
   const openMeta = (record: PipelineRow) => {
@@ -204,7 +234,6 @@ export default function Pipeline() {
     },
     { title: '更新时间', dataIndex: 'updateTime', width: COL.time },
   ]
-
   const menuItems = (): MenuProps['items'] => {
     const items: MenuProps['items'] = []
     if (can('devops:pipeline:save')) {
@@ -242,11 +271,23 @@ export default function Pipeline() {
     columns.push({
       title: '操作',
       key: 'action',
-      width: COL.actionWide,
+      width: 300,
       render: (_, record) => {
         const items = menuItems()
         return (
           <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            {/* 运行与触发依赖运行模型，尚未实现：按钮先占位并置灰，
+                给出「待接入」提示比隐藏更能看出这里最终要有入口 */}
+            <Tooltip title="运行详情待运行模块接入">
+              <Button type="link" size="small" disabled>
+                查看运行
+              </Button>
+            </Tooltip>
+            <Tooltip title="手动触发待运行模块接入">
+              <Button type="link" size="small" disabled>
+                手动触发
+              </Button>
+            </Tooltip>
             {can('devops:pipeline:saveVersion') && (
               <Button
                 type="link"
@@ -277,15 +318,26 @@ export default function Pipeline() {
         title="流水线管理"
         description="流水线定义按版本快照管理，历史版本可对比与回退。"
         extra={
-          can('devops:pipeline:save') && (
-            <Button
-              type="primary"
-              icon={<Plus size={14} />}
-              onClick={() => setEditor({ mode: 'create', pipeline: null })}
-            >
-              新建流水线
-            </Button>
-          )
+          <>
+            {can('devops:pipeline:export') && (
+              <Button
+                icon={<Download size={15} />}
+                loading={exportMutation.isPending}
+                onClick={() => exportMutation.mutate()}
+              >
+                {selected.length ? `导出勾选（${selected.length}）` : '导出'}
+              </Button>
+            )}
+            {can('devops:pipeline:save') && (
+              <Button
+                type="primary"
+                icon={<Plus size={14} />}
+                onClick={() => setEditor({ mode: 'create', pipeline: null })}
+              >
+                新建流水线
+              </Button>
+            )}
+          </>
         }
       />
 
@@ -314,6 +366,18 @@ export default function Pipeline() {
               }))
             }
           />
+          <Select<string[]>
+            mode="multiple"
+            allowClear
+            showSearch
+            optionFilterProp="label"
+            maxTagCount="responsive"
+            placeholder="负责人"
+            style={{ width: 240 }}
+            options={ownerOptions}
+            value={draft.ownerIds}
+            onChange={(value) => setDraft((prev) => ({ ...prev, ownerIds: value?.length ? value : undefined }))}
+          />
           <Button type="primary" icon={<Search size={15} />} onClick={applyFilters}>查询</Button>
           <Button icon={<RotateCw size={15} />} onClick={resetFilters}>重置</Button>
         </div>
@@ -325,12 +389,16 @@ export default function Pipeline() {
             dataSource={listQuery.data?.records ?? []}
             loading={listQuery.isLoading || listQuery.isFetching}
             scroll={{ x: 'max-content' }}
+            rowSelection={{
+              selectedRowKeys: selected,
+              onChange: (keys) => setSelected(keys.map(String)),
+            }}
             pagination={{
               current: page.current,
               pageSize: page.size,
               total: listQuery.data?.total ?? 0,
               showSizeChanger: true,
-              pageSizeOptions: ['30', '100'],
+              pageSizeOptions: ['30', '100', '200', '500', '1000'],
               showTotal: (total) => `共 ${total} 条`,
               onChange: (current, size) => setPage({ current, size }),
             }}

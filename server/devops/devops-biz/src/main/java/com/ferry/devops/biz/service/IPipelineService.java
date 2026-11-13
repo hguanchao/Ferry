@@ -6,6 +6,7 @@ import com.ferry.devops.api.dto.PipelineDTO;
 import com.ferry.devops.api.dto.query.PipelineQuery;
 import com.ferry.devops.api.entity.Pipeline;
 import com.ferry.devops.api.vo.PipelineVO;
+import jakarta.servlet.http.HttpServletResponse;
 
 import java.util.List;
 
@@ -44,4 +45,16 @@ public interface IPipelineService extends IService<Pipeline> {
      * @return true 成功 || false 失败
      */
     boolean deleted(List<Long> ids);
+
+    /**
+     * 流水线管理-导出
+     *
+     * <p>传 ids 时只导出这些流水线（勾选导出），不传则按查询条件导出（筛选结果导出）；
+     * 两种情况都受数据权限约束，与列表同一口径。
+     *
+     * @param body 查询条件
+     * @param ids  勾选的流水线id，为空表示导出全部筛选结果
+     * @param response HTTP 响应，xlsx 直接写入响应流
+     */
+    void export(PipelineQuery body, List<Long> ids, HttpServletResponse response);
 }

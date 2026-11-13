@@ -16,4 +16,7 @@ public class PipelineQuery extends Query {
 
     @Schema(description = "应用id，多选")
     private List<Long> appIds;
+
+    @Schema(description = "应用负责人id，多选，命中任一即返回")
+    private List<Long> ownerIds;
 }

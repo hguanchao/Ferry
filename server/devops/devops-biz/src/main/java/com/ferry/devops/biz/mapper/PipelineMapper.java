@@ -35,6 +35,20 @@ public interface PipelineMapper extends BaseMapper<Pipeline> {
     IPage<PipelineVO> selectPageList(IPage<PipelineVO> page, @Param("query") PipelineQuery query);
 
     /**
+     * 查询用于导出的流水线数据
+     *
+     * <p>与分页共用同一段查询条件；勾选导出也走这条语句，靠 ids 收窄结果集，
+     * 不另写按 id 直查的 SQL——数据权限由 dev_app 注入，绕过它就会导出权限外的数据。
+     *
+     * @param query 查询条件
+     * @param ids   勾选的流水线id，为空表示按查询条件导出
+     * @param limit 最大导出条数
+     * @return 流水线列表
+     */
+    List<PipelineVO> selectExportList(@Param("query") PipelineQuery query, @Param("ids") List<Long> ids,
+                                      @Param("limit") int limit);
+
+    /**
      * 按 id 查询可见流水线
      *
      * @param id 流水线id

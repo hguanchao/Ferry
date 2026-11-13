@@ -1,4 +1,4 @@
-import { get, post } from './client'
+import { download, get, post } from './client'
 import type {
   ApiPage,
   AppRow,
@@ -9,6 +9,13 @@ import type {
   PipelineVersionRow,
 } from './types'
 import type { PageParams } from './system'
+
+/** 流水线列表筛选条件，列表与导出共用，避免两边字段名写偏 */
+export interface PipelineFilter {
+  keyword?: string
+  appIds?: string[]
+  ownerIds?: string[]
+}
 
 export const appApi = {
   pageList: (body: PageParams) => post<ApiPage<AppRow>>('/ferry-devops/app/pageList', body),
@@ -23,6 +30,9 @@ export const pipelineApi = {
   detail: (id: string) => get<PipelineDetail>('/ferry-devops/pipeline/detail', { id }),
   save: (body: Record<string, unknown>) => post<string>('/ferry-devops/pipeline/save', body),
   deleted: (ids: string[]) => post<string>('/ferry-devops/pipeline/deleted', ids),
+  /** 导出 xlsx：勾选传 ids，未勾选按筛选条件导出，两种都由后端写文件流 */
+  export: (body: PipelineFilter & { ids?: string[] }) =>
+    download('/ferry-devops/pipeline/export', body, '流水线列表'),
 }
 
 export const pipelineVersionApi = {

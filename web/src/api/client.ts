@@ -23,7 +23,14 @@ http.interceptors.request.use((config) => {
 
 http.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
+    // 下载类请求（responseType=blob）的错误体是二进制且没有统一响应结构：
+    // 原样抛给 download 自己读回，别在这里用 describe 压成「请求失败（400）」而丢掉后端文案
+    const blob = (error as { response?: { data?: unknown } })?.response?.data
+    if (blob instanceof Blob) {
+      return Promise.reject(await toBlobError(blob))
+    }
+
     const apiError = describe(error)
 
     if (apiError.kind === 'auth') {
@@ -76,4 +83,49 @@ export function get<T>(url: string, params?: Record<string, unknown>, options?: 
 
 export function post<T>(url: string, body?: unknown, options?: RequestOptions): Promise<T> {
   return unwrap(http.post<ApiEnvelope<T>>(url, body ?? {}, options), options?.silent)
+}
+
+/**
+ * 下载文件
+ *
+ * 与普通请求的差别在于响应体可能是二进制、也可能仍是 JSON 错误体：后端在写流之前失败时
+ * 走的是统一响应（code != 200），这里必须按 content-type 判断，否则会把一段错误 JSON
+ * 当成 xlsx 存下来，用户打开才发现文件损坏。错误路径已由响应拦截器统一转成 ApiError。
+ *
+ * @param url      接口地址
+ * @param body     请求体
+ * @param fileName 保存的文件名，后端未给响应头时用它兜底
+ */
+export async function download(url: string, body: unknown, fileName: string): Promise<void> {
+  const response = await http.post(url, body ?? {}, { responseType: 'blob', timeout: 60_000 })
+
+  const contentType = String(response.headers['content-type'] ?? '')
+  if (contentType.includes('application/json')) {
+    throw await toBlobError(response.data as Blob)
+  }
+
+  // 文件名以响应头为准：后端按 RFC 5987 编码过，中文名才能正确还原
+  const disposition = String(response.headers['content-disposition'] ?? '')
+  const matched = /filename\*=UTF-8''([^;]+)/i.exec(disposition)
+  const name = matched ? decodeURIComponent(matched[1]) : `${fileName}.xlsx`
+
+  const blobUrl = URL.createObjectURL(response.data as Blob)
+  const anchor = document.createElement('a')
+  anchor.href = blobUrl
+  anchor.download = name
+  document.body.appendChild(anchor)
+  anchor.click()
+  document.body.removeChild(anchor)
+  URL.revokeObjectURL(blobUrl)
+}
+
+/** 把错误响应体（Blob）还原成带后端提示的 ApiError */
+async function toBlobError(blob: Blob): Promise<ApiError> {
+  const text = await blob.text()
+  try {
+    const parsed = JSON.parse(text) as ApiEnvelope<unknown>
+    return new ApiError(hideServiceName(parsed.msg || '导出失败'), parsed.code || 500, 'business')
+  } catch {
+    return new ApiError('导出失败，请稍后重试', 500, 'business')
+  }
 }
