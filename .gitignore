@@ -38,4 +38,5 @@ dist-ssr/
 Thumbs.db
 
 ### 本地智能体数据
+.zcode/
 .workbuddy/
