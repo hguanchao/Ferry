@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ferry.devops.biz.mapper.PipelineMapper">
+    <select id="selectPageList" resultType="com.ferry.devops.api.vo.PipelineVO">
+        SELECT p.id,
+               p.app_id             AS appId,
+               a.code               AS appCode,
+               a.name               AS appName,
+               p.name,
+               p.description,
+               p.current_version_id AS currentVersionId,
+               p.current_version_no AS currentVersionNo,
+               p.stage_count        AS stageCount,
+               a.repo_branch        AS defaultBranch,
+               a.owner_names        AS ownerNames,
+               p.create_time        AS createTime,
+               p.update_time        AS updateTime
+        FROM dev_pipeline p
+                 INNER JOIN dev_app a ON a.id = p.app_id AND a.is_deleted = 0
+        <where>
+            p.is_deleted = 0
+            <if test="query.keyword != null and query.keyword != ''">
+                AND p.name LIKE CONCAT('%', #{query.keyword}, '%')
+            </if>
+            <if test="query.appIds != null and query.appIds.size() > 0">
+                AND p.app_id IN
+                <foreach collection="query.appIds" item="appId" open="(" separator="," close=")">
+                    #{appId}
+                </foreach>
+            </if>
+        </where>
+        ORDER BY p.update_time DESC
+    </select>
+
+    <select id="selectVisibleById" resultType="com.ferry.devops.api.entity.Pipeline">
+        SELECT p.id,
+               p.app_id             AS appId,
+               p.name,
+               p.description,
+               p.current_version_id AS currentVersionId,
+               p.current_version_no AS currentVersionNo,
+               p.stage_count        AS stageCount,
+               p.create_user        AS createUser,
+               p.create_time        AS createTime,
+               p.update_user        AS updateUser,
+               p.update_time        AS updateTime,
+               p.is_deleted         AS isDeleted
+        FROM dev_pipeline p
+        INNER JOIN dev_app ON dev_app.id = p.app_id AND dev_app.is_deleted = 0
+        WHERE p.id = #{id}
+          AND p.is_deleted = 0
+    </select>
+
+    <select id="selectVisibleCount" resultType="long">
+        SELECT COUNT(1)
+        FROM dev_pipeline p
+        INNER JOIN dev_app ON dev_app.id = p.app_id AND dev_app.is_deleted = 0
+        WHERE p.is_deleted = 0
+          AND p.id IN
+          <foreach collection="ids" item="id" open="(" separator="," close=")">
+              #{id}
+          </foreach>
+    </select>
+
+    <select id="selectNameCount" resultType="long">
+        SELECT COUNT(1)
+        FROM dev_pipeline
+        WHERE is_deleted = 0
+          AND app_id = #{appId}
+          AND name = #{name}
+        <if test="id != null">
+            AND id != #{id}
+        </if>
+    </select>
+
+</mapper>

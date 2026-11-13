@@ -41,6 +41,49 @@ CREATE TABLE `dev_app`  (
 ) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '应用档案表' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
+-- Table structure for dev_pipeline
+-- ----------------------------
+DROP TABLE IF EXISTS `dev_pipeline`;
+CREATE TABLE `dev_pipeline`  (
+  `id` bigint NOT NULL COMMENT '数据id',
+  `app_id` bigint NOT NULL COMMENT '应用id',
+  `name` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '流水线名称',
+  `description` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '描述',
+  `current_version_id` bigint NULL DEFAULT NULL COMMENT '当前版本id',
+  `current_version_no` int NULL DEFAULT NULL COMMENT '当前版本号',
+  `stage_count` int NOT NULL DEFAULT 0 COMMENT '阶段数',
+  `create_user` bigint NULL DEFAULT NULL COMMENT '创建人',
+  `create_time` datetime NULL DEFAULT NULL COMMENT '创建时间',
+  `update_user` bigint NULL DEFAULT NULL COMMENT '更新人',
+  `update_time` datetime NULL DEFAULT NULL COMMENT '更新时间',
+  `is_deleted` tinyint(1) NOT NULL DEFAULT 0 COMMENT '是否删除 0：否 1：是',
+  PRIMARY KEY (`id`) USING BTREE,
+  INDEX `idx_app_name`(`app_id` ASC, `name` ASC) USING BTREE,
+  INDEX `idx_update_time`(`update_time` ASC) USING BTREE
+) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '流水线定义表' ROW_FORMAT = DYNAMIC;
+
+-- ----------------------------
+-- Table structure for dev_pipeline_version
+-- ----------------------------
+DROP TABLE IF EXISTS `dev_pipeline_version`;
+CREATE TABLE `dev_pipeline_version`  (
+  `id` bigint NOT NULL COMMENT '数据id',
+  `pipeline_id` bigint NOT NULL COMMENT '流水线id',
+  `version_no` int NOT NULL COMMENT '版本号',
+  `content` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '定义快照',
+  `content_hash` char(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '内容hash',
+  `change_note` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '变更说明',
+  `create_user_name` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '变更人',
+  `create_user` bigint NULL DEFAULT NULL COMMENT '创建人',
+  `create_time` datetime NULL DEFAULT NULL COMMENT '创建时间',
+  `update_user` bigint NULL DEFAULT NULL COMMENT '更新人',
+  `update_time` datetime NULL DEFAULT NULL COMMENT '更新时间',
+  `is_deleted` tinyint(1) NOT NULL DEFAULT 0 COMMENT '是否删除 0：否 1：是',
+  PRIMARY KEY (`id`) USING BTREE,
+  UNIQUE INDEX `uk_pipeline_version`(`pipeline_id` ASC, `version_no` ASC) USING BTREE
+) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '流水线版本表' ROW_FORMAT = DYNAMIC;
+
+-- ----------------------------
 -- Table structure for sys_config
 -- ----------------------------
 DROP TABLE IF EXISTS `sys_config`;
