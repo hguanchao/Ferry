@@ -88,6 +88,8 @@
     'Hiragino Sans GB', 'Microsoft YaHei', 'Helvetica Neue', Arial, sans-serif;
   --font-mono: 'JetBrains Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
 
+  /* 11px 是眉标与等宽小字的下限：再往下在 1x 屏上已经不成字 */
+  --fs-11: 11px;
   --fs-12: 12px;
   --fs-13: 13px;
   --fs-14: 14px;
@@ -107,6 +109,7 @@
   --sider-collapsed: 72px;
   --header-height: 56px;
   --content-max: 1600px;
+  --pipeline-inspector-width: 420px;
 
   /* ---------- 动效：克制的 160-220ms ---------- */
   --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);

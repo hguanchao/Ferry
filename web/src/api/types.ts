@@ -289,3 +289,75 @@ export interface AppRow {
   repoCredentialId?: ID | null
   createTime: string
 }
+
+/** 应用下拉选项，流水线页与新建抽屉共用 */
+export interface AppOption {
+  id: ID
+  code: string
+  name: string
+  status: number
+}
+
+/* ------------------------------ 流水线 ------------------------------ */
+
+export type PipelineStageType =
+  | 'BUILD'
+  | 'UNIT_TEST'
+  | 'STATIC_SCAN'
+  | 'ARTIFACT_PUSH'
+  | 'DEPLOY_NON_PROD'
+  | 'INTEGRATION_TEST'
+  | 'ADMISSION'
+  | 'PROD_RELEASE'
+
+export interface PipelineTask {
+  name: string
+  command?: string | null
+  timeoutMinutes: number
+}
+
+export interface PipelineStage {
+  type: PipelineStageType
+  name: string
+  timeoutMinutes: number
+  continueOnFailure: boolean
+  artifacts: string[]
+  tasks: PipelineTask[]
+}
+
+export interface PipelineDefinition {
+  stages: PipelineStage[]
+}
+
+export interface PipelineRow {
+  id: ID
+  appId: ID
+  appCode: string
+  appName: string
+  name: string
+  description?: string | null
+  currentVersionId?: ID | null
+  currentVersionNo?: number | null
+  stageCount: number
+  defaultBranch?: string | null
+  ownerNames?: string | null
+  createTime: string
+  updateTime: string
+}
+
+export interface PipelineDetail extends PipelineRow {
+  definition?: PipelineDefinition | null
+}
+
+export interface PipelineVersionRow {
+  id: ID
+  pipelineId: ID
+  versionNo: number
+  changeNote: string
+  createUserName?: string | null
+  createTime: string
+}
+
+export interface PipelineVersionDetail extends PipelineVersionRow {
+  definition: PipelineDefinition
+}

@@ -30,14 +30,13 @@ export const PROFILE_NAV: NavNode = {
   path: '/profile',
 }
 
-/** 交付域尚未建设：不注册路由，仅作路线图占位 */
+/** 交付域尚未建设的模块：不注册路由，仅作路线图占位 */
 export const ROADMAP_NAV: NavNode = {
   key: 'roadmap',
   label: '交付域（规划中）',
   icon: <Rocket size={15} />,
   children: [
     { key: 'roadmap:app', label: '应用管理', path: '/roadmap/app', disabled: true, tag: '规划中' },
-    { key: 'roadmap:pipeline', label: '流水线管理', path: '/roadmap/pipeline', disabled: true, tag: '规划中' },
     { key: 'roadmap:artifact', label: '制品管理', path: '/roadmap/artifact', disabled: true, tag: '规划中' },
     { key: 'roadmap:release', label: '发布准入', path: '/roadmap/release', disabled: true, tag: '规划中' },
   ],

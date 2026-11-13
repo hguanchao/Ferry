@@ -1,4 +1,5 @@
 @import './tokens.css';
+@import './pipeline-studio.css';
 
 /* ============================================================
    基础重置
@@ -63,8 +64,8 @@ a {
 }
 
 *::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 
 *::-webkit-scrollbar-thumb {
@@ -78,6 +79,36 @@ a {
 
 *::-webkit-scrollbar-track {
   background: transparent;
+}
+
+/*
+ * antd 虚拟列表的滚动条是 rc-virtual-list 自己渲染的 div，不走 ::-webkit-scrollbar。
+ * 滑块颜色写成 inline style：var(--rc-virtual-list-scrollbar-bg, rgba(0,0,0,0.5))，
+ * 而 Select 下拉等组件没有定义这个变量，于是回退成深灰方条，和页面其它滚动条割裂。
+ *
+ * 这里做三件事：在 :root 兜底变量；用 !important 盖过 Tree / List / Table
+ * 在组件根上按各自 token 重定义的变量值；再把容器宽度从 rc-virtual-list 内联的
+ * 8px 收到 6px，与上面原生滚动条同宽。保证两类滚动条同色、同宽、同圆角。
+ */
+:root {
+  --rc-virtual-list-scrollbar-bg: var(--border-2);
+}
+
+.rc-virtual-list-scrollbar-vertical {
+  width: 6px !important;
+}
+
+.rc-virtual-list-scrollbar-horizontal {
+  height: 6px !important;
+}
+
+.rc-virtual-list-scrollbar-thumb {
+  background: var(--border-2) !important;
+}
+
+.rc-virtual-list-scrollbar-thumb:hover,
+.rc-virtual-list-scrollbar-thumb-moving {
+  background: var(--border-3) !important;
 }
 
 /* ============================================================
@@ -1515,10 +1546,12 @@ a {
 /**
  * 输入类控件的字号。antd 的 Input / Select 没有暴露 fontSize 组件 token，
  * 只能读全局 fontSize，而全局 14px 对 13px 的表格与工具栏偏大，这里统一降一号。
+ * 数字输入框的内部 input 是独立类名，漏掉它会让同一行里数字比文字大一号。
  */
 .ant-picker,
 .ant-input,
 .ant-input-affix-wrapper,
+.ant-input-number-input,
 .ant-select-selector {
   font-size: var(--fs-13) !important;
 }
