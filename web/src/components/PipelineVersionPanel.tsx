@@ -18,11 +18,7 @@ interface PipelineVersionPanelProps {
   onChanged: () => void
 }
 
-/**
- * 版本历史面板
- *
- * 复选两版做左右 diff，回退以旧内容生成新版本；当前版本不提供回退入口。
- */
+/** 版本历史面板：复选两版做左右 diff，回退以旧内容生成新版本，当前版本不提供回退入口 */
 export default function PipelineVersionPanel({ open, pipeline, onClose, onChanged }: PipelineVersionPanelProps) {
   const { message, modal } = AntApp.useApp()
   const queryClient = useQueryClient()
@@ -46,8 +42,7 @@ export default function PipelineVersionPanel({ open, pipeline, onClose, onChange
     enabled: open && Boolean(pipelineId),
   })
 
-  // 保存与回退永远指向最新生成的版本，列表按版本号倒序，首行就是当前版本；
-  // 用查询结果而不是父级快照，回退后当前标记能立即跟上。
+  // 列表按版本号倒序，首行就是最新生成的版本（当前版本），回退后标记能立即跟上
   const currentVersionId = versionsQuery.data?.[0]?.id ?? pipeline?.currentVersionId
 
   const rollbackMutation = useMutation({

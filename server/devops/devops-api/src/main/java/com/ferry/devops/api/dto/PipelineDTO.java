@@ -9,9 +9,6 @@ import lombok.Data;
 
 /**
  * 流水线基本信息
- *
- * <p>新增时必须同时提交初始定义；编辑只允许改名称与描述，定义变更走版本保存接口，
- * 避免同一份定义存在两个写入口。
  */
 @Data
 public class PipelineDTO {

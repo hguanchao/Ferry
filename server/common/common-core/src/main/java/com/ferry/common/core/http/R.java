@@ -59,101 +59,101 @@ public class R<T> implements Serializable {
     }
 
     /**
-     * 返回R
+     * 构建成功响应并承载数据，data 为 null 时消息取「暂无数据」
      *
      * @param data 数据
      * @param <T>  T 泛型标记
-     * @return R
+     * @return 统一响应
      */
     public static <T> R<T> data(T data) {
         return data(data, null);
     }
 
     /**
-     * 返回R
+     * 构建成功响应并承载数据与自定义消息，data 为 null 时消息取「暂无数据」
      *
      * @param data 数据
      * @param msg  消息
      * @param <T>  T 泛型标记
-     * @return R
+     * @return 统一响应
      */
     public static <T> R<T> data(T data, String msg) {
         return data(HttpStatus.SUCCESS.getCode(), data, data == null ? NO_DATA : msg);
     }
 
     /**
-     * 返回R
+     * 按指定状态码构建响应并承载数据，data 为 null 时消息取「暂无数据」
      *
      * @param code 状态码
      * @param data 数据
      * @param msg  消息
      * @param <T>  T 泛型标记
-     * @return R
+     * @return 统一响应
      */
     public static <T> R<T> data(int code, T data, String msg) {
         return new R<>(code, data, data == null ? NO_DATA : msg);
     }
 
     /**
-     * 返回R
+     * 构建成功响应，消息取状态码默认文案
      *
      * @param <T> T 泛型标记
-     * @return R
+     * @return 统一响应
      */
     public static <T> R<T> success() {
         return new R<>(HttpStatus.SUCCESS);
     }
 
     /**
-     * 返回R
+     * 构建成功响应，消息为自定义文案
      *
      * @param msg 消息
      * @param <T> T 泛型标记
-     * @return R
+     * @return 统一响应
      */
     public static <T> R<T> success(String msg) {
         return new R<>(HttpStatus.SUCCESS, msg);
     }
 
     /**
-     * 返回R
+     * 按传入状态码构建响应，消息取状态码默认文案
      *
-     * @param httpStatus 业务代码
+     * @param httpStatus 业务状态码
      * @param <T>        T 泛型标记
-     * @return R
+     * @return 统一响应
      */
     public static <T> R<T> success(HttpStatus httpStatus) {
         return new R<>(httpStatus);
     }
 
     /**
-     * 返回R
+     * 按传入状态码构建响应，消息为自定义文案
      *
-     * @param httpStatus 业务代码
+     * @param httpStatus 业务状态码
      * @param msg        消息
      * @param <T>        T 泛型标记
-     * @return R
+     * @return 统一响应
      */
     public static <T> R<T> success(HttpStatus httpStatus, String msg) {
         return new R<>(httpStatus, msg);
     }
 
     /**
-     * 返回R
+     * 构建失败响应，消息取状态码默认文案
      *
      * @param <T> T 泛型标记
-     * @return R
+     * @return 统一响应
      */
     public static <T> R<T> fail() {
         return new R<>(HttpStatus.FAILURE);
     }
 
     /**
-     * 返回R
+     * 构建失败响应，消息为自定义文案
      *
      * @param msg 消息
      * @param <T> T 泛型标记
-     * @return R
+     * @return 统一响应
      */
     public static <T> R<T> fail(String msg) {
         return new R<>(HttpStatus.FAILURE, msg);
@@ -161,45 +161,45 @@ public class R<T> implements Serializable {
 
 
     /**
-     * 返回R
+     * 按指定状态码与消息构建失败响应
      *
      * @param code 状态码
      * @param msg  消息
      * @param <T>  T 泛型标记
-     * @return R
+     * @return 统一响应
      */
     public static <T> R<T> fail(int code, String msg) {
         return new R<>(code, null, msg);
     }
 
     /**
-     * 返回R
+     * 按传入状态码构建失败响应，消息取状态码默认文案
      *
-     * @param httpStatus 业务代码
+     * @param httpStatus 业务状态码
      * @param <T>        T 泛型标记
-     * @return R
+     * @return 统一响应
      */
     public static <T> R<T> fail(HttpStatus httpStatus) {
         return new R<>(httpStatus);
     }
 
     /**
-     * 返回R
+     * 按传入状态码与自定义消息构建失败响应
      *
-     * @param httpStatus 业务代码
+     * @param httpStatus 业务状态码
      * @param msg        消息
      * @param <T>        T 泛型标记
-     * @return R
+     * @return 统一响应
      */
     public static <T> R<T> fail(HttpStatus httpStatus, String msg) {
         return new R<>(httpStatus, msg);
     }
 
     /**
-     * 返回R
+     * 按布尔结果返回成功或失败响应
      *
      * @param flag 成功状态
-     * @return R
+     * @return 统一响应
      */
     public static <T> R<T> status(boolean flag) {
         return flag ? success(HttpStatus.SUCCESS) : fail(HttpStatus.FAILURE);

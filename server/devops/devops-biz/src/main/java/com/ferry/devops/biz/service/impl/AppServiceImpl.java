@@ -55,7 +55,7 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements IAppS
             if (ObjUtil.isEmpty(app)) {
                 throw new ServiceException("应用不存在");
             }
-            // 下游全部按编码引用，改动会让历史流水线、发布单指错应用
+            // 校验应用编码不可修改，下游流水线、发布单都按编码引用
             if (!ObjUtil.equals(app.getCode(), body.getCode())) {
                 throw new ServiceException("应用编码创建后不可修改");
             }

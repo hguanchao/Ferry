@@ -6,8 +6,6 @@ import lombok.Data;
 
 /**
  * 登录请求
- *
- * <p>凭据统一走请求体，避免密码出现在 URL、代理日志与浏览器历史中。
  */
 @Data
 public class LoginDTO {

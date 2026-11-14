@@ -80,11 +80,8 @@ public class RedisCacheAutoConfiguration {
     public CacheManager cacheManager(CacheProperties properties,
                                      RedisTemplate<String, Object> redisTemplate) {
         RedisCacheConfiguration configuration = RedisCacheConfiguration.defaultCacheConfig()
-                // 设置缓存默认过期时间为7天
                 .entryTtl(Duration.ofDays(IntConst.SEVEN))
-                // 根据RedisTemplate设置key的序列化
                 .serializeKeysWith(RedisSerializationContext.SerializationPair.fromSerializer(redisTemplate.getStringSerializer()))
-                // 根据RedisTemplate设置value的序列化
                 .serializeValuesWith(RedisSerializationContext.SerializationPair.fromSerializer(redisTemplate.getValueSerializer()));
         CacheProperties.Redis redisProperties = properties.getRedis();
         if (redisProperties.getTimeToLive() != null) {

@@ -11,9 +11,6 @@ import java.io.Serializable;
 
 /**
  * 应用档案
- *
- * <p>应用是交付管理的最小对象，下游的流水线、制品、环境、发布单、数据权限都按应用编码挂载，
- * 因此编码创建后不允许修改，逻辑删除后编码也不再复用。
  */
 @Data
 @TableName(value = "dev_app")

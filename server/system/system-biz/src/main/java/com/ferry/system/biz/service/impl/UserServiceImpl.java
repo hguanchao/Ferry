@@ -99,13 +99,12 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         if (isSuccess) {
             String roleId = body.getRoleId();
             if (StrUtil.isNotBlank(roleId)) {
-                // 用户授权角色
                 RoleAuthorize<Long, Long> roleAuthorize = new RoleAuthorize<>(
                         CollUtil.toLongList(roleId), CollUtil.asList(user.getId())
                 );
                 userRoleService.authorizeRole(roleAuthorize);
             }
-            // 改密或禁用之后旧令牌必须失效，否则被停用的账号仍能凭既有会话继续访问
+            // 改密或禁用后注销旧令牌，防止账号凭既有会话继续访问
             boolean revokeRequired = StrUtil.isNotBlank(body.getPassword()) || SysConst.IS_DISABLE.equals(user.getStatus());
             if (!isCreate && revokeRequired) {
                 AuthUtil.revokeAll(user.getId());
@@ -127,7 +126,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         String password = CryptoUtil.bcryptEncode(SysConst.DEFAULT_PASSWORD);
         boolean isSuccess = update(Wrappers.<User>lambdaUpdate().set(User::getPassword, password).eq(User::getId, id));
         if (isSuccess) {
-            // 重置密码等同于接管账号，旧会话不能继续有效
+            // 重置密码等同于接管账号，注销旧令牌使旧会话失效
             AuthUtil.revokeAll(id);
         }
         return isSuccess;
@@ -146,7 +145,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         }
         boolean isSuccess = removeByIds(ids);
         if (isSuccess) {
-            // 用户已删除，令牌若继续有效，被删账号仍可访问系统
+            // 删除后注销令牌，防止被删账号凭旧会话访问系统
             ids.forEach(AuthUtil::revokeAll);
             userRoleService.remove(Wrappers.<UserRole>lambdaQuery().in(UserRole::getUserId, ids));
         }

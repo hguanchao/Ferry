@@ -26,10 +26,6 @@ import java.util.List;
 public class TenantController {
     private final ITenantService service;
 
-    /**
-     * 租户列表不标注权限注解：该路径在免登录名单中，供登录页选择租户使用，
-     * 标注后取不到会话会直接返回 401，登录页将无法加载。
-     */
     @PostMapping("/list")
     @Operation(summary = "租户管理-租户列表", description = "传入查询条件")
     public R<List<TenantVO>> list(@RequestBody TenantQuery body) {
@@ -58,6 +54,5 @@ public class TenantController {
     public R<String> deleted(@RequestBody List<Long> ids) {
         boolean isSuccess = service.deleted(ids);
         return isSuccess ? R.success("删除成功") : R.fail("删除失败");
-
     }
 }

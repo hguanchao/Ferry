@@ -58,7 +58,7 @@ public class PipelineDefinitionDTO {
             if (task == null) {
                 throw new ServiceException("任务配置不能为空");
             }
-            // 前后空格不构成不同的任务，按去空格后的名称判重
+            // 按去空格后的任务名称判重
             String taskName = task.getName() == null ? "" : task.getName().trim();
             if (!taskNames.add(taskName)) {
                 throw new ServiceException("阶段「" + stage.getName() + "」内任务名称重复");

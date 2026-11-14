@@ -29,9 +29,6 @@ import java.util.stream.Collectors;
 
 /**
  * 系统服务契约的服务端实现
- *
- * <p>/internal 前缀必须声明在本类上：接口侧的 {@code @FeignClient} 不允许标注
- * {@code @RequestMapping}，其 path 属性只参与客户端 URL 拼接，不会注册成服务端映射。
  */
 @RestController
 @RequestMapping("/internal")
@@ -64,8 +61,8 @@ public class SystemFeign implements ISystemFeign {
      * 多角色取并集，任一角色可看全部即为全部。
      *
      * @param authUser 认证用户
-     * @param deptId   部门ID
-     * @param roles    用户角色
+     * @param deptId   部门id
+     * @param roles    用户角色列表
      */
     private void fillDataScope(AuthUser authUser, Long deptId, List<Role> roles) {
         Set<Long> deptIds = new HashSet<>();

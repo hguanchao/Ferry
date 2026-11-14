@@ -24,8 +24,7 @@ http.interceptors.request.use((config) => {
 http.interceptors.response.use(
   (response) => response,
   async (error) => {
-    // 下载类请求（responseType=blob）的错误体是二进制且没有统一响应结构：
-    // 原样抛给 download 自己读回，别在这里用 describe 压成「请求失败（400）」而丢掉后端文案
+    // blob 错误体没有统一响应结构，不走 describe，按后端文案转成 ApiError 抛给 download
     const blob = (error as { response?: { data?: unknown } })?.response?.data
     if (blob instanceof Blob) {
       return Promise.reject(await toBlobError(blob))
@@ -85,17 +84,7 @@ export function post<T>(url: string, body?: unknown, options?: RequestOptions): 
   return unwrap(http.post<ApiEnvelope<T>>(url, body ?? {}, options), options?.silent)
 }
 
-/**
- * 下载文件
- *
- * 与普通请求的差别在于响应体可能是二进制、也可能仍是 JSON 错误体：后端在写流之前失败时
- * 走的是统一响应（code != 200），这里必须按 content-type 判断，否则会把一段错误 JSON
- * 当成 xlsx 存下来，用户打开才发现文件损坏。错误路径已由响应拦截器统一转成 ApiError。
- *
- * @param url      接口地址
- * @param body     请求体
- * @param fileName 保存的文件名，后端未给响应头时用它兜底
- */
+/** 下载文件：按 content-type 区分文件流与 JSON 错误体，错误体转成 ApiError 抛出 */
 export async function download(url: string, body: unknown, fileName: string): Promise<void> {
   const response = await http.post(url, body ?? {}, { responseType: 'blob', timeout: 60_000 })
 

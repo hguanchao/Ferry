@@ -14,7 +14,7 @@ public interface IRegionService extends IService<Region> {
      * 区域管理-树结构列表
      *
      * @param body 查询条件
-     * @return List<RegionTree> 树结构列表
+     * @return 树结构列表
      */
     List<RegionTree> treeList(RegionQuery body);
 
@@ -38,15 +38,15 @@ public interface IRegionService extends IService<Region> {
      * 区域管理-编辑信息
      *
      * @param body 表单数据
-     * @return true 修改成功 || false 修改失败
+     * @return 是否成功
      */
     boolean save(RegionDTO body);
 
     /**
      * 区域管理-删除信息
      *
-     * @param ids 区域id(支持批量)
-     * @return true 删除成功 || false 删除失败
+     * @param ids 区域id，支持批量
+     * @return 是否成功
      */
     boolean deleted(List<Long> ids);
 }

@@ -77,11 +77,7 @@ export default function LoginPage() {
     }
   }, [])
 
-  /**
-   * 租户列表走免登录接口，供登录页选择；接口不可用时退化为手工输入编码。
-   * 输入框展示租户名称，列表到达后把已填的编码/名称统一归一为名称，
-   * 默认值优先级：本次输入 > 上次登录租户 > 列表首个启用租户 > 保留原值。
-   */
+  /** 租户列表走免登录接口，接口不可用时退化为手工输入编码 */
   const loadTenants = useCallback(async () => {
     setTenantsLoading(true)
     try {
@@ -394,8 +390,7 @@ export default function LoginPage() {
                   </div>
                 </Tooltip>
               </div>
-              {/* 服务不可用时顶部横幅已点明根因，这里不再重复同一句话；
-                  只有在「接口成功但内容为空」这类横幅覆盖不到的情况才就地提示 */}
+              {/* 顶部横幅已点明服务不可用的根因，这里只在横幅覆盖不到时才就地提示 */}
               {captchaError && !serviceError && (
                 <div className="ferry-login__error" role="alert">
                   <AlertCircle size={16} style={{ marginTop: 2, flex: '0 0 auto' }} />

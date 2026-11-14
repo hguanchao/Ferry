@@ -14,7 +14,7 @@ public interface IMenuService extends IService<Menu> {
      * 菜单管理-树形列表
      *
      * @param body 查询条件
-     * @return List<TreeNode> 树形列表
+     * @return 树形列表
      */
     List<MenuTree> treeList(MenuQuery body);
 
@@ -22,15 +22,15 @@ public interface IMenuService extends IService<Menu> {
      * 菜单管理-编辑信息
      *
      * @param body 表单数据
-     * @return true 成功 || false 失败
+     * @return 是否成功
      */
     boolean save(MenuDTO body);
 
     /**
      * 菜单管理-删除信息
      *
-     * @param ids 菜单id(支持批量)
-     * @return true 成功 || false 失败
+     * @param ids 菜单id，支持批量
+     * @return 是否成功
      */
     boolean deleted(List<Long> ids);
 }

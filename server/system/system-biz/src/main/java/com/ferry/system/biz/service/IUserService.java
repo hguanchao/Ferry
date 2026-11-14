@@ -18,7 +18,7 @@ public interface IUserService extends IService<User> {
      *
      * @param tenantId 租户id
      * @param account  用户账号
-     * @return {@link User} 用户信息
+     * @return 用户信息
      */
     User auth(String tenantId, String account);
 
@@ -26,7 +26,7 @@ public interface IUserService extends IService<User> {
      * 用户管理-分页列表
      *
      * @param body 查询条件
-     * @return IPage<UserVO> 分页列表
+     * @return 分页列表
      */
     IPage<UserVO> pageList(UserQuery body);
 
@@ -34,7 +34,7 @@ public interface IUserService extends IService<User> {
      * 用户管理-详情信息
      *
      * @param id 用户id
-     * @return UserVO 详情信息
+     * @return 详情信息
      */
     UserVO detail(Long id);
 
@@ -42,25 +42,23 @@ public interface IUserService extends IService<User> {
      * 用户管理-编辑信息
      *
      * @param body 表单数据
-     * @return true 成功 || false 失败
+     * @return 是否成功
      */
     boolean save(UserDTO body);
 
     /**
-     * 用户管理-重置密码
-     *
-     * <p>恢复为系统默认密码，仅超管可执行。
+     * 用户管理-重置密码，恢复为系统默认密码，仅超管可执行
      *
      * @param id 用户id
-     * @return true 成功 || false 失败
+     * @return 是否成功
      */
     boolean resetPassword(Long id);
 
     /**
      * 用户管理-删除信息
      *
-     * @param ids 用户id(支持批量)
-     * @return true 成功 || false 失败
+     * @param ids 用户id，支持批量
+     * @return 是否成功
      */
     boolean deleted(List<Long> ids);
 
@@ -68,7 +66,7 @@ public interface IUserService extends IService<User> {
      * 用户管理-用户授权角色
      *
      * @param body 表单数据
-     * @return true 成功 || false 失败
+     * @return 是否成功
      */
     boolean authorizeRole(RoleAuthorize<Long, Long> body);
 
@@ -78,7 +76,7 @@ public interface IUserService extends IService<User> {
      * @param tenantId 租户id
      * @param id       用户id
      * @param isSuper  是否超管 0：否 1：是
-     * @return List 权限列表
+     * @return 权限列表
      */
     List<MenuTree> permissions(String tenantId, Long id, Integer isSuper);
 }

@@ -47,8 +47,7 @@ public class DeptServiceImpl extends ServiceImpl<DeptMapper, Dept> implements ID
     public List<DeptTree> treeList(DeptQuery body) {
         List<Dept> list = list(DeptWrapper.build().lambda(body));
         List<DeptTree> deptList = BeanUtil.copy(list, DeptTree.class);
-        // 数据权限会把结果裁成一棵子树，可见节点的父级常常不在结果里；
-        // 不把这类节点提成根，TreeUtil 从 0 号根往下找不到它们，整棵树会塌空、只剩平铺列表
+        // 把父级不在结果里的可见节点提成根，否则被数据权限裁剪过的节点建树时会塌空
         Set<Long> ids = deptList.stream().map(DeptTree::getId).collect(Collectors.toSet());
         deptList.stream()
                 .filter(item -> !TreeUtil.isRoot(item.getParentId()) && !ids.contains(item.getParentId()))
@@ -104,7 +103,7 @@ public class DeptServiceImpl extends ServiceImpl<DeptMapper, Dept> implements ID
         if (CollUtil.isEmpty(ids)) {
             throw new ServiceException("请选择要删除的部门");
         }
-        // 用户表按部门id关联，删部门后这些 id 会悬空，先拦住
+        // 拦住已挂用户的部门，删除后用户归属会悬空
         long userCount = baseMapper.selectUserCountByIds(ids);
         if (userCount > IntConst.ZERO) {
             throw new ServiceException("部门下存在用户，请先调整用户所属部门");
@@ -125,11 +124,7 @@ public class DeptServiceImpl extends ServiceImpl<DeptMapper, Dept> implements ID
     }
 
     /**
-     * 重算子孙部门的祖级列表
-     *
-     * <p>改路径不允许被数据权限过滤：子树里可能有当前操作者看不到的部门，
-     * 只改看得见的那部分，剩下的行 ancestors 会停在旧位置，从树上脱节。
-     * 这里只绕过数据权限，租户条件仍然生效。
+     * 重算子孙部门的祖级列表，只绕过数据权限，租户条件仍生效
      *
      * @param dept 已保存的部门
      */
@@ -141,12 +136,9 @@ public class DeptServiceImpl extends ServiceImpl<DeptMapper, Dept> implements ID
     }
 
     /**
-     * 重算子孙部门的祖级列表
+     * 重算子孙部门的祖级列表，每个子孙截掉旧前缀再接上新前缀，更深的子孙无需单独处理
      *
-     * <p>每个子孙从自己的路径里截掉「到当前节点为止」的旧前缀，再接上由当前节点新路径拼出的前缀，
-     * 所以三级及更深的子孙不用单独处理。
-     *
-     * @param dept 已保存的部门，取其id与新路径；新路径为空表示已提到根部门
+     * @param dept 已保存的部门，新路径为空表示已提到根部门
      */
     private void doRefreshChildrenAncestors(Dept dept) {
         String id = StrUtil.toStr(dept.getId());
@@ -155,7 +147,7 @@ public class DeptServiceImpl extends ServiceImpl<DeptMapper, Dept> implements ID
         boolean changed = false;
         for (Dept child : children) {
             String ancestors = child.getAncestors();
-            // 前后各补一个逗号再定位，避免 12 命中 123；like 捞回来的行不含这一段时跳过，免得改坏别人的路径
+            // 前后补逗号再定位旧前缀，避免 12 命中 123；不含该段时跳过，以免改坏他人路径
             int start = (StrConst.COMMA + ancestors + StrConst.COMMA).indexOf(StrConst.COMMA + id + StrConst.COMMA);
             if (start < 0) {
                 continue;

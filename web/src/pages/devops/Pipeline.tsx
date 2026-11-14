@@ -276,8 +276,7 @@ export default function Pipeline() {
         const items = menuItems()
         return (
           <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            {/* 运行与触发依赖运行模型，尚未实现：按钮先占位并置灰，
-                给出「待接入」提示比隐藏更能看出这里最终要有入口 */}
+            {/* 运行模型尚未实现：按钮占位并置灰，用「待接入」提示表明这里最终要有入口 */}
             <Tooltip title="运行详情待运行模块接入">
               <Button type="link" size="small" disabled>
                 查看运行

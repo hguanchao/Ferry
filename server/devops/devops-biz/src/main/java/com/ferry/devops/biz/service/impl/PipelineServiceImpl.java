@@ -157,7 +157,7 @@ public class PipelineServiceImpl extends ServiceImpl<PipelineMapper, Pipeline> i
             }
             PoiUtil.exports("流水线列表", rows, PipelineExportRow.class, response);
         } catch (IOException e) {
-            // 响应流已开始写出，此时再抛给全局处理器也改不了状态码，只能记日志让调用方看到明确的失败
+            // 响应流已开始写出，状态码无法再改，记日志后抛业务异常
             log.error("流水线导出写出失败", e);
             throw new ServiceException("导出失败，请稍后重试");
         }

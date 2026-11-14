@@ -7,12 +7,7 @@ export interface DiffRow {
   text: string
 }
 
-/**
- * 行级差异
- *
- * 左右两侧的行号各走各的计数器：删除行只占左侧、新增行只占右侧，
- * 界面据此渲染成两栏并保持对齐。
- */
+/** 行级差异：删除行只占左侧行号、新增行只占右侧，渲染成两栏时保持对齐 */
 export function diffLines(leftText: string, rightText: string): DiffRow[] {
   const rows: DiffRow[] = []
   let leftNo = 1

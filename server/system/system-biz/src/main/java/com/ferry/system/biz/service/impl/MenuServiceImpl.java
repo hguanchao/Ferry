@@ -42,14 +42,14 @@ public class MenuServiceImpl extends ServiceImpl<MenuMapper, Menu> implements IM
     @Override
     @Transactional(rollbackFor = Exception.class)
     public boolean save(MenuDTO body) {
-        // 类型必须命中枚举，否则脏值会进菜单树
+        // 校验菜单类型是已定义的枚举值，否则脏值会进菜单树
         if (!MenuTypeEnum.contains(body.getType())) {
             throw new ServiceException("菜单类型仅支持目录、菜单、按钮");
         }
         Long id = body.getId();
         Long parentId = body.getParentId();
         Menu menu = BeanUtil.copy(body, Menu.class);
-        // 前端「根菜单」固定传 parentId=0，0 不是真实菜单id，不能拿去查库
+        // 根菜单把 parentId 归一为 0，0 不是真实菜单id不能拿去查库
         if (TreeUtil.isRoot(parentId)) {
             menu.setParentId(TOP_PARENT_ID);
         } else {
@@ -57,7 +57,7 @@ public class MenuServiceImpl extends ServiceImpl<MenuMapper, Menu> implements IM
             if (ObjUtil.isEmpty(parent)) {
                 throw new ServiceException("上级菜单不存在");
             }
-            // 菜单没有路径字段，只能一次取出全部 id→parentId，再沿父链上溯判环
+            // 菜单没有路径字段，一次取出全部 id→parentId 后沿父链上溯判环
             if (ObjUtil.isNotEmpty(id)) {
                 Map<Long, Long> parents = new HashMap<>();
                 for (Menu item : list(Wrappers.<Menu>lambdaQuery().select(Menu::getId, Menu::getParentId))) {
@@ -69,7 +69,7 @@ public class MenuServiceImpl extends ServiceImpl<MenuMapper, Menu> implements IM
                     if (ObjUtil.equals(cursor, id)) {
                         throw new ServiceException("上级菜单不能是自身或自身的下级");
                     }
-                    // 走到走过的节点说明库里本来就有环，直接停，别让上溯死循环
+                    // 走到已访问节点说明库里已有环，停止上溯避免死循环
                     if (!visited.add(cursor)) {
                         break;
                     }

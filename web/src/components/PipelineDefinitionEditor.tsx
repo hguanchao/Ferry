@@ -59,12 +59,7 @@ const MIN_ZOOM = 0.3
 // 上限取整倍数而不是 1.8：世界层靠 transform 缩放，只有整倍比例下笔画落点才回到整设备像素
 const MAX_ZOOM = 2
 
-/**
- * 平移吸附到设备像素。
- *
- * 世界层靠 transform 缩放，节点坐标都是整数；平移只要落在整设备像素，缩放为整数倍时
- * 文字笔画的落点才回到整像素，不会被灰度抗锯齿糊掉一层。
- */
+/** 平移吸附到设备像素：整数倍缩放下笔画落点才回到整像素，文字不被抗锯齿糊掉 */
 const snapToDevicePixel = (value: number) => {
   const dpr = window.devicePixelRatio || 1
   return Math.round(value * dpr) / dpr
@@ -154,12 +149,7 @@ interface PipelineDefinitionEditorProps {
   overviewExtra?: ReactNode
 }
 
-/**
- * 流水线定义画布编辑器
- *
- * 阶段以实线单向链表从左向右排列，任务以虚线链挂在阶段下方；属性编辑统一收进右侧检查器，
- * 画布只承担结构与选中。表单与 YAML、JSON 共用同一份 definition，切页签不复制状态。
- */
+/** 流水线定义画布编辑器：表单与 YAML、JSON 共用同一份 definition，切页签不复制状态 */
 const PipelineDefinitionEditor = forwardRef<
   PipelineDefinitionEditorHandle,
   PipelineDefinitionEditorProps

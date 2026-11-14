@@ -13,10 +13,9 @@ public interface RoleMenuMapper extends BaseMapper<RoleMenu> {
 
     /**
      * 查询角色授权的菜单列表
-     * 注：支持批量查询，角色id按逗号拼接
      *
-     * @param roleIds 角色id
-     * @return List
+     * @param roleIds 角色id，多个按逗号拼接
+     * @return 菜单列表
      */
     List<Menu> selectRoleMenuListByRoleId(@Param("roleIds") String roleIds);
 }

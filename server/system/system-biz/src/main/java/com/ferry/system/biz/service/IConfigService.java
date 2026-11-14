@@ -15,7 +15,7 @@ public interface IConfigService extends IService<Config> {
      * 配置管理-分页列表
      *
      * @param body 查询条件
-     * @return IPage<ConfigVO> 分页列表
+     * @return 分页列表
      */
     IPage<ConfigVO> pageList(ConfigQuery body);
 
@@ -23,15 +23,15 @@ public interface IConfigService extends IService<Config> {
      * 配置管理-编辑信息
      *
      * @param body 表单数据
-     * @return true 成功 || false 失败
+     * @return 是否成功
      */
     boolean save(ConfigDTO body);
 
     /**
      * 配置管理-删除信息
      *
-     * @param ids 数据id(支持批量)
-     * @return true 成功 || false 失败
+     * @param ids 数据id，支持批量
+     * @return 是否成功
      */
     boolean deleted(List<Long> ids);
 }

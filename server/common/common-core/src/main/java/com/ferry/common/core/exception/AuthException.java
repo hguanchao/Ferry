@@ -37,6 +37,7 @@ public class AuthException extends RuntimeException {
 
     @Override
     public Throwable fillInStackTrace() {
+        // 异常仅承载提示文本、按控制流使用，堆栈没有诊断价值，跳过采集避免无谓开销
         return this;
     }
 }

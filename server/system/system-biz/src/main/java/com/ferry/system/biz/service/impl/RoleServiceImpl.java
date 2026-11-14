@@ -61,8 +61,7 @@ public class RoleServiceImpl extends ServiceImpl<RoleMapper, Role> implements IR
         if (count > IntConst.ZERO) {
             throw new ServiceException("角色编码[" + role.getCode() + "]已存在");
         }
-        // 建表默认值是「全部数据」，新角色直接落库等于默认放权；
-        // 数据范围改由授权接口单独授予，这里只负责给一个看不到任何数据的安全起点
+        // 新角色数据范围先置为自定义空授权，落库默认的「全部数据」等于默认放权
         if (ObjUtil.isEmpty(role.getId())) {
             role.setDataScope(DataScopeEnum.CUSTOM.getCode());
         }
@@ -75,7 +74,7 @@ public class RoleServiceImpl extends ServiceImpl<RoleMapper, Role> implements IR
         if (CollUtil.isEmpty(ids)) {
             throw new ServiceException("请选择要删除的角色");
         }
-        // 角色还在给用户使用，删掉会让用户凭空失去权限，先拦住
+        // 拦住已分配给用户的角色，删除会让用户凭空失去权限
         long userCount = userRoleService.count(Wrappers.<UserRole>lambdaQuery().in(UserRole::getRoleId, ids));
         if (userCount > IntConst.ZERO) {
             throw new ServiceException("角色已分配给用户，请先解除授权");
@@ -83,7 +82,7 @@ public class RoleServiceImpl extends ServiceImpl<RoleMapper, Role> implements IR
         boolean isSuccess = removeByIds(ids);
         if (isSuccess) {
             roleMenuService.remove(Wrappers.<RoleMenu>lambdaQuery().in(RoleMenu::getRoleId, ids));
-            // 授权记录随角色一起清掉，否则同编码重建角色会捡到上一份数据范围
+            // 连带清掉部门授权记录，否则同编码重建角色会捡到上一份数据范围
             roleDeptService.remove(Wrappers.<RoleDept>lambdaQuery().in(RoleDept::getRoleId, ids));
         }
         return isSuccess;
@@ -133,7 +132,7 @@ public class RoleServiceImpl extends ServiceImpl<RoleMapper, Role> implements IR
         body.setAuthorizedIds(List.of(role.getId()));
         if (scope == DataScopeEnum.CUSTOM) {
             if (CollUtil.isEmpty(deptIds)) {
-                // 空的「自定义」等于什么都看不到，会让授权人以为是功能坏了
+                // 拒绝空的「自定义」范围，空集合等于什么都看不到
                 throw new ServiceException("自定义数据范围至少要选择一个部门");
             }
             body.setAuthorizeIds(deptIds);

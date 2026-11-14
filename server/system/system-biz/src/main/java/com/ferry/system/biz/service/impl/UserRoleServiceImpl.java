@@ -61,7 +61,7 @@ public class UserRoleServiceImpl extends ServiceImpl<UserRoleMapper, UserRole> i
             List<Role> roles = roles(roleIds);
             List<String> roleCodes = roles.stream().map(Role::getCode).toList();
             int isSuper = roleCodes.contains(SUPER_ADMIN_CODE) ? 1 : 0;
-            // 授权后按用户重算超级管理员标记，避免出现状态残留或批量串写。
+            // 授权后按用户重算超管标记，避免状态残留
             baseMapper.updateSuperUserByUserIds(userIds, isSuper);
         }
         return isSuccess;

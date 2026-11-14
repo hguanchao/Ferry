@@ -66,7 +66,7 @@ public class AuthFilter implements Filter {
      * 排除不需要鉴权认证的请求路径
      *
      * @param path 请求路径
-     * @return 不需要鉴权认证的请求路径
+     * @return 是否命中排除名单
      */
     private boolean excludePath(String path) {
         return properties.getExcludePath().stream().anyMatch(pattern -> antPathMatcher.match(pattern, path));

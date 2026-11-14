@@ -10,27 +10,12 @@ import java.util.Arrays;
 @Getter
 @AllArgsConstructor
 public enum MenuTypeEnum {
-    /**
-     * 目录
-     */
     DIR(IntConst.ZERO, "目录"),
-    /**
-     * 菜单
-     */
     MENU(IntConst.ONE, "菜单"),
-    /**
-     * 按钮
-     */
     BUTTON(IntConst.TWO, "按钮");
 
-    /**
-     * 类型
-     */
     private final Integer type;
 
-    /**
-     * 描述
-     */
     private final String desc;
 
     /**

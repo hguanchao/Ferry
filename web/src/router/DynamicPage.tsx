@@ -12,12 +12,7 @@ function PageSkeleton() {
   )
 }
 
-/**
- * 菜单已存在但前端没有对应组件时的兜底
- *
- * 这种情况通常发生在后端先加了菜单、前端还没发版。页面把差异直接摆出来，
- * 比静默 404 更容易定位——运维和开发看到的都是同一句话。
- */
+/** 菜单已存在但前端没有对应组件时的兜底：把差异直接摆出来，比静默 404 更容易定位 */
 function UnregisteredMenu({ route }: { route: MenuRoute }) {
   return (
     <div className="ferry-panel">

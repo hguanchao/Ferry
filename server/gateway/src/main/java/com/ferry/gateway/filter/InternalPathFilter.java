@@ -12,12 +12,6 @@ import reactor.core.publisher.Mono;
 
 /**
  * 内部接口访问控制
- *
- * <p>服务间调用走服务发现直连目标实例，不经过网关，进入网关的都是外部请求。
- * 服务间的契约统一声明在 /internal 下，这里按前缀整段拦掉，新增内部接口无需改动本类。
- *
- * <p>拦截后按未找到处理，而不是返回无权限：403 会让对方确认路径真实存在，
- * 与普通不存在路径返回同样的状态码和提示，外部才无法探测内部接口。
  */
 @Component
 public class InternalPathFilter implements GlobalFilter, Ordered {

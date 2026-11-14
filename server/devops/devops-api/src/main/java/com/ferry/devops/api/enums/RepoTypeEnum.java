@@ -8,33 +8,16 @@ import java.util.Arrays;
 
 /**
  * 代码托管平台
- *
- * <p>取值即仓库地址所属平台，保存时要与仓库地址域名一致，否则运行期会拉错仓库。
  */
 @Getter
 @AllArgsConstructor
 public enum RepoTypeEnum {
-    /**
-     * GitLab
-     */
     GITLAB("GITLAB", "GitLab"),
-    /**
-     * GitHub
-     */
     GITHUB("GITHUB", "GitHub"),
-    /**
-     * Gitee
-     */
     GITEE("GITEE", "Gitee");
 
-    /**
-     * 取值
-     */
     private final String code;
 
-    /**
-     * 描述
-     */
     private final String desc;
 
     /**

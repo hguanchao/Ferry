@@ -16,8 +16,8 @@ public class ServiceImpl<M extends BaseMapper<T>, T> extends com.baomidou.mybati
      * 根据字段批量更新
      *
      * @param entityList 实体数据列表
-     * @param function   函数式编程(实体字段函数)
-     * @return boolean
+     * @param function   按实体生成更新条件的函数
+     * @return 是否全部更新成功
      */
     @Transactional(rollbackFor = Exception.class)
     public boolean updateBatchBy(Collection<T> entityList, Function<T, Wrapper<T>> function) {

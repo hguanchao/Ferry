@@ -6,10 +6,7 @@ const REMEMBER_KEY = 'ferry.remember'
 const TENANT_KEY = 'ferry.tenant'
 export const UNAUTHORIZED_EVENT = 'ferry:unauthorized'
 
-/**
- * 会话读写集中在此，避免 axios 客户端与 store 互相引用形成循环依赖。
- * 令牌只落 localStorage，页面关闭后仍可续用；「记住账号」单独存账号字符串。
- */
+/** 会话读写集中在此，避免 axios 客户端与 store 互相引用形成循环依赖 */
 export const session = {
   readToken(): string | null {
     try {

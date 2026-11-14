@@ -10,9 +10,6 @@ import java.io.Serializable;
 
 /**
  * 流水线版本快照
- *
- * <p>版本一经生成只读不改，运行实例将来按版本 id 绑定快照执行；
- * 因此定义内容整体存 JSON，不在版本表里拆阶段和任务。
  */
 @Data
 @TableName(value = "dev_pipeline_version")

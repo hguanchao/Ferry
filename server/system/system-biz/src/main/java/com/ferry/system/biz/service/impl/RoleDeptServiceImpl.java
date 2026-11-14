@@ -32,7 +32,7 @@ public class RoleDeptServiceImpl extends ServiceImpl<RoleDeptMapper, RoleDept> i
         if (CollUtil.isEmpty(roleIds)) {
             throw new ServiceException("请选择要授权的角色");
         }
-        // 先清空再按新集合重建，因此空菜单是合法输入，表示撤销该角色的全部菜单授权
+        // 先清空再按新集合重建，空部门集合表示撤销该角色的全部部门授权
         remove(Wrappers.<RoleDept>lambdaQuery().in(RoleDept::getRoleId, roleIds));
         if (CollUtil.isEmpty(deptIds)) {
             return true;

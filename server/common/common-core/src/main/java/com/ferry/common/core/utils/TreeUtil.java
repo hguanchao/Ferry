@@ -27,21 +27,21 @@ public final class TreeUtil {
     }
 
     /**
-     * 转换为树形列表
+     * 转换为树形列表，根节点从 0 开始判定
      *
-     * @param nodes 子节点列表
-     * @return TreeNode
+     * @param nodes 节点平铺列表
+     * @return 树形列表
      */
     public static <T extends TreeNode> List<T> build(List<T> nodes) {
         return build(nodes, SysConst.TOP_PARENT_ID);
     }
 
     /**
-     * 转换为树形列表
+     * 转换为树形列表，从指定父节点开始挂载
      *
-     * @param nodes    子节点列表
-     * @param parentId 父节点id
-     * @return TreeNode
+     * @param nodes    节点平铺列表
+     * @param parentId 根判定用的父节点id
+     * @return 树形列表
      */
     public static <T extends TreeNode> List<T> build(List<T> nodes, Object parentId) {
         if (CollUtil.isEmpty(nodes)) {
@@ -57,6 +57,13 @@ public final class TreeUtil {
         return buildChildren(childrenMap, parentId);
     }
 
+    /**
+     * 从子节点映射递归组装指定父节点的子级列表
+     *
+     * @param childrenMap 父节点id到子节点列表的映射
+     * @param parentId    当前父节点id
+     * @return 子级列表，没有子级时为空列表
+     */
     private static <T extends TreeNode> List<T> buildChildren(Map<Object, List<T>> childrenMap, Object parentId) {
         List<T> children = childrenMap.get(parentId);
         if (CollUtil.isEmpty(children)) {

@@ -39,7 +39,7 @@ public class TenantServiceImpl extends ServiceImpl<TenantMapper, Tenant> impleme
     @Transactional(rollbackFor = Exception.class)
     public boolean save(TenantDTO body) {
         Tenant tenant = BeanUtil.copy(body, Tenant.class);
-        // 租户编码是登录时的租户标识，重复会导致归属错乱
+        // 校验租户编码唯一，重复会导致登录归属错乱
         long count = count(Wrappers.<Tenant>lambdaQuery()
                 .eq(Tenant::getCode, tenant.getCode())
                 .ne(ObjUtil.isNotEmpty(tenant.getId()), Tenant::getId, tenant.getId()));

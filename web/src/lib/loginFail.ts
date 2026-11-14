@@ -1,16 +1,4 @@
-/**
- * 登录失败计数
- *
- * 后端 `AuthUtil.loginLock` 的口径（common-security）：
- * - 每次密码校验失败 INCR 一次，首次失败开始计 TTL；
- * - 达到 maxFailCount（默认 5）时刷新 TTL，锁定 lockDuration（默认 900s = 15 分钟）；
- * - `checkLoginLock` 在**校验密码之前**拦截，所以第 6 次请求才会收到"失败次数过多"。
- *
- * 也就是说：第 5 次失败那一刻账号其实已经锁了，但用户要到第 6 次点击才知道。
- * 前端按同一口径本地记一份，好在第 5 次就当场提示，不必让用户白试一次。
- *
- * 计数只是提示用的副本，真正的判定始终在后端：本地丢了最多多提示一次，不会放宽校验。
- */
+/** 登录失败计数：前端按后端 loginLock 同口径本地记一份，第 5 次失败就当场提示，判定始终以后端为准 */
 const STORAGE_KEY = 'ferry.login.fail'
 export const MAX_FAIL_COUNT = 5
 export const LOCK_MINUTES = 15

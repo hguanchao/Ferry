@@ -21,17 +21,12 @@ import reactor.core.publisher.Mono;
 public class GatewayExceptionHandler implements ErrorWebExceptionHandler, Ordered {
 
     /**
-     * 未找到路由时的提示语
-     *
-     * <p>被内部调用策略拦截的路径也使用这条提示，使外部无法区分"路径不存在"与"路径不对外开放"。
+     * 未找到路由时的提示语，内部接口拦截也复用，避免外部探测出路径存在
      */
     public static final String NOT_FOUND_MESSAGE = "404 请求未找到";
 
     /**
      * 统一处理网关异常
-     *
-     * <p>参数与返回值标注跟随 {@link org.springframework.web.server.WebExceptionHandler} 所在的
-     * 包级 {@code @NonNullApi} 契约，不属于本类的自定义约束。
      *
      * @param exchange 当前请求响应上下文
      * @param ex       异常对象，由 WebFlux 保证非空
@@ -65,11 +60,11 @@ public class GatewayExceptionHandler implements ErrorWebExceptionHandler, Ordere
     }
 
     /**
-     * 设置webflux模型响应
+     * 写出 JSON 响应
      *
      * @param message  响应消息
-     * @param response ServerHttpResponse
-     * @return Mono<Void>
+     * @param response HTTP 响应
+     * @return 写出结果
      */
     public static Mono<Void> write(ServerHttpResponse response, Object message) {
         response.getHeaders().setContentType(MediaType.APPLICATION_JSON);

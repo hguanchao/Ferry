@@ -87,7 +87,7 @@ public class PipelineVersionServiceImpl extends ServiceImpl<PipelineVersionMappe
         version.setCreateUserName(currentUserName());
         boolean isSuccess = save(version);
         if (isSuccess) {
-            // 阶段数与快照同源，避免两处各数一次导致口径不一致
+            // 阶段数从本次保存的快照统计并回写流水线，保证口径一致
             JsonNode stages = JsonUtil.getNode(content, STAGES);
             baseMapper.updatePipeline(pipeline.getId(), version.getId(), versionNo, stages == null ? null : stages.size());
         }
@@ -119,7 +119,7 @@ public class PipelineVersionServiceImpl extends ServiceImpl<PipelineVersionMappe
         version.setCreateUserName(currentUserName());
         boolean isSuccess = save(version);
         if (isSuccess) {
-            // 回退内容来自源版本快照，阶段数必须按快照算，不能取回退请求里的定义
+            // 阶段数按源版本快照统计，不取回退请求里的定义
             JsonNode stages = JsonUtil.getNode(source.getContent(), STAGES);
             baseMapper.updatePipeline(pipeline.getId(), version.getId(), versionNo, stages == null ? null : stages.size());
         }

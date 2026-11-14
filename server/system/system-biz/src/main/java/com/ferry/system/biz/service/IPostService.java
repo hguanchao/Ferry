@@ -15,7 +15,7 @@ public interface IPostService extends IService<Post> {
      * 岗位管理-分页列表
      *
      * @param body 查询条件
-     * @return IPage<PostVO> 分页列表
+     * @return 分页列表
      */
     IPage<PostVO> pageList(PostQuery body);
 
@@ -23,15 +23,15 @@ public interface IPostService extends IService<Post> {
      * 岗位管理-编辑信息
      *
      * @param body 表单数据
-     * @return true 成功 || false 失败
+     * @return 是否成功
      */
     boolean save(PostDTO body);
 
     /**
      * 岗位管理-删除信息
      *
-     * @param ids 岗位id(支持批量)
-     * @return true 成功 || false 失败
+     * @param ids 岗位id，支持批量
+     * @return 是否成功
      */
     boolean deleted(List<Long> ids);
 }

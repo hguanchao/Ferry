@@ -13,18 +13,18 @@ import org.springframework.web.util.WebUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 
 /**
  * Web工具类
  */
-@Slf4j
 public class WebUtil extends WebUtils {
     public static final String UN_KNOWN = "unknown";
 
     /**
      * 获取 HttpServletRequest
      *
-     * @return {HttpServletRequest}
+     * @return 当前请求对象
      */
     public static HttpServletRequest getRequest() {
         RequestAttributes requestAttributes = RequestContextHolder.getRequestAttributes();
@@ -54,11 +54,7 @@ public class WebUtil extends WebUtils {
         if (StrUtil.isBlank(value)) {
             return StrConst.EMPTY;
         }
-        try {
-            return URLDecoder.decode(value, StrConst.UTF_8);
-        } catch (UnsupportedEncodingException e) {
-            throw new UtilException(e);
-        }
+        return URLDecoder.decode(value, StandardCharsets.UTF_8);
     }
 
     /**

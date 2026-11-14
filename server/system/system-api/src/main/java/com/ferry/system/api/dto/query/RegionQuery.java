@@ -16,10 +16,7 @@ public class RegionQuery extends Query {
     private String name;
 
     /**
-     * 搜索关键字，同时匹配区域名称与区域编码。
-     *
-     * 与 parentId 互斥：不传 parentId 时即为跨层级检索，一次返回所有匹配的区划，由前端平铺展示。
-     * 区划编码是层级路径码（省 6 位 / 市 6 位 / 区县 6 位 / 街道 12 位），输入编码前缀即可收敛到某一棵子树。
+     * 搜索关键字，匹配区域名称或编码；与 parentId 互斥，不传时跨层级检索，编码前缀可收敛到子树
      */
     @Schema(description = "搜索关键字（匹配名称或编码）")
     private String keyword;

@@ -12,16 +12,16 @@ public interface IUserRoleService extends IService<UserRole> {
     /**
      * 角色列表
      *
-     * @param roleIds 角色id(支持批量查询)
-     * @return List 角色列表
+     * @param roleIds 角色id集合
+     * @return 角色列表
      */
     List<Role> roles(List<Long> roleIds);
 
     /**
      * 用户角色列表
      *
-     * @param userIds 用户id(支持批量查询)
-     * @return List 角色列表
+     * @param userIds 用户id集合
+     * @return 角色列表
      */
     List<Role> userRoles(List<Long> userIds);
 
@@ -29,7 +29,7 @@ public interface IUserRoleService extends IService<UserRole> {
      * 用户授权角色
      *
      * @param body 参数体
-     * @return true 成功 || false 失败
+     * @return 是否成功
      */
     boolean authorizeRole(RoleAuthorize<Long, Long> body);
 }

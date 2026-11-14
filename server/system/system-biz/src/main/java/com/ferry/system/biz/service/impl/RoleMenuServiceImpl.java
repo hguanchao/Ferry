@@ -43,14 +43,13 @@ public class RoleMenuServiceImpl extends ServiceImpl<RoleMenuMapper, RoleMenu> i
         if (!AuthUtil.isSuper()) {
             throw new AuthException(HttpStatus.FORBIDDEN);
         }
-        // authorizedIds 是「被授权对象」（角色），authorizeIds 是「授予的内容」（菜单）。
-        // 这两个名字容易看反：写反会落成 (菜单id, 角色id)，查询按角色反查永远为空。
+        // authorizedIds 是被授权的角色、authorizeIds 是授予的菜单，写反会落成 (菜单id, 角色id) 导致查询恒空
         List<Long> roleIds = body.getAuthorizedIds();
         List<Long> menuIds = body.getAuthorizeIds();
         if (CollUtil.isEmpty(roleIds)) {
             throw new ServiceException("请选择要授权的角色");
         }
-        // 先清空再按新集合重建，因此空菜单是合法输入，表示撤销该角色的全部菜单授权
+        // 先清空再按新集合重建，空菜单集合表示撤销该角色的全部菜单授权
         remove(Wrappers.<RoleMenu>lambdaQuery().in(RoleMenu::getRoleId, roleIds));
         if (CollUtil.isEmpty(menuIds)) {
             return true;

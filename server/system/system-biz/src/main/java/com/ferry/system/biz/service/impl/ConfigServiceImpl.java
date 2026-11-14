@@ -35,7 +35,7 @@ public class ConfigServiceImpl extends ServiceImpl<ConfigMapper, Config> impleme
     @Transactional(rollbackFor = Exception.class)
     public boolean save(ConfigDTO body) {
         Config config = BeanUtil.copy(body, Config.class);
-        // 配置键名是业务取值依据，重复会导致取到的值不确定
+        // 校验配置键名唯一，重复会导致按键取值不确定
         long count = count(Wrappers.<Config>lambdaQuery()
                 .eq(Config::getCode, config.getCode())
                 .ne(ObjUtil.isNotEmpty(config.getId()), Config::getId, config.getId()));

@@ -25,12 +25,7 @@ interface AppSelectProps {
   presetOptions?: Array<Pick<AppOption, 'id' | 'code' | 'name'>>
 }
 
-/**
- * 应用下拉
- *
- * 应用数量会增长到几百个，一次性拉全量既慢又占用下拉列表；这里用 pageList 做远程搜索 +
- * 滚动分页。已加载过的选项会累积在 seen 里，搜索条件变化后已选项仍能显示名称。
- */
+/** 应用下拉：pageList 远程搜索 + 滚动分页，已加载选项累积保留以便回显已选名称 */
 export default function AppSelect({
   id,
   multiple = false,

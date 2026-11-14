@@ -10,8 +10,6 @@ import java.io.Serializable;
 
 /**
  * 行政区划
- *
- * <p>国标数据，各租户共用同一份，因此不设租户字段，也不参与租户拦截。
  */
 @Data
 @TableName(value = "sys_region")

@@ -57,18 +57,17 @@ public class RequestLogAspect {
     }
 
     /**
-     * AOP环切打印请求日志
+     * 环切打印请求与响应日志
      *
-     * @param point JoinPoint
-     * @return Object
-     * @throws Throwable 异常
+     * @param point 连接点
+     * @return 原方法返回值
+     * @throws Throwable 原方法抛出的异常
      */
     @Around("pointCut()")
     public Object around(ProceedingJoinPoint point) throws Throwable {
         HttpServletRequest request = WebUtil.getRequest();
         String requestUri = Objects.requireNonNull(request).getRequestURI();
         String requestMethod = request.getMethod();
-        // 打印请求路径和请求参数
         StringBuilder requestLog = new StringBuilder(300);
         List<Object> requestArgs = new ArrayList<>();
         requestLog.append("\n================  Request Start  ================\n");
@@ -81,10 +80,8 @@ public class RequestLogAspect {
         } else {
             requestArgs.add(parseArgs(point));
         }
-        // 客户端ip
         requestLog.append("===   IP  ===  {}\n");
         requestArgs.add(WebUtil.getIp(request));
-        // 打印关键请求头
         for (String key : HEADERS) {
             String value = request.getHeader(key);
             if (StrUtil.isNotBlank(value)) {
@@ -94,12 +91,10 @@ public class RequestLogAspect {
             }
         }
         requestLog.append("================  Request End   ================\n");
-        // 打印执行时间
         StopWatch stopWatch = new StopWatch();
         stopWatch.start();
         log.info(requestLog.toString(), requestArgs.toArray());
 
-        // 打印请求响应
         StringBuilder responseLog = new StringBuilder(200);
         List<Object> responseArgs = new ArrayList<>();
         responseLog.append("\n================  Response Start  ================\n");
@@ -151,7 +146,6 @@ public class RequestLogAspect {
                     continue;
                 }
                 RequestBody requestBody = methodParameter.getParameterAnnotation(RequestBody.class);
-                // 参数是Json
                 if (requestBody != null && arg != null) {
                     if (arg instanceof List) {
                         argMap.put("param", arg.toString());
@@ -171,7 +165,6 @@ public class RequestLogAspect {
                 } else if (arg instanceof MultipartFile[]) {
                     mfs(argMap, arg);
                 } else {
-                    // 参数存在注解RequestParam
                     RequestParam requestParam = methodParameter.getParameterAnnotation(RequestParam.class);
                     String paraName;
                     if (requestParam != null && StrUtil.isNotBlank(requestParam.value())) {
@@ -198,7 +191,7 @@ public class RequestLogAspect {
      * 参数类型是否为List<File>
      *
      * @param arg 参数
-     * @return true || false
+     * @return 是否为 List 形态的上传参数
      */
     private boolean isListFile(Object arg) {
         if (arg instanceof List) {

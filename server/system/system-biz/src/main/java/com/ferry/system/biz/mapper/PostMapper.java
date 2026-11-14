@@ -14,7 +14,7 @@ public interface PostMapper extends BaseMapper<Post> {
      * 统计关联这些岗位的用户数量
      *
      * @param ids 岗位id集合
-     * @return long 用户数量
+     * @return 用户数量
      */
     long selectUserCountByIds(@Param("ids") List<Long> ids);
 }

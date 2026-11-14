@@ -30,12 +30,7 @@ function timestamp() {
   return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}`
 }
 
-/**
- * CSV 导出
- *
- * 导出与列表同源、受数据权限约束、首行带导出人与筛选条件摘要；
- * 这里把水印写成以 # 开头的注释行，Excel 打开时可直接看到，不影响列结构。
- */
+/** CSV 导出：首行写以 # 开头的水印注释行，带导出人与筛选条件摘要，不影响列结构 */
 export function exportCsv<T>({ filename, rows, columns, operator, filters }: ExportOptions<T>) {
   const now = new Date().toLocaleString('zh-CN', { hour12: false })
   const watermark = [

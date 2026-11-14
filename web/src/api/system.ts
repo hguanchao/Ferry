@@ -36,31 +36,15 @@ export const roleApi = {
   pageList: (body: PageParams) => post<ApiPage<RoleRow>>('/ferry-system/role/pageList', body),
   save: (body: Record<string, unknown>) => post<string>('/ferry-system/role/save', body),
   deleted: (ids: string[]) => post<string>('/ferry-system/role/deleted', ids),
-  /**
-   * 该角色已授权的菜单：后端返回扁平 List<MenuTree>（BeanUtil.copy 自 sys_role_menu 关联结果），
-   * 不是树。前端取 id 作为 Tree 的选中键。
-   */
-  /** 已授权菜单：后端是 @RequestParam 接收，必须走查询参数，拼成路径会 404 */
+  /** 已授权菜单：后端返回扁平列表而非树，且接口用 @RequestParam 接收，必须走查询参数 */
   menuList: (id: string) => get<Array<{ id: string; name?: string; type?: number }>>('/ferry-system/role/menuList', { id }),
-  /**
-   * 角色授权菜单。
-   *
-   * 后端约定 authorizedIds 是「被授权对象」（角色），authorizeIds 是「授予的内容」（菜单），
-   * 与用户授权角色（authorizedIds=用户、authorizeIds=角色）保持同一语义。
-   * 两者写反会让 sys_role_menu 存成 (菜单id, 角色id)，查询按角色id反查永远为空。
-   */
+  /** 角色授权菜单：authorizedIds 是被授权对象（角色），authorizeIds 是授予的内容（菜单），两者不能写反 */
   authorizeMenu: (roleId: string, menuIds: string[]) =>
     post<string>('/ferry-system/role/authorizeMenu', { authorizeIds: menuIds, authorizedIds: [roleId] }),
   /** 已授权数据范围：数据范围取值 + 授权时勾选的原始部门（不含下级） */
   dataScope: (id: string) =>
     get<{ dataScope: number; deptIds: string[] }>('/ferry-system/role/dataScope', { id }),
-  /**
-   * 角色授权数据范围。
-   *
-   * 与菜单授权分开提交：数据范围带自定义部门，和菜单树塞进同一个接口会让两种授权互相覆盖。
-   * 后端把角色id与范围取值放在路径上、部门放在请求体里，取消自定义时传空数组即可清空。
-   * 保存只改库，不注销在线会话：已登录用户按旧范围继续用，重新登录后才按新范围过滤。
-   */
+  /** 角色授权数据范围：与菜单授权分开提交避免互相覆盖，保存只改库、不注销在线会话 */
   authorizeDataScope: (roleId: string, dataScope: number, deptIds: string[]) =>
     post<string>(`/ferry-system/role/authorizeDataScope/${roleId}/${dataScope}`, deptIds),
 }
@@ -107,13 +91,7 @@ export const tenantApi = {
   deleted: (ids: string[]) => post<string>('/ferry-system/tenant/deleted', ids),
 }
 
-/**
- * 区域列表查询条件
- *
- * 两种用法互斥：
- * - 传 parentId：逐级懒加载，取该父级下的直接子节点；
- * - 传 keyword：跨层级检索，取全部命中名称或编码的区划（编码是层级路径码，前缀即子树）。
- */
+/** 区域列表查询条件：传 parentId 逐级懒加载、传 keyword 跨层级检索，两种用法互斥 */
 export interface RegionFilter {
   parentId?: string
   keyword?: string
@@ -121,12 +99,7 @@ export interface RegionFilter {
 }
 
 export const regionApi = {
-  /**
-   * 懒加载列表。
-   *
-   * 这是区域管理页面唯一的数据来源：首屏只拉根节点，展开哪一级才拉哪一级，
-   * 不再提供整棵树的一次性拉取，避免 4.5 万行行政区划在打开页面时被全量建树。
-   */
+  /** 区域懒加载列表：首屏只拉根节点，展开哪一级才拉哪一级，避免全量建树 */
   lazyList: (body: RegionFilter) => post<RegionNode[]>('/ferry-system/region/lazyList', body),
   detail: (id: string) => get<RegionNode>('/ferry-system/region/detail', { id }),
   save: (body: Record<string, unknown>) => post<string>('/ferry-system/region/save', body),
@@ -145,10 +118,7 @@ export const workbenchApi = {
 
 /** 数据权限的授权对象：应用 × 环境（由应用管理提供，未接入时降级为空） */
 export const appScopeApi = {
-  /**
-   * 应用管理尚未落地，后端没有 /apps/scope-options；404 视为「暂未接入」返回空清单，
-   * 由页面渲染待接入空态。可选接口不该把整页打挂，也不该弹一条 404 错误。
-   */
+  /** 应用管理尚未落地，404 视为「暂未接入」返回空清单，可选接口不把页面打挂也不弹错 */
   options: async (): Promise<{ apps: AppRow[]; envs: EnvRow[] }> => {
     try {
       return await get<{ apps: AppRow[]; envs: EnvRow[] }>('/ferry-system/apps/scope-options', undefined, { silent: true })

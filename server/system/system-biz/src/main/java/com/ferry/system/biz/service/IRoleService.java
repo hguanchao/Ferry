@@ -19,7 +19,7 @@ public interface IRoleService extends IService<Role> {
      * 角色管理-分页列表
      *
      * @param body 查询条件
-     * @return IPage<RoleVO> 分页列表
+     * @return 分页列表
      */
     IPage<RoleVO> pageList(RoleQuery body);
 
@@ -27,15 +27,15 @@ public interface IRoleService extends IService<Role> {
      * 角色管理-编辑信息
      *
      * @param body 表单数据
-     * @return true 成功 || false 失败
+     * @return 是否成功
      */
     boolean save(RoleDTO body);
 
     /**
      * 角色管理-删除信息
      *
-     * @param ids 数据id(支持批量)
-     * @return true 成功 || false 失败
+     * @param ids 数据id，支持批量
+     * @return 是否成功
      */
     boolean deleted(List<Long> ids);
 
@@ -43,7 +43,7 @@ public interface IRoleService extends IService<Role> {
      * 角色管理-角色菜单列表
      *
      * @param id 角色id
-     * @return List 菜单列表
+     * @return 菜单列表
      */
     List<MenuTree> menuList(Long id);
 
@@ -51,7 +51,7 @@ public interface IRoleService extends IService<Role> {
      * 角色管理-角色授权菜单
      *
      * @param body 表单数据
-     * @return true 成功 || false 失败
+     * @return 是否成功
      */
     boolean authorizeMenu(RoleAuthorize<Long, Long> body);
 
@@ -66,8 +66,10 @@ public interface IRoleService extends IService<Role> {
     /**
      * 角色管理-角色授权数据范围
      *
-     * @param body 表单数据
-     * @return true 成功 || false 失败
+     * @param id        角色id
+     * @param dataScope 数据范围
+     * @param deptIds   自定义部门id集合
+     * @return 是否成功
      */
     boolean authorizeDataScope(Long id, Integer dataScope, List<Long> deptIds);
 }

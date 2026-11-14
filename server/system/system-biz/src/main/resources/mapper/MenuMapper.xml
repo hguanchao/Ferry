@@ -2,8 +2,6 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.ferry.system.biz.mapper.MenuMapper">
     <resultMap id="BaseResultMap" type="com.ferry.system.api.entity.Menu">
-        <!--@mbg.generated-->
-        <!--@Table sys_menu-->
         <id column="id" jdbcType="BIGINT" property="id"/>
         <result column="tenant_id" jdbcType="VARCHAR" property="tenantId"/>
         <result column="parent_id" jdbcType="BIGINT" property="parentId"/>
@@ -25,7 +23,6 @@
         <result column="is_deleted" jdbcType="TINYINT" property="isDeleted"/>
     </resultMap>
     <sql id="Base_Column_List">
-        <!--@mbg.generated-->
         id, tenant_id, parent_id, `name`, `type`, icon, `path`, component, perms, is_show,
         is_frame, is_cache, `status`, sort, create_user, create_time, update_user, update_time,
         is_deleted

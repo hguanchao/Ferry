@@ -45,7 +45,7 @@ public class CaptchaAuthServiceImpl implements IAuthService, ICaptchaAuthService
         if (StrUtil.isBlank(code) || !ObjUtil.equals(code, RedisUtil.get(key))) {
             throw new ServiceException("验证码不正确或已过期");
         }
-        // 校验通过即作废：同一个码若能在有效期内反复提交，验证码就失去了拦截作用
+        // 校验通过后立即作废验证码，防止同一码在有效期内反复提交
         RedisUtil.del(key);
         return passwordAuthService.login(tenantId, account, password);
     }
@@ -62,7 +62,7 @@ public class CaptchaAuthServiceImpl implements IAuthService, ICaptchaAuthService
         if (!isSuccess) {
             throw new ServiceException("验证码发送失败");
         }
-        // 码值只经短信通道下发，不从响应体返回，避免任意人取码后直接冒用
+        // 验证码只经短信通道下发，不从响应体返回，防止取码后冒用
         return Collections.emptyMap();
     }
 

@@ -19,12 +19,7 @@ import {
 } from 'lucide-react'
 import type { ReactNode } from 'react'
 
-/**
- * 菜单图标登记表
- *
- * 键名与 sys_menu.icon 存的值一致，值取 Lucide 的 PascalCase 组件名。
- * 后端只存字符串，前端负责渲染；未登记的键回落到通用图标，不阻断导航。
- */
+/** 菜单图标登记表：键名与 sys_menu.icon 一致，未登记的键回落到通用图标 */
 const ICONS: Record<string, LucideIcon> = {
   /* 目录 */
   Settings,

@@ -1,12 +1,6 @@
 import type { ApiEnvelope } from '@/api/types'
 
-/**
- * 错误分类：调用方据此决定是内联展示、静默重试还是引导用户排查环境。
- *
- * 之所以要区分 gateway / offline，是因为「网关 502」与「浏览器断网」的处置完全不同：
- * 前者要去看后端服务是否启动，后者要用户自查本地网络。统一报「网络异常」会把
- * 排障方向指错，这也是登录页 502 却毫无提示那套逻辑留下的坑。
- */
+/** 错误分类：调用方据此决定内联展示、静默重试还是引导用户排查环境 */
 export type ApiErrorKind =
   | 'auth' // 401，令牌失效
   | 'forbidden' // 403，无权限
@@ -31,11 +25,7 @@ export class ApiError extends Error {
   }
 }
 
-/**
- * 面向用户的文案统一说「后端服务」，不暴露 ferry-auth / ferry-system 这类内部服务名。
- * 后端 msg 偶尔也会带上上游实例名，这里再做一次兜底替换；排障要看具体服务时，
- * 直接看浏览器 Network 里的请求路径即可。
- */
+/** 面向用户的文案统一说「后端服务」，不暴露 ferry-* 内部服务名 */
 export function hideServiceName(text: string): string {
   return text.replace(/\bferry-[a-z0-9-]+\b/gi, '后端服务')
 }

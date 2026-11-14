@@ -22,13 +22,7 @@ public enum HttpStatus {
     SERVICE_UNAVAILABLE(503, "服务器维护中..."),
     ;
 
-    /**
-     * code编码
-     */
     final int code;
 
-    /**
-     * 中文信息描述
-     */
     final String message;
 }

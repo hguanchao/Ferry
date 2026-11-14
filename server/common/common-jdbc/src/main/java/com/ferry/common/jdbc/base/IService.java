@@ -9,12 +9,12 @@ import java.util.stream.Collectors;
 public interface IService<T> extends com.baomidou.mybatisplus.spring.service.IService<T> {
 
     /**
-     * 根据queryWrapper获取数据列表
+     * 根据查询条件获取数据列表
      *
-     * @param queryWrapper Wrapper
+     * @param queryWrapper 查询条件
      * @param function     收集的字段
      * @param <R>          泛型
-     * @return List 数据列表
+     * @return 数据列表
      */
     default <R> List<R> list(Wrapper<T> queryWrapper, Function<? super T, ? extends R> function) {
         return collect(getBaseMapper().selectList(queryWrapper), function);
@@ -26,7 +26,7 @@ public interface IService<T> extends com.baomidou.mybatisplus.spring.service.ISe
      * @param list     数据列表
      * @param function 收集的字段
      * @param <R>      泛型
-     * @return List 数据列表
+     * @return 数据列表
      */
     default <R> List<R> collect(List<T> list, Function<? super T, ? extends R> function) {
         return list.stream().map(function).collect(Collectors.toList());

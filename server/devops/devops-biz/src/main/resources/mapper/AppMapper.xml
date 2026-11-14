@@ -2,8 +2,6 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.ferry.devops.biz.mapper.AppMapper">
     <resultMap id="BaseResultMap" type="com.ferry.devops.api.entity.App">
-        <!--@mbg.generated-->
-        <!--@Table dev_app-->
         <id column="id" jdbcType="BIGINT" property="id"/>
         <result column="code" jdbcType="VARCHAR" property="code"/>
         <result column="name" jdbcType="VARCHAR" property="name"/>
@@ -25,7 +23,6 @@
         <result column="is_deleted" jdbcType="TINYINT" property="isDeleted"/>
     </resultMap>
     <sql id="Base_Column_List">
-        <!--@mbg.generated-->
         id, code, name, dept_id, owner_ids, owner_names, description, is_core, status,
         repo_type, repo_url, repo_branch, repo_commit_id, repo_credential_id,
         create_user, create_time, update_user, update_time, is_deleted

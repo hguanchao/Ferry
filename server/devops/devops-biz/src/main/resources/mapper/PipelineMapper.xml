@@ -2,8 +2,6 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.ferry.devops.biz.mapper.PipelineMapper">
     <resultMap id="BaseResultMap" type="com.ferry.devops.api.entity.Pipeline">
-        <!--@mbg.generated-->
-        <!--@Table dev_pipeline-->
         <id column="id" jdbcType="BIGINT" property="id"/>
         <result column="app_id" jdbcType="BIGINT" property="appId"/>
         <result column="name" jdbcType="VARCHAR" property="name"/>
@@ -18,7 +16,6 @@
         <result column="is_deleted" jdbcType="TINYINT" property="isDeleted"/>
     </resultMap>
     <sql id="Base_Column_List">
-        <!--@mbg.generated-->
         id, app_id, name, description, current_version_id, current_version_no, stage_count,
         create_user, create_time, update_user, update_time, is_deleted
     </sql>

@@ -1,12 +1,7 @@
 import type { ReactNode } from 'react'
 import { LayoutDashboard, Lock, Rocket } from 'lucide-react'
 
-/**
- * 固定导航项
- *
- * 业务菜单（系统管理等）来自后端 sys_menu，由 useMenuRoutes 动态生成；
- * 这里只保留两类不进入权限表的内容：任何角色都可达的工作台，以及尚未建设的交付域占位。
- */
+/** 固定导航项：不进权限表的工作台入口与交付域占位，业务菜单由 useMenuRoutes 动态生成 */
 export interface NavNode {
   key: string
   label: string

@@ -1,12 +1,6 @@
 import type { AuthPerm } from '@/api/types'
 
-/**
- * 菜单与动态路由
- *
- * 数据源是登录返回的 permissions（sys_menu 的镜像）：目录 type=0、菜单 type=1、按钮 type=2。
- * 前端只把 type=1 且带 path 的节点注册成路由——按钮权限仅用于控制操作可用性。
- * 目录不产生路由，只作为导航分组；因此路由是扁平的，避免后端调整层级时前端跟着改嵌套。
- */
+/** 菜单与动态路由：数据源是登录返回的 permissions，只把 type=1 且带 path 的菜单注册成扁平路由 */
 
 export interface MenuNode {
   id: string

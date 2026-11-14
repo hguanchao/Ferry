@@ -42,11 +42,7 @@ export function createStage(type: PipelineStageType): PipelineStage {
   }
 }
 
-/**
- * 把后端或 YAML 给的结构补齐成编辑器可用的形状
- *
- * 后端理论上不会下发缺字段的定义；YAML 是人工输入，缺省值在这里统一，避免表单出现 undefined。
- */
+/** 把后端或 YAML 给的结构补齐成编辑器可用的形状，缺省值在这里统一 */
 export function normalizeDefinition(value?: PipelineDefinition | null): PipelineDefinition {
   return {
     stages: (value?.stages ?? []).map((stage) => ({
@@ -64,14 +60,7 @@ export function normalizeDefinition(value?: PipelineDefinition | null): Pipeline
   }
 }
 
-/**
- * 校验定义结构，收集全部不满足的规则
- *
- * 与后端 PipelineDefinitionValidator 保持同一口径；这里做第一道拦截，只为让用户在保存前看到具体问题，
- * 真正的约束仍以后端为准。
- *
- * @returns 全部不满足的规则，按阶段顺序排列
- */
+/** 校验定义结构：与后端校验器保持同一口径做第一道拦截，返回全部不满足的规则（按阶段顺序排列） */
 export function collectDefinitionIssues(definition: PipelineDefinition): string[] {
   const issues: string[] = []
   if (!definition.stages.length) {
@@ -128,11 +117,7 @@ export function collectDefinitionIssues(definition: PipelineDefinition): string[
   return issues
 }
 
-/**
- * 校验定义结构
- *
- * @returns 第一条不满足的规则，全部通过返回 null
- */
+/** 校验定义结构：返回第一条不满足的规则，全部通过返回 null */
 export function validateDefinition(definition: PipelineDefinition): string | null {
   return collectDefinitionIssues(definition)[0] ?? null
 }
@@ -165,11 +150,7 @@ export interface DefinitionChangeSummary {
   hasChanges: boolean
 }
 
-/**
- * 对比两个版本的定义
- *
- * 阶段类型在一条流水线内唯一，因此按类型配对；顺序变化单独标记，避免只报告字段修改而漏掉执行顺序调整。
- */
+/** 对比两个版本的定义：按阶段类型配对，顺序变化单独标记 */
 export function summarizeDefinitionChanges(
   previous: PipelineDefinition | null | undefined,
   next: PipelineDefinition,

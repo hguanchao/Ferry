@@ -9,10 +9,7 @@ import lombok.EqualsAndHashCode;
 import java.io.Serializable;
 
 /**
- * 流水线定义
- *
- * <p>主表只保存流水线本身与当前生效版本的指针，定义内容按版本存放在快照表；
- * 列表展示的阶段数、版本号在这里冗余，避免列表解析快照。
+ * 流水线
  */
 @Data
 @TableName(value = "dev_pipeline")

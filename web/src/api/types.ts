@@ -1,9 +1,4 @@
-/**
- * 接口契约类型
- *
- * 与 server/system、server/auth 的 VO / DTO 一一对应；后端 Jackson 已把 Long 统一序列化为字符串，
- * 因此前端所有 id 一律按 string 处理，避免 18 位主键在 JS 中丢精度。
- */
+/** 接口契约类型：与后端 VO / DTO 对应，后端已把 Long 序列化为字符串，所有 id 一律按 string 处理 */
 
 export type ID = string
 
@@ -97,10 +92,7 @@ export interface RoleRow {
   remark?: string
   /** 预置角色不可删除，作为审计与应急恢复的兜底 */
   builtin?: boolean
-  /**
-   * 菜单授权与成员数不在列表里下发：前者在 sys_role_menu、后者在 sys_user_role，都需要单独统计。
-   * 因此按可选处理，渲染层必须能对「未接入」和「真的为 0」给出不同表达。
-   */
+  /** 菜单授权不在列表里下发，按可选处理，渲染层需区分「未接入」与「真的为 0」 */
   menuIds?: ID[]
   /** 数据范围 1：全部 2：自定义 3：本部门 4：本部门及以下 5：仅本人 */
   dataScope?: number

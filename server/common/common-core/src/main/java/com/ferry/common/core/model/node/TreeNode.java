@@ -10,7 +10,10 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * TreeNode
+ * 树节点基类，配合 TreeUtil 组树。
+ *
+ * <p>id 与 parentId 序列化为字符串，前端按 string 处理避免 Long 精度丢失；
+ * children 为空时不输出，前端据此判定叶子节点。
  */
 @Data
 public class TreeNode {

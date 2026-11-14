@@ -19,7 +19,7 @@ public abstract class BaseEntityWrapper<E, V> {
     /**
      * 实体类集合包装
      *
-     * @param list 猎豹
+     * @param list 实体集合
      * @return List V
      */
     public List<V> listVo(List<E> list) {

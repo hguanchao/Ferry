@@ -14,9 +14,9 @@ public interface TenantMapper extends BaseMapper<Tenant> {
     /**
      * 根据查询条件获取租户分页列表
      *
-     * @param page      分页对象
+     * @param page  分页对象
      * @param query 查询条件
-     * @return Page<Tenant> 租户分页列表
+     * @return 租户分页列表
      */
     IPage<TenantVO> selectPageList(IPage<Tenant> page, @Param("query") TenantQuery query);
 }

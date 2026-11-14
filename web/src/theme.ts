@@ -1,19 +1,10 @@
 import { theme as antdTheme, type ThemeConfig } from 'antd'
 
-/**
- * 树密度：侧栏窄列树与 TreeSelect 下拉（上级菜单 / 上级部门）必须共用同一组值。
- * 两者是独立的组件级 token，只配 Tree 的话下拉仍会沿用 controlHeightSM 的
- * 28px 行高 / 28px 缩进，看起来比侧栏松一大截。
- */
+/** 树密度常量：侧栏窄列树与 TreeSelect 下拉必须共用同一组值 */
 const TREE_TITLE_HEIGHT = 26
 const TREE_INDENT_SIZE = 16
 
-/**
- * Ant Design 主题
- *
- * 只覆盖企业后台真正会被感知的令牌：主色、圆角、控件高度、表格密度、菜单项。
- * 其余交给默认算法，避免为了「定制感」堆砌无效变量。
- */
+/** Ant Design 主题：只覆盖真正会被感知的令牌，其余交给默认算法 */
 export function buildTheme(mode: 'light' | 'dark'): ThemeConfig {
   const dark = mode === 'dark'
 
@@ -108,16 +99,7 @@ export function buildTheme(mode: 'light' | 'dark'): ThemeConfig {
       },
       Tree: {
         nodeSelectedBg: dark ? 'rgba(22, 119, 255, 0.16)' : '#e6f4ff',
-        /**
-         * 树密度。
-         *
-         * antd 的默认缩进是 28px/级、行高随 controlHeightSM 一起放大到 34px 行节奏，
-         * 而渡口的树大多长在 248px 的侧栏窄列里（组织架构 / 行政区划 / 字典），
-         * 四级以后文字就会被挤成两行。这里把行高与缩进一起收窄。
-         *
-         * indentSize 必须显式写：组件级覆盖 titleHeight 不会回写到它，
-         * 不写会停留在默认的 28px。两个值需成对调整，缩进才真的比行高更紧凑。
-         */
+        /** 树密度：antd 默认行高缩进在 248px 侧栏窄列里放不下，行高与缩进成对收窄，indentSize 必须显式写 */
         titleHeight: TREE_TITLE_HEIGHT,
         indentSize: TREE_INDENT_SIZE,
       },
@@ -145,13 +127,7 @@ export function buildTheme(mode: 'light' | 'dark'): ThemeConfig {
         titleMinWidth: 120,
       },
       Pagination: {
-        /**
-         * 分页项高度。
-         *
-         * 默认取全局 controlHeight（36px），比表格 13px 的字号大出好几号，
-         * 一整页只有几条数据时那块页码会显得特别突兀。这里收窄到与表格行接近的尺寸，
-         * 视觉上分页退成页脚的一部分，不再抢主体内容。
-         */
+        /** 分页项高度收窄到与表格行接近，页码退成页脚的一部分，不抢主体内容 */
         itemSize: 28,
         itemSizeSM: 24,
       },

@@ -97,12 +97,7 @@ export default function Role() {
   const [grantRole, setGrantRole] = useState<RoleRow | null>(null)
   const [grantTab, setGrantTab] = useState<'menu' | 'data'>('menu')
   const [checkedKeys, setCheckedKeys] = useState<string[]>([])
-  /**
-   * 该角色的菜单授权是否已真正加载。
-   *
-   * 与「勾选列表为空」不是一回事：加载失败时列表同样为空，
-   * 此时点保存会以空集合覆盖授权，表现为「进去看了一眼，权限全没了」。
-   */
+  /** 该角色的菜单授权是否已真正加载：加载失败时列表同样为空，点保存会以空集合覆盖授权 */
   const [menuLoaded, setMenuLoaded] = useState(false)
   /** 数据范围与已授权部门：同样要区分「没加载」与「就是空的」 */
   const [dataScope, setDataScope] = useState(2)
@@ -129,10 +124,7 @@ export default function Role() {
 
   const deptTreeData = useMemo(() => toDeptTree(deptQuery.data ?? []), [deptQuery.data])
 
-  /**
-   * 已授权菜单单独拉：列表接口不下发 menuIds。
-   * 授权抽屉每次打开都要拿最新值，因此 staleTime 置 0 不做缓存。
-   */
+  /** 已授权菜单单独拉：列表接口不下发 menuIds，授权抽屉每次打开都取最新值 */
   const grantedQuery = useQuery({
     queryKey: ['role-menus', grantRole?.id],
     queryFn: () => roleApi.menuList(grantRole!.id),
@@ -161,8 +153,7 @@ export default function Role() {
       setCheckedKeys(grantedQuery.data.map((menu) => String(menu.id)))
       setMenuLoaded(true)
     }
-    // 加载失败时保持 false：此时勾选列表必然为空，提交上去等于把授权清空，
-    // 宁可让「保存」按钮不可用，也不要用一个假状态覆盖真实权限
+    // 加载失败时保持 false：提交空勾选等于清空授权，宁可让保存按钮不可用
   }, [grantRole, grantedQuery.data])
 
   useEffect(() => {

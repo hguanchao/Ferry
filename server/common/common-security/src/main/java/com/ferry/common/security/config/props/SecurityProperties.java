@@ -67,7 +67,10 @@ public class SecurityProperties {
     /**
      * 获取排除的路径列表
      *
-     * @return Set
+     * <p>默认排除路径随取值并入：使用方在配置里另写 excludePath 时不会覆盖掉
+     * 登录、内部接口这些必备放行项，漏配也不至于把它们挡在鉴权外。
+     *
+     * @return 排除的路径列表
      */
     public Set<String> getExcludePath() {
         this.excludePath.addAll(AuthConst.DEFAULT_EXCLUDE_PATH);
