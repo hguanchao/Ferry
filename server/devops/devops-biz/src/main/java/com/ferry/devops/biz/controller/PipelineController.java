@@ -5,7 +5,6 @@ import com.ferry.common.core.http.R;
 import com.ferry.common.core.utils.ObjUtil;
 import com.ferry.common.security.annotation.PreAuthorize;
 import com.ferry.devops.api.dto.PipelineDTO;
-import com.ferry.devops.api.dto.PipelineExportDTO;
 import com.ferry.devops.api.dto.query.PipelineQuery;
 import com.ferry.devops.api.vo.PipelineVO;
 import com.ferry.devops.biz.service.IPipelineService;
@@ -64,16 +63,10 @@ public class PipelineController {
         return isSuccess ? R.success("删除成功") : R.fail("删除失败");
     }
 
-    /**
-     * 导出 xlsx
-     *
-     * <p>返回值是流不是 R：一旦开始写 Excel 就无法再改成统一响应体，
-     * 因此返回值声明为 void，异常仍由全局处理器兜底（此时响应头尚未写出才有机会替换）。
-     */
     @PostMapping("/export")
     @PreAuthorize("devops:pipeline:export")
     @Operation(summary = "流水线管理-导出", description = "传查询条件与勾选id，返回 xlsx 文件流")
-    public void export(@RequestBody PipelineExportDTO body, HttpServletResponse response) {
-        service.export(body, body.getIds(), response);
+    public void export(@RequestBody PipelineQuery body, HttpServletResponse response) {
+        service.export(body, response);
     }
 }

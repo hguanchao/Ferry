@@ -52,9 +52,8 @@ public interface IPipelineService extends IService<Pipeline> {
      * <p>传 ids 时只导出这些流水线（勾选导出），不传则按查询条件导出（筛选结果导出）；
      * 两种情况都受数据权限约束，与列表同一口径。
      *
-     * @param body 查询条件
-     * @param ids  勾选的流水线id，为空表示导出全部筛选结果
+     * @param body     查询条件
      * @param response HTTP 响应，xlsx 直接写入响应流
      */
-    void export(PipelineQuery body, List<Long> ids, HttpServletResponse response);
+    void export(PipelineQuery body, HttpServletResponse response);
 }

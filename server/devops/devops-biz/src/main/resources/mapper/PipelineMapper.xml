@@ -1,31 +1,26 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.ferry.devops.biz.mapper.PipelineMapper">
-
-    <!-- 导出与分页必须同一口径，条件只写这一处：两处各写一份迟早会因为加字段而错开，
-         导出结果与页面列表不一致，排查时又看不出差在哪 -->
-    <sql id="queryCondition">
-        <where>
-            p.is_deleted = 0
-            <if test="query.keyword != null and query.keyword != ''">
-                AND p.name LIKE CONCAT('%', #{query.keyword}, '%')
-            </if>
-            <if test="query.appIds != null and query.appIds.size() > 0">
-                AND p.app_id IN
-                <foreach collection="query.appIds" item="appId" open="(" separator="," close=")">
-                    #{appId}
-                </foreach>
-            </if>
-            <!-- 负责人是 dev_app.owner_ids 里的逗号分隔串，没有关联表：用 FIND_IN_SET 精确命中单个人，
-                 LIKE '%id%' 会把 12 当成 2 的命中，导致选了 2 号负责人却查出 12 号负责的应用 -->
-            <if test="query.ownerIds != null and query.ownerIds.size() > 0">
-                AND (
-                <foreach collection="query.ownerIds" item="ownerId" separator=" OR ">
-                    FIND_IN_SET(#{ownerId}, a.owner_ids) > 0
-                </foreach>
-                )
-            </if>
-        </where>
+    <resultMap id="BaseResultMap" type="com.ferry.devops.api.entity.Pipeline">
+        <!--@mbg.generated-->
+        <!--@Table dev_pipeline-->
+        <id column="id" jdbcType="BIGINT" property="id"/>
+        <result column="app_id" jdbcType="BIGINT" property="appId"/>
+        <result column="name" jdbcType="VARCHAR" property="name"/>
+        <result column="description" jdbcType="VARCHAR" property="description"/>
+        <result column="current_version_id" jdbcType="BIGINT" property="currentVersionId"/>
+        <result column="current_version_no" jdbcType="INTEGER" property="currentVersionNo"/>
+        <result column="stage_count" jdbcType="INTEGER" property="stageCount"/>
+        <result column="create_user" jdbcType="BIGINT" property="createUser"/>
+        <result column="create_time" jdbcType="TIMESTAMP" property="createTime"/>
+        <result column="update_user" jdbcType="BIGINT" property="updateUser"/>
+        <result column="update_time" jdbcType="TIMESTAMP" property="updateTime"/>
+        <result column="is_deleted" jdbcType="TINYINT" property="isDeleted"/>
+    </resultMap>
+    <sql id="Base_Column_List">
+        <!--@mbg.generated-->
+        id, app_id, name, description, current_version_id, current_version_no, stage_count,
+        create_user, create_time, update_user, update_time, is_deleted
     </sql>
 
     <select id="selectPageList" resultType="com.ferry.devops.api.vo.PipelineVO">
@@ -44,39 +39,16 @@
                p.update_time        AS updateTime
         FROM dev_pipeline p
                  INNER JOIN dev_app a ON a.id = p.app_id AND a.is_deleted = 0
-        <include refid="queryCondition"/>
-        ORDER BY p.update_time DESC
-    </select>
-
-    <!-- 导出专用：与列表同样的字段、条件与排序，不分页，由 limit 兜住上限。
-         ids 不为空表示「勾选导出」，仍走这条 SQL：数据权限是按 dev_app 注入的，
-         另起一条按 id 直查的语句会绕过它 -->
-    <select id="selectExportList" resultType="com.ferry.devops.api.vo.PipelineVO">
-        SELECT p.id,
-               p.app_id             AS appId,
-               a.code               AS appCode,
-               a.name               AS appName,
-               p.name,
-               p.description,
-               p.current_version_id AS currentVersionId,
-               p.current_version_no AS currentVersionNo,
-               p.stage_count        AS stageCount,
-               a.repo_branch        AS defaultBranch,
-               a.owner_names        AS ownerNames,
-               p.create_time        AS createTime,
-               p.update_time        AS updateTime
-        FROM dev_pipeline p
-                 INNER JOIN dev_app a ON a.id = p.app_id AND a.is_deleted = 0
         <where>
             p.is_deleted = 0
-            <if test="ids != null and ids.size() > 0">
-                AND p.id IN
-                <foreach collection="ids" item="id" open="(" separator="," close=")">
-                    #{id}
-                </foreach>
-            </if>
             <if test="query.keyword != null and query.keyword != ''">
                 AND p.name LIKE CONCAT('%', #{query.keyword}, '%')
+            </if>
+            <if test="query.ids != null and query.ids.size() > 0">
+                AND p.id IN
+                <foreach collection="query.ids" item="id" open="(" separator="," close=")">
+                    #{id}
+                </foreach>
             </if>
             <if test="query.appIds != null and query.appIds.size() > 0">
                 AND p.app_id IN
@@ -93,48 +65,5 @@
             </if>
         </where>
         ORDER BY p.update_time DESC
-        LIMIT #{limit}
     </select>
-
-    <select id="selectVisibleById" resultType="com.ferry.devops.api.entity.Pipeline">
-        SELECT p.id,
-               p.app_id             AS appId,
-               p.name,
-               p.description,
-               p.current_version_id AS currentVersionId,
-               p.current_version_no AS currentVersionNo,
-               p.stage_count        AS stageCount,
-               p.create_user        AS createUser,
-               p.create_time        AS createTime,
-               p.update_user        AS updateUser,
-               p.update_time        AS updateTime,
-               p.is_deleted         AS isDeleted
-        FROM dev_pipeline p
-        INNER JOIN dev_app ON dev_app.id = p.app_id AND dev_app.is_deleted = 0
-        WHERE p.id = #{id}
-          AND p.is_deleted = 0
-    </select>
-
-    <select id="selectVisibleCount" resultType="long">
-        SELECT COUNT(1)
-        FROM dev_pipeline p
-        INNER JOIN dev_app ON dev_app.id = p.app_id AND dev_app.is_deleted = 0
-        WHERE p.is_deleted = 0
-          AND p.id IN
-          <foreach collection="ids" item="id" open="(" separator="," close=")">
-              #{id}
-          </foreach>
-    </select>
-
-    <select id="selectNameCount" resultType="long">
-        SELECT COUNT(1)
-        FROM dev_pipeline
-        WHERE is_deleted = 0
-          AND app_id = #{appId}
-          AND name = #{name}
-        <if test="id != null">
-            AND id != #{id}
-        </if>
-    </select>
-
 </mapper>

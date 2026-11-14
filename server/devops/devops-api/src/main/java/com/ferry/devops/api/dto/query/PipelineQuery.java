@@ -14,6 +14,9 @@ public class PipelineQuery extends Query {
     @Schema(description = "流水线名称，模糊搜索")
     private String keyword;
 
+    @Schema(description = "流水线id，多选")
+    private List<Long> ids;
+
     @Schema(description = "应用id，多选")
     private List<Long> appIds;
 
