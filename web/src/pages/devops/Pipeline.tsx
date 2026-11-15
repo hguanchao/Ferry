@@ -16,6 +16,7 @@ import {
 } from 'antd'
 import {
   Download,
+  Play,
   History,
   MoreHorizontal,
   Pencil,
@@ -29,6 +30,8 @@ import PageHeader from '@/components/PageHeader'
 import AppSelect from '@/components/AppSelect'
 import PipelineEditorDrawer from '@/components/PipelineEditorDrawer'
 import PipelineVersionPanel, { type VersionPanelAdapter } from '@/components/PipelineVersionPanel'
+import RunTriggerModal from '@/components/RunTriggerModal'
+import RunListDrawer from '@/components/RunListDrawer'
 import TemplateMergeModal from '@/components/TemplateMergeModal'
 import { pipelineApi, pipelineVersionApi, type PipelineFilter } from '@/api/devops'
 import { userApi } from '@/api/system'
@@ -76,6 +79,9 @@ export default function Pipeline() {
   const [versionTarget, setVersionTarget] = useState<PipelineRow | null>(null)
   const [versionOpen, setVersionOpen] = useState(false)
   const [mergeTarget, setMergeTarget] = useState<PipelineDetail | null>(null)
+  const [triggerOpen, setTriggerOpen] = useState(false)
+  const [triggerPipeline, setTriggerPipeline] = useState<PipelineRow | null>(null)
+  const [runsTarget, setRunsTarget] = useState<PipelineRow | null>(null)
 
   const listQuery = useQuery({
     queryKey: ['pipelines', filters, page],
@@ -106,6 +112,9 @@ export default function Pipeline() {
     void queryClient.invalidateQueries({ queryKey: ['pipelines'] })
     void queryClient.invalidateQueries({ queryKey: ['pipeline-detail'] })
     void queryClient.invalidateQueries({ queryKey: ['pipeline-versions'] })
+    void queryClient.invalidateQueries({ queryKey: ['runs'] })
+    void queryClient.invalidateQueries({ queryKey: ['run-detail'] })
+    void queryClient.invalidateQueries({ queryKey: ['run-triggers'] })
     void queryClient.invalidateQueries({ queryKey: ['workbench-overview'] })
   }
 
@@ -303,7 +312,9 @@ export default function Pipeline() {
     can('devops:pipeline:save') ||
     can('devops:pipeline:deleted') ||
     can('devops:pipeline:versionList') ||
-    can('devops:pipeline:saveVersion')
+    can('devops:pipeline:saveVersion') ||
+    can('devops:pipeline:trigger') ||
+    can('devops:pipeline:runPageList')
 
   if (hasRowAction) {
     columns.push({
@@ -314,17 +325,24 @@ export default function Pipeline() {
         const items = menuItems()
         return (
           <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            {/* 运行模型尚未实现：按钮占位并置灰，用「待接入」提示表明这里最终要有入口 */}
-            <Tooltip title="运行详情待运行模块接入">
-              <Button type="link" size="small" disabled>
-                查看运行
-              </Button>
-            </Tooltip>
-            <Tooltip title="手动触发待运行模块接入">
-              <Button type="link" size="small" disabled>
+            {can('devops:pipeline:trigger') && (
+              <Button
+                type="link"
+                size="small"
+                onClick={() => { setTriggerPipeline(record); setTriggerOpen(true) }}
+              >
                 手动触发
               </Button>
-            </Tooltip>
+            )}
+            {can('devops:pipeline:runPageList') && (
+              <Button
+                type="link"
+                size="small"
+                onClick={() => setRunsTarget(record)}
+              >
+                查看运行
+              </Button>
+            )}
             {can('devops:pipeline:saveVersion') && (
               <Button
                 type="link"
@@ -356,6 +374,11 @@ export default function Pipeline() {
         description="流水线定义按版本快照管理，历史版本可对比与回退。"
         extra={
           <>
+            {can('devops:pipeline:trigger') && (
+              <Button icon={<Play size={15} />} onClick={() => { setTriggerPipeline(null); setTriggerOpen(true) }}>
+                手动触发
+              </Button>
+            )}
             {can('devops:pipeline:export') && (
               <Button
                 icon={<Download size={15} />}
@@ -491,6 +514,20 @@ export default function Pipeline() {
         open={Boolean(mergeTarget)}
         pipeline={mergeTarget}
         onClose={() => setMergeTarget(null)}
+        onChanged={invalidate}
+      />
+
+      <RunTriggerModal
+        open={triggerOpen}
+        pipeline={triggerPipeline}
+        onClose={() => setTriggerOpen(false)}
+        onTriggered={() => invalidate()}
+      />
+
+      <RunListDrawer
+        open={Boolean(runsTarget)}
+        pipeline={runsTarget ? { pipelineId: runsTarget.id, pipelineName: runsTarget.name } : null}
+        onClose={() => setRunsTarget(null)}
         onChanged={invalidate}
       />
     </>

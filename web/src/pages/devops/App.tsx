@@ -19,6 +19,7 @@ import { EnabledTag } from '@/components/StatusTag'
 import { appApi } from '@/api/devops'
 import { deptApi, userApi } from '@/api/system'
 import type { AppRow } from '@/api/types'
+import { REPO_TYPES } from '@/lib/platform'
 import { COL } from '@/lib/table'
 import { flattenTree } from '@/lib/tree'
 import { useAuthStore } from '@/stores/auth'
@@ -30,12 +31,6 @@ interface Filters {
   isCore?: number
   repoType?: string
 }
-
-const REPO_TYPES = [
-  { value: 'GITLAB', label: 'GitLab' },
-  { value: 'GITHUB', label: 'GitHub' },
-  { value: 'GITEE', label: 'Gitee' },
-]
 
 export default function App() {
   const { message, modal } = AntApp.useApp()
@@ -207,7 +202,7 @@ export default function App() {
             style={{ width: 130 }}
             value={draft.repoType}
             onChange={(value) => setDraft((prev) => ({ ...prev, repoType: value }))}
-            options={REPO_TYPES}
+            options={[...REPO_TYPES]}
           />
           <Select
             allowClear
@@ -278,16 +273,20 @@ export default function App() {
               <Select mode="multiple" maxCount={3} placeholder="最多 3 人" options={userOptions} showSearch optionFilterProp="label" />
             </Form.Item>
             <Form.Item name="repoType" label="代码托管平台">
-              <Select allowClear placeholder="请选择" options={REPO_TYPES} />
+              <Select allowClear placeholder="请选择" options={[...REPO_TYPES]} />
+            </Form.Item>
+            <Form.Item
+              name="repoToken"
+              label="平台访问令牌"
+              extra="加密存储，页面不回显；编辑时留空表示沿用原值"
+            >
+              <Input.Password maxLength={500} placeholder="粘贴平台访问令牌" autoComplete="new-password" />
             </Form.Item>
             <Form.Item name="repoUrl" label="仓库地址">
               <Input placeholder="https://..." />
             </Form.Item>
             <Form.Item name="repoBranch" label="默认分支">
               <Input placeholder="例如 main" />
-            </Form.Item>
-            <Form.Item name="repoCommitId" label="提交ID">
-              <Input placeholder="选填，7-40 位十六进制" />
             </Form.Item>
             <Form.Item name="isCore" label="核心链路">
               <Radio.Group options={[{ value: 1, label: '是' }, { value: 0, label: '否' }]} />
@@ -301,6 +300,7 @@ export default function App() {
           </Form.Item>
         </Form>
       </Modal>
+
     </>
   )
 }

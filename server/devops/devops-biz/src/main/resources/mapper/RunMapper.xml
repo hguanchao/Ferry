@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ferry.devops.biz.mapper.RunMapper">
+
+    <select id="selectPageList" resultType="com.ferry.devops.api.vo.RunVO">
+        SELECT r.id,
+               r.app_id                 AS appId,
+               a.name                   AS appName,
+               a.code                   AS appCode,
+               r.pipeline_id            AS pipelineId,
+               p.name                   AS pipelineName,
+               r.pipeline_version_no    AS pipelineVersionNo,
+               r.branch,
+               r.ref_type               AS refType,
+               r.commit_id              AS commitId,
+               r.commit_author          AS commitAuthor,
+               r.status,
+               r.reused_run_id          AS reusedRunId,
+               r.trigger_user_name      AS triggerUserName,
+               r.trigger_note           AS triggerNote,
+               r.create_time            AS createTime,
+               r.started_time           AS startedTime,
+               r.finished_time          AS finishedTime,
+               r.duration
+        FROM dev_run r
+                 INNER JOIN dev_app a ON a.id = r.app_id AND a.is_deleted = 0
+                 INNER JOIN dev_pipeline p ON p.id = r.pipeline_id AND p.is_deleted = 0
+        <where>
+            r.is_deleted = 0
+            <if test="query.pipelineId != null">
+                AND r.pipeline_id = #{query.pipelineId}
+            </if>
+            <if test="query.appId != null">
+                AND r.app_id = #{query.appId}
+            </if>
+            <if test="query.status != null and query.status != ''">
+                AND r.status = #{query.status}
+            </if>
+        </where>
+        ORDER BY r.create_time DESC
+    </select>
+
+    <select id="selectTriggerPageList" resultType="com.ferry.devops.api.vo.TriggerRecordVO">
+        SELECT t.id,
+               t.app_id               AS appId,
+               a.name                 AS appName,
+               t.branch,
+               t.commit_id            AS commitId,
+               t.result,
+               t.reject_reason        AS rejectReason,
+               t.run_id               AS runId,
+               t.trigger_user_name    AS triggerUserName,
+               t.create_time          AS createTime
+        FROM dev_run_trigger t
+                 INNER JOIN dev_app a ON a.id = t.app_id AND a.is_deleted = 0
+        <where>
+            t.is_deleted = 0
+            <if test="query.appId != null">
+                AND t.app_id = #{query.appId}
+            </if>
+        </where>
+        ORDER BY t.create_time DESC
+    </select>
+</mapper>

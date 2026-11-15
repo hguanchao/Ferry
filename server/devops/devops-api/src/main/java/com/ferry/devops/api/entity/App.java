@@ -91,7 +91,7 @@ public class App extends BaseEntity implements Serializable {
     private String repoCommitId;
 
     /**
-     * 平台凭据id
+     * 平台访问令牌，AES 加密存储
      */
-    private Long repoCredentialId;
+    private String repoToken;
 }

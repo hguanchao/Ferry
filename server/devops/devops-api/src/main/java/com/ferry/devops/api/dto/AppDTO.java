@@ -57,10 +57,8 @@ public class AppDTO {
     @Size(max = 100, message = "默认分支不能超过 100 个字符")
     private String repoBranch;
 
-    @Schema(description = "指定提交id，留空取默认分支最新提交")
-    @Pattern(regexp = "^$|^[0-9a-fA-F]{7,40}$", message = "提交id 只能是 7-40 位十六进制")
-    private String repoCommitId;
+    @Schema(description = "平台访问令牌")
+    @Size(max = 500, message = "平台访问令牌不能超过 500 个字符")
+    private String repoToken;
 
-    @Schema(description = "平台凭据id")
-    private Long repoCredentialId;
 }

@@ -1,6 +1,5 @@
--- 表结构以 Flyway 迁移为准：系统管理域在 server/system/system-biz/src/main/resources/db/migration，
--- 交付域在 server/devops/devops-biz/src/main/resources/db/migration
--- 本文件保留用于手工重建与排查，含 DROP TABLE，切勿在存量库执行
+-- 表结构以本文件为唯一权威口径：结构变更直接修改这里的全量建表脚本
+-- 本文件含 DROP TABLE，切勿在存量库执行，存量库按交付说明执行增量 ALTER
 /*
  Source Server Type    : MySQL
  Source Server Version : 8.4.0
@@ -29,7 +28,7 @@ CREATE TABLE `dev_app`  (
   `repo_url` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '仓库 Git 地址',
   `repo_branch` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '默认分支',
   `repo_commit_id` varchar(40) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '提交ID',
-  `repo_credential_id` bigint NULL DEFAULT NULL COMMENT '平台凭据id',
+  `repo_token` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '平台访问令牌，AES 加密存储',
   `create_user` bigint NULL DEFAULT NULL COMMENT '创建人',
   `create_time` datetime NULL DEFAULT NULL COMMENT '创建时间',
   `update_user` bigint NULL DEFAULT NULL COMMENT '更新人',
@@ -134,6 +133,83 @@ CREATE TABLE `dev_pipeline_template_version`  (
   PRIMARY KEY (`id`) USING BTREE,
   UNIQUE INDEX `uk_template_version`(`template_id` ASC, `version_no` ASC) USING BTREE
 ) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '流水线模板版本表' ROW_FORMAT = DYNAMIC;
+
+-- ----------------------------
+-- Table structure for dev_run
+-- ----------------------------
+DROP TABLE IF EXISTS `dev_run`;
+CREATE TABLE `dev_run`  (
+  `id` bigint NOT NULL COMMENT '数据id',
+  `app_id` bigint NOT NULL COMMENT '应用id',
+  `pipeline_id` bigint NOT NULL COMMENT '流水线id',
+  `pipeline_version_id` bigint NOT NULL COMMENT '运行绑定的版本id',
+  `pipeline_version_no` int NOT NULL COMMENT '运行绑定的版本号',
+  `trigger_type` tinyint(1) NOT NULL DEFAULT 1 COMMENT '触发方式 1：手动（V1.2.0 起唯一运行入口，历史枚举保留扩展位）',
+  `branch` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '目标分支',
+  `ref_type` tinyint(1) NOT NULL DEFAULT 0 COMMENT '目标类型 0：提交 1：标签/引用',
+  `commit_id` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '提交id或标签/引用',
+  `commit_author` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '提交人',
+  `commit_time` datetime NULL DEFAULT NULL COMMENT '提交时间',
+  `trigger_note` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '触发说明',
+  `trigger_user_name` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '触发人名称快照',
+  `status` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '运行状态 QUEUED/RUNNING/BLOCKED/SUCCESS/FAILED/TIMEOUT/CANCELED',
+  `reused_run_id` bigint NULL DEFAULT NULL COMMENT '复用的源运行id，非复用为空',
+  `precheck_result` text CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '五项预校验结论JSON',
+  `started_time` datetime NULL DEFAULT NULL COMMENT '开始时间',
+  `finished_time` datetime NULL DEFAULT NULL COMMENT '结束时间',
+  `create_user` bigint NULL DEFAULT NULL COMMENT '创建人',
+  `create_time` datetime NULL DEFAULT NULL COMMENT '创建时间',
+  `update_user` bigint NULL DEFAULT NULL COMMENT '更新人',
+  `update_time` datetime NULL DEFAULT NULL COMMENT '更新时间',
+  `is_deleted` tinyint(1) NOT NULL DEFAULT 0 COMMENT '是否删除 0：否 1：是',
+  PRIMARY KEY (`id`) USING BTREE,
+  INDEX `idx_app_commit_version`(`app_id` ASC, `commit_id` ASC, `pipeline_version_id` ASC) USING BTREE,
+  INDEX `idx_pipeline`(`pipeline_id` ASC) USING BTREE,
+  INDEX `idx_create_time`(`create_time` ASC) USING BTREE
+) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '流水线运行表' ROW_FORMAT = DYNAMIC;
+
+-- ----------------------------
+-- Table structure for dev_run_stage
+-- ----------------------------
+DROP TABLE IF EXISTS `dev_run_stage`;
+CREATE TABLE `dev_run_stage`  (
+  `id` bigint NOT NULL COMMENT '数据id',
+  `run_id` bigint NOT NULL COMMENT '运行id',
+  `stage_type` varchar(30) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '阶段类型，执行耗时的分析维度',
+  `stage_order` int NOT NULL COMMENT '阶段顺序，从 1 起',
+  `status` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL DEFAULT 'PENDING' COMMENT '阶段状态 PENDING/RUNNING/SUCCESS/FAILED/SKIPPED/BLOCKED',
+  `started_time` datetime NULL DEFAULT NULL COMMENT '开始时间',
+  `finished_time` datetime NULL DEFAULT NULL COMMENT '结束时间',
+  `create_user` bigint NULL DEFAULT NULL COMMENT '创建人',
+  `create_time` datetime NULL DEFAULT NULL COMMENT '创建时间',
+  `update_user` bigint NULL DEFAULT NULL COMMENT '更新人',
+  `update_time` datetime NULL DEFAULT NULL COMMENT '更新时间',
+  `is_deleted` tinyint(1) NOT NULL DEFAULT 0 COMMENT '是否删除 0：否 1：是',
+  PRIMARY KEY (`id`) USING BTREE,
+  INDEX `idx_run`(`run_id` ASC) USING BTREE
+) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '运行阶段表' ROW_FORMAT = DYNAMIC;
+
+-- ----------------------------
+-- Table structure for dev_run_trigger
+-- ----------------------------
+DROP TABLE IF EXISTS `dev_run_trigger`;
+CREATE TABLE `dev_run_trigger`  (
+  `id` bigint NOT NULL COMMENT '数据id',
+  `app_id` bigint NOT NULL COMMENT '应用id',
+  `branch` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '目标分支',
+  `commit_id` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '提交id或标签/引用',
+  `result` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '触发结果 CREATED/MERGED/REUSED/REJECTED',
+  `reject_reason` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '拒绝原因',
+  `run_id` bigint NULL DEFAULT NULL COMMENT '关联的运行id，被拒绝时为空',
+  `trigger_user_name` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '触发人名称快照',
+  `create_user` bigint NULL DEFAULT NULL COMMENT '创建人',
+  `create_time` datetime NULL DEFAULT NULL COMMENT '创建时间',
+  `update_user` bigint NULL DEFAULT NULL COMMENT '更新人',
+  `update_time` datetime NULL DEFAULT NULL COMMENT '更新时间',
+  `is_deleted` tinyint(1) NOT NULL DEFAULT 0 COMMENT '是否删除 0：否 1：是',
+  PRIMARY KEY (`id`) USING BTREE,
+  INDEX `idx_app_create`(`app_id` ASC, `create_time` ASC) USING BTREE
+) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '流水线触发记录表' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
 -- Table structure for sys_config

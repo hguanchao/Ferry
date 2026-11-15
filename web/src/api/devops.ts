@@ -2,6 +2,7 @@ import { download, get, post } from './client'
 import type {
   ApiPage,
   AppRow,
+  CommitBrief,
   PipelineDefinition,
   PipelineDetail,
   PipelineRow,
@@ -9,9 +10,14 @@ import type {
   PipelineTemplateRow,
   PipelineVersionDetail,
   PipelineVersionRow,
+  PrecheckItem,
+  RunDetail,
+  RunRow,
   TemplateDefinition,
   TemplateVersionDetail,
   TemplateVersionRow,
+  TriggerRecordRow,
+  TriggerResult,
 } from './types'
 import type { PageParams } from './system'
 
@@ -58,6 +64,38 @@ export const pipelineVersionApi = {
     post<string>('/ferry-devops/pipeline/version/save', body),
   rollback: (body: { pipelineId: string; versionId: string }) =>
     post<string>('/ferry-devops/pipeline/version/rollback', body),
+}
+
+export const runApi = {
+  /** 实时查询应用代码平台的分支列表 */
+  branchOptions: (body: { appId: string }) => post<string[]>('/ferry-devops/run/branchOptions', body),
+  /** 查询所选分支最近 10 条提交 */
+  commitOptions: (body: { appId: string; branch: string }) =>
+    post<CommitBrief[]>('/ferry-devops/run/commitOptions', body),
+  /** 五项预校验逐条结论，不落库 */
+  precheck: (body: RunTriggerInput) => post<PrecheckItem[]>('/ferry-devops/run/precheck', body),
+  /** 手动触发：幂等命中进行中合并、命中成功待确认复用 */
+  trigger: (body: RunTriggerInput) => post<TriggerResult>('/ferry-devops/run/trigger', body),
+  /** 最近触发记录，含被拒绝的触发 */
+  triggerPageList: (body: PageParams & { appId?: string }) =>
+    post<ApiPage<TriggerRecordRow>>('/ferry-devops/run/trigger/pageList', body),
+  pageList: (body: PageParams & { pipelineId?: string; appId?: string; status?: string }) =>
+    post<ApiPage<RunRow>>('/ferry-devops/run/pageList', body),
+  detail: (id: string) => get<RunDetail>('/ferry-devops/run/detail', { id }),
+  /** 取消排队中的运行：标量参数平铺在查询串上 */
+  cancel: (id: string) => post<string>('/ferry-devops/run/cancel', undefined, { params: { id } }),
+}
+
+/** 手动触发入参，预校验与触发共用 */
+export interface RunTriggerInput {
+  appId: string
+  pipelineId: string
+  branch: string
+  commitId: string
+  refType: number
+  triggerNote?: string
+  /** 幂等命中成功运行时确认复用 */
+  reuse?: boolean
 }
 
 export const pipelineTemplateApi = {

@@ -277,8 +277,6 @@ export interface AppRow {
   repoType?: string | null
   repoUrl?: string | null
   repoBranch?: string | null
-  repoCommitId?: string | null
-  repoCredentialId?: ID | null
   createTime: string
 }
 
@@ -411,4 +409,97 @@ export interface TemplateVersionRow {
 
 export interface TemplateVersionDetail extends TemplateVersionRow {
   definition: TemplateDefinition
+}
+
+/* ------------------------------ 运行台账 ------------------------------ */
+
+/** 提交摘要，来自代码平台实时查询 */
+export interface CommitBrief {
+  sha: string
+  author: string
+  /** ISO-8601 文本 */
+  committedTime?: string | null
+  message: string
+}
+
+/** 触发预校验单项结论 */
+export interface PrecheckItem {
+  /** REPO / BRANCH / COMMIT / DEFINITION / IDEMPOTENT */
+  item: string
+  itemName: string
+  /** PASS 通过 / FAIL 不通过 / NA 不适用 */
+  conclusion: 'PASS' | 'FAIL' | 'NA'
+  detail: string
+}
+
+export interface RunRow {
+  id: ID
+  appId: ID
+  appName: string
+  appCode: string
+  pipelineId: ID
+  pipelineName: string
+  pipelineVersionNo: number
+  branch: string
+  /** 0 提交 / 1 标签或引用 */
+  refType: number
+  commitId: string
+  commitAuthor?: string | null
+  /** QUEUED / RUNNING / BLOCKED / SUCCESS / FAILED / TIMEOUT / CANCELED */
+  status: string
+  reusedRunId?: ID | null
+  triggerUserName?: string | null
+  triggerNote?: string | null
+  createTime: string
+  startedTime?: string | null
+  finishedTime?: string | null
+}
+
+/** 运行阶段的任务明细，来自运行绑定的版本快照 */
+export interface RunStageTask {
+  name: string
+  command?: string | null
+  timeoutMinutes: number
+}
+
+export interface RunStageRow {
+  id: ID
+  stageType: string
+  stageName?: string | null
+  stageOrder: number
+  /** PENDING / RUNNING / SUCCESS / FAILED / SKIPPED / BLOCKED */
+  status: string
+  timeoutMinutes?: number | null
+  startedTime?: string | null
+  finishedTime?: string | null
+  tasks: RunStageTask[]
+}
+
+export interface RunDetail extends RunRow {
+  prechecks: PrecheckItem[]
+  stages: RunStageRow[]
+}
+
+export interface TriggerRecordRow {
+  id: ID
+  appId: ID
+  appName: string
+  branch?: string | null
+  commitId?: string | null
+  /** CREATED / MERGED / REUSED / REJECTED */
+  result: string
+  rejectReason?: string | null
+  runId?: ID | null
+  triggerUserName?: string | null
+  createTime: string
+}
+
+export interface TriggerResult {
+  /** CREATED / MERGED / REUSED / REJECTED / PENDING_REUSE */
+  result: string
+  resultName: string
+  runId?: ID | null
+  reuseCandidateRunId?: ID | null
+  /** 拒绝原因，仅已拒绝时返回 */
+  rejectReason?: string | null
 }

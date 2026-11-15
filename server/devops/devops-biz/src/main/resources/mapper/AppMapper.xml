@@ -15,7 +15,7 @@
         <result column="repo_url" jdbcType="VARCHAR" property="repoUrl"/>
         <result column="repo_branch" jdbcType="VARCHAR" property="repoBranch"/>
         <result column="repo_commit_id" jdbcType="VARCHAR" property="repoCommitId"/>
-        <result column="repo_credential_id" jdbcType="BIGINT" property="repoCredentialId"/>
+        <result column="repo_token" jdbcType="BIGINT" property="repoToken"/>
         <result column="create_user" jdbcType="BIGINT" property="createUser"/>
         <result column="create_time" jdbcType="TIMESTAMP" property="createTime"/>
         <result column="update_user" jdbcType="BIGINT" property="updateUser"/>
@@ -23,11 +23,9 @@
         <result column="is_deleted" jdbcType="TINYINT" property="isDeleted"/>
     </resultMap>
     <sql id="Base_Column_List">
-        id, code, name, dept_id, owner_ids, owner_names, description, is_core, status,
-        repo_type, repo_url, repo_branch, repo_commit_id, repo_credential_id,
-        create_user, create_time, update_user, update_time, is_deleted
+        id, code, name, dept_id, owner_ids, owner_names, description, is_core, status, repo_type, repo_url,
+        repo_branch, repo_commit_id, repo_token, create_user, create_time, update_user, update_time, is_deleted
     </sql>
-
 
     <select id="selectCodeCount" resultType="long">
         SELECT COUNT(1)
@@ -44,18 +42,18 @@
         SELECT id,
                code,
                name,
-               dept_id            AS deptId,
-               owner_ids          AS ownerIds,
-               owner_names        AS ownerNames,
+               dept_id        AS deptId,
+               owner_ids      AS ownerIds,
+               owner_names    AS ownerNames,
                description,
-               is_core            AS isCore,
+               is_core        AS isCore,
                status,
-               repo_type          AS repoType,
-               repo_url           AS repoUrl,
-               repo_branch        AS repoBranch,
-               repo_commit_id     AS repoCommitId,
-               repo_credential_id AS repoCredentialId,
-               create_time        AS createTime
+               repo_type      AS repoType,
+               repo_url       AS repoUrl,
+               repo_branch    AS repoBranch,
+               repo_commit_id AS repoCommitId,
+               repo_token     AS repoToken,
+               create_time    AS createTime
         FROM dev_app
         <where>
             is_deleted = 0
@@ -69,7 +67,9 @@
                 </foreach>
             </if>
             <if test="query.ownerIds != null and query.ownerIds.size() > 0">
-                AND (<foreach collection="query.ownerIds" item="ownerId" separator=" OR "> FIND_IN_SET(#{ownerId}, owner_ids) </foreach>)
+                AND (<foreach collection="query.ownerIds" item="ownerId" separator=" OR ">
+                FIND_IN_SET(#{ownerId}, owner_ids)
+            </foreach>)
             </if>
             <if test="query.repoTypes != null and query.repoTypes.size() > 0">
                 AND repo_type IN

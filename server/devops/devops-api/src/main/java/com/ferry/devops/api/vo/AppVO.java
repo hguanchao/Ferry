@@ -49,8 +49,8 @@ public class AppVO {
     @Schema(description = "指定提交id")
     private String repoCommitId;
 
-    @Schema(description = "平台凭据id")
-    private Long repoCredentialId;
+    @Schema(description = "平台凭据")
+    private String repoToken;
 
     @Schema(description = "创建时间")
     @JsonFormat(pattern = DateUtil.NORM_DATETIME_PATTERN)
