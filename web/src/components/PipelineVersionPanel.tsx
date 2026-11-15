@@ -2,51 +2,88 @@ import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { App as AntApp, Alert, Button, Drawer, Modal, Table, Tag, type TableColumnsType } from 'antd'
 import { GitCompare, RotateCcw } from 'lucide-react'
-import { pipelineVersionApi } from '@/api/devops'
-import type { PipelineRow, PipelineVersionDetail, PipelineVersionRow } from '@/api/types'
 import { COL } from '@/lib/table'
 import { showError } from '@/lib/notify'
 import { useAuthStore } from '@/stores/auth'
-import { definitionToYaml } from '@/lib/pipeline'
 import { diffLines, type DiffRow } from '@/lib/diff'
 
-interface PipelineVersionPanelProps {
+/** 版本行展示视图，流水线版本与模板版本共用 */
+export interface VersionRowView {
+  id: string
+  versionNo: number
+  changeNote: string
+  createUserName?: string | null
+  createTime: string
+}
+
+/** 版本历史的属主信息，流水线与模板都满足这个形状 */
+export interface VersionOwner {
+  id: string
+  name: string
+  currentVersionId?: string | null
+}
+
+/**
+ * 版本面板的 API 适配器：列表、详情、回退与 YAML 渲染都由调用方注入，
+ * 面板本身不关心版本属于流水线还是模板。
+ */
+export interface VersionPanelAdapter<D extends VersionRowView> {
+  list: (ownerId: string) => Promise<VersionRowView[]>
+  detail: (versionId: string) => Promise<D>
+  /** 版本定义转 YAML 文本，用于左右对比 */
+  yamlOf: (version: D) => string
+  rollback: (ownerId: string, versionId: string) => Promise<string>
+  /** 列表与单版本详情的 queryKey 前缀 */
+  listKey: string
+  detailKey: string
+  /** 回退按钮的权限串 */
+  rollbackPerm: string
+}
+
+interface PipelineVersionPanelProps<D extends VersionRowView> {
   open: boolean
-  pipeline: Pick<PipelineRow, 'id' | 'name' | 'currentVersionId'> | null
+  owner: VersionOwner | null
+  adapter: VersionPanelAdapter<D>
   onClose: () => void
   /** 回退成功后通知列表刷新 */
   onChanged: () => void
 }
 
 /** 版本历史面板：复选两版做左右 diff，回退以旧内容生成新版本，当前版本不提供回退入口 */
-export default function PipelineVersionPanel({ open, pipeline, onClose, onChanged }: PipelineVersionPanelProps) {
+export default function PipelineVersionPanel<D extends VersionRowView>({
+  open,
+  owner,
+  adapter,
+  onClose,
+  onChanged,
+}: PipelineVersionPanelProps<D>) {
   const { message, modal } = AntApp.useApp()
   const queryClient = useQueryClient()
   const can = useAuthStore((state) => state.can)
   const [selected, setSelected] = useState<string[]>([])
   const [diffOpen, setDiffOpen] = useState(false)
   const [diffLoading, setDiffLoading] = useState(false)
-  const [diff, setDiff] = useState<{ left: PipelineVersionDetail; right: PipelineVersionDetail } | null>(null)
+  const [diff, setDiff] = useState<{ left: D; right: D } | null>(null)
 
-  const pipelineId = pipeline?.id ?? ''
+  const ownerId = owner?.id ?? ''
 
   useEffect(() => {
     setSelected([])
     setDiff(null)
     setDiffOpen(false)
-  }, [open, pipelineId])
+  }, [open, ownerId])
 
   const versionsQuery = useQuery({
-    queryKey: ['pipeline-versions', pipelineId],
-    queryFn: () => pipelineVersionApi.list(pipelineId),
-    enabled: open && Boolean(pipelineId),
+    queryKey: [adapter.listKey, ownerId],
+    queryFn: () => adapter.list(ownerId),
+    enabled: open && Boolean(ownerId),
   })
 
   // 列表按版本号倒序，首行就是最新生成的版本（当前版本），回退后标记能立即跟上
-  const currentVersionId = versionsQuery.data?.[0]?.id ?? pipeline?.currentVersionId
+  const currentVersionId = versionsQuery.data?.[0]?.id ?? owner?.currentVersionId
 
   const rollbackMutation = useMutation({
-    mutationFn: (versionId: string) => pipelineVersionApi.rollback({ pipelineId, versionId }),
+    mutationFn: (versionId: string) => adapter.rollback(ownerId, versionId),
     onSuccess: (text) => {
       message.success(text || '回退成功')
       onChanged()
@@ -63,8 +100,8 @@ export default function PipelineVersionPanel({ open, pipeline, onClose, onChange
       const [first, second] = await Promise.all(
         selected.map((id) =>
           queryClient.fetchQuery({
-            queryKey: ['pipeline-version', id],
-            queryFn: () => pipelineVersionApi.detail(id),
+            queryKey: [adapter.detailKey, id],
+            queryFn: () => adapter.detail(id),
           }),
         ),
       )
@@ -78,7 +115,7 @@ export default function PipelineVersionPanel({ open, pipeline, onClose, onChange
     }
   }
 
-  const confirmRollback = (record: PipelineVersionRow) => {
+  const confirmRollback = (record: VersionRowView) => {
     modal.confirm({
       title: `回退到 V${record.versionNo}？`,
       content: '将以该版本内容生成一个新版本，历史版本全部保留，新版本成为当前版本。',
@@ -88,7 +125,7 @@ export default function PipelineVersionPanel({ open, pipeline, onClose, onChange
     })
   }
 
-  const columns: TableColumnsType<PipelineVersionRow> = [
+  const columns: TableColumnsType<VersionRowView> = [
     {
       title: '版本',
       dataIndex: 'versionNo',
@@ -108,7 +145,7 @@ export default function PipelineVersionPanel({ open, pipeline, onClose, onChange
       key: 'action',
       width: 90,
       render: (_, record) =>
-        can('devops:pipeline:rollback') && record.id !== currentVersionId ? (
+        can(adapter.rollbackPerm) && record.id !== currentVersionId ? (
           <Button
             type="link"
             size="small"
@@ -127,18 +164,15 @@ export default function PipelineVersionPanel({ open, pipeline, onClose, onChange
     if (!diff) {
       return []
     }
-    return diffLines(
-      definitionToYaml(diff.left.definition),
-      definitionToYaml(diff.right.definition),
-    )
-  }, [diff])
+    return diffLines(adapter.yamlOf(diff.left), adapter.yamlOf(diff.right))
+  }, [diff, adapter])
 
   return (
     <>
       <Drawer
         open={open}
         width={720}
-        title={pipeline ? `版本历史 · ${pipeline.name}` : '版本历史'}
+        title={owner ? `版本历史 · ${owner.name}` : '版本历史'}
         onClose={onClose}
         destroyOnHidden
         extra={
@@ -158,7 +192,7 @@ export default function PipelineVersionPanel({ open, pipeline, onClose, onChange
           style={{ marginBottom: 12 }}
           message="勾选两个版本查看差异；回退会生成新版本，不会删除历史。"
         />
-        <Table<PipelineVersionRow>
+        <Table<VersionRowView>
           rowKey="id"
           size="small"
           columns={columns}
@@ -194,7 +228,8 @@ export default function PipelineVersionPanel({ open, pipeline, onClose, onChange
   )
 }
 
-function DiffPane({ rows, side, title }: { rows: DiffRow[]; side: 'left' | 'right'; title: string }) {
+/** 左右两栏 diff 展示，模板合并弹窗也复用这份渲染 */
+export function DiffPane({ rows, side, title }: { rows: DiffRow[]; side: 'left' | 'right'; title: string }) {
   return (
     <div>
       <div className="ferry-caption" style={{ marginBottom: 6 }}>{title}</div>

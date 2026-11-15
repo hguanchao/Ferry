@@ -333,12 +333,18 @@ export interface PipelineRow {
   stageCount: number
   defaultBranch?: string | null
   ownerNames?: string | null
+  sourceTemplateId?: ID | null
+  sourceTemplateName?: string | null
+  sourceTemplateVersionNo?: number | null
+  sourceTemplateOutdated?: boolean | null
   createTime: string
   updateTime: string
 }
 
 export interface PipelineDetail extends PipelineRow {
   definition?: PipelineDefinition | null
+  sourceTemplateVars?: Record<string, string> | null
+  sourceTemplateMergedTime?: string | null
 }
 
 export interface PipelineVersionRow {
@@ -352,4 +358,57 @@ export interface PipelineVersionRow {
 
 export interface PipelineVersionDetail extends PipelineVersionRow {
   definition: PipelineDefinition
+}
+
+/* ------------------------------ 流水线模板 ------------------------------ */
+
+/** 模板占位变量，模板定义中以 {{key}} 引用，派生时替换为实际值 */
+export interface TemplateVariable {
+  key: string
+  label: string
+  description?: string | null
+  defaultValue?: string | null
+  required: boolean
+}
+
+/** 模板定义 = 流水线阶段 + 占位变量表 */
+export interface TemplateDefinition {
+  stages: PipelineStage[]
+  variables: TemplateVariable[]
+}
+
+export interface PipelineTemplateRow {
+  id: ID
+  /** 0 组织级 / 1 团队级 */
+  scope: number
+  deptId?: ID | null
+  name: string
+  description?: string | null
+  /** 0 停用 / 1 启用 */
+  status: number
+  currentVersionId?: ID | null
+  currentVersionNo?: number | null
+  stageCount: number
+  variableCount: number
+  derivedCount: number
+  createUserName?: string | null
+  createTime: string
+  updateTime: string
+}
+
+export interface PipelineTemplateDetail extends PipelineTemplateRow {
+  definition?: TemplateDefinition | null
+}
+
+export interface TemplateVersionRow {
+  id: ID
+  templateId: ID
+  versionNo: number
+  changeNote: string
+  createUserName?: string | null
+  createTime: string
+}
+
+export interface TemplateVersionDetail extends TemplateVersionRow {
+  definition: TemplateDefinition
 }

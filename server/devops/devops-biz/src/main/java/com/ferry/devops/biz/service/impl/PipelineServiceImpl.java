@@ -20,6 +20,7 @@ import com.ferry.devops.api.dto.PipelineVersionDTO;
 import com.ferry.devops.api.dto.query.PipelineQuery;
 import com.ferry.devops.api.entity.App;
 import com.ferry.devops.api.entity.Pipeline;
+import com.ferry.devops.api.entity.PipelineTemplate;
 import com.ferry.devops.api.entity.PipelineVersion;
 import com.ferry.devops.api.vo.PipelineDefinitionVO;
 import com.ferry.devops.api.vo.PipelineVO;
@@ -27,16 +28,21 @@ import com.ferry.devops.api.vo.excel.PipelineExportRow;
 import com.ferry.devops.biz.mapper.PipelineMapper;
 import com.ferry.devops.biz.service.IAppService;
 import com.ferry.devops.biz.service.IPipelineService;
+import com.ferry.devops.biz.service.IPipelineTemplateService;
 import com.ferry.devops.biz.service.IPipelineVersionService;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.databind.JsonNode;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Date;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 @Slf4j
 @Service
@@ -44,6 +50,7 @@ import java.util.List;
 public class PipelineServiceImpl extends ServiceImpl<PipelineMapper, Pipeline> implements IPipelineService {
     private final IAppService appService;
     private final IPipelineVersionService pipelineVersionService;
+    private final IPipelineTemplateService pipelineTemplateService;
 
     @Override
     public IPage<PipelineVO> pageList(PipelineQuery body) {
@@ -73,6 +80,17 @@ public class PipelineServiceImpl extends ServiceImpl<PipelineMapper, Pipeline> i
             }
             vo.setDefinition(JsonUtil.toBean(version.getContent(), PipelineDefinitionVO.class));
         }
+        if (ObjUtil.isNotEmpty(pipeline.getSourceTemplateId())) {
+            PipelineTemplate template = pipelineTemplateService.getById(pipeline.getSourceTemplateId());
+            if (ObjUtil.isNotEmpty(template)) {
+                vo.setSourceTemplateName(template.getName());
+                // 取值 JSON 与视图字段类型不同，BeanUtil 不会拷贝，这里手动解析回填
+                vo.setSourceTemplateVars(parseVars(pipeline.getSourceTemplateVars()));
+                Integer derivedNo = pipeline.getSourceTemplateVersionNo() == null
+                        ? IntConst.ZERO : pipeline.getSourceTemplateVersionNo();
+                vo.setSourceTemplateOutdated(template.getCurrentVersionNo() != null && template.getCurrentVersionNo() > derivedNo);
+            }
+        }
         return vo;
     }
 
@@ -93,22 +111,28 @@ public class PipelineServiceImpl extends ServiceImpl<PipelineMapper, Pipeline> i
         }
         validateDefinition(body.getDefinition());
 
-        Integer stageCount = IntConst.ZERO;
-        if (ObjUtil.isNotEmpty(body.getId())) {
-            Pipeline pipeline = getById(body.getId());
-            if (ObjUtil.isEmpty(pipeline)) {
+        Pipeline pipeline = BeanUtil.copy(body, Pipeline.class);
+        pipeline.setStageCount(IntConst.ZERO);
+        if (ObjUtil.isEmpty(body.getId())) {
+            applySourceTemplate(body, pipeline);
+        } else {
+            Pipeline existing = getById(body.getId());
+            if (ObjUtil.isEmpty(existing)) {
                 throw new ServiceException("流水线不存在");
             }
-            if (!ObjUtil.equals(pipeline.getAppId(), body.getAppId())) {
+            if (!ObjUtil.equals(existing.getAppId(), body.getAppId())) {
                 throw new ServiceException("流水线所属应用创建后不可修改");
             }
             if (ObjUtil.isNotEmpty(body.getDefinition())) {
                 throw new ServiceException("定义变更请使用版本保存接口");
             }
-            stageCount = pipeline.getStageCount();
+            pipeline.setStageCount(existing.getStageCount());
+            // 编辑不改动派生来源，请求里携带的相关字段一律忽略
+            pipeline.setSourceTemplateId(existing.getSourceTemplateId());
+            pipeline.setSourceTemplateVersionNo(existing.getSourceTemplateVersionNo());
+            pipeline.setSourceTemplateVars(existing.getSourceTemplateVars());
+            pipeline.setSourceTemplateMergedTime(existing.getSourceTemplateMergedTime());
         }
-        Pipeline pipeline = BeanUtil.copy(body, Pipeline.class);
-        pipeline.setStageCount(stageCount);
         boolean isSuccess = saveOrUpdate(pipeline);
         if (isSuccess) {
             PipelineVersionDTO versionDTO = new PipelineVersionDTO();
@@ -163,10 +187,99 @@ public class PipelineServiceImpl extends ServiceImpl<PipelineMapper, Pipeline> i
         }
     }
 
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public boolean templateAck(Long pipelineId, Boolean merged) {
+        if (pipelineId == null) {
+            throw new ServiceException("流水线id不能为空");
+        }
+        if (merged == null) {
+            throw new ServiceException("确认类型不能为空");
+        }
+        Pipeline pipeline = getById(pipelineId);
+        if (ObjUtil.isEmpty(pipeline)) {
+            throw new ServiceException("流水线不存在");
+        }
+        if (ObjUtil.isEmpty(pipeline.getSourceTemplateId())) {
+            throw new ServiceException("该流水线不是从模板派生，无需确认");
+        }
+        PipelineTemplate template = pipelineTemplateService.getById(pipeline.getSourceTemplateId());
+        if (ObjUtil.isEmpty(template)) {
+            throw new ServiceException("来源模板不存在");
+        }
+        if (template.getCurrentVersionNo() == null) {
+            throw new ServiceException("来源模板还没有可用版本");
+        }
+        // 推进记录的模板版本号即视为已跟进；合并时额外记录合并时间
+        return lambdaUpdate()
+                .eq(Pipeline::getId, pipeline.getId())
+                .set(Pipeline::getSourceTemplateVersionNo, template.getCurrentVersionNo())
+                .set(Boolean.TRUE.equals(merged), Pipeline::getSourceTemplateMergedTime, new Date())
+                .update();
+    }
+
     private void validateDefinition(PipelineDefinitionDTO definition) {
         if (definition == null) {
             throw new ServiceException("至少配置一个阶段");
         }
         definition.validateStages(definition.getStages());
+    }
+
+    /**
+     * 处理新增时的模板派生来源：校验模板可用并写入来源字段，派生为独立副本、不保留引用
+     *
+     * @param body     表单数据
+     * @param pipeline 待落库的流水线
+     */
+    private void applySourceTemplate(PipelineDTO body, Pipeline pipeline) {
+        if (ObjUtil.isEmpty(body.getSourceTemplateId())) {
+            return;
+        }
+        PipelineTemplate template = pipelineTemplateService.getById(body.getSourceTemplateId());
+        if (ObjUtil.isEmpty(template)) {
+            throw new ServiceException("来源模板不存在");
+        }
+        if (!IntConst.ONE.equals(template.getStatus())) {
+            throw new ServiceException("模板已停用，不能从它创建流水线");
+        }
+        Map<String, String> vars = body.getSourceTemplateVars();
+        if (CollUtil.isNotEmpty(vars)) {
+            if (vars.size() > 20) {
+                throw new ServiceException("占位变量取值不能超过 20 项");
+            }
+            for (Map.Entry<String, String> entry : vars.entrySet()) {
+                if (StrUtil.isBlank(entry.getKey())) {
+                    throw new ServiceException("占位变量名不能为空");
+                }
+                if (entry.getValue() != null && entry.getValue().length() > 500) {
+                    throw new ServiceException("占位变量「" + entry.getKey() + "」的取值不能超过 500 个字符");
+                }
+            }
+        }
+        pipeline.setSourceTemplateId(template.getId());
+        pipeline.setSourceTemplateVersionNo(body.getSourceTemplateVersionNo() != null
+                ? body.getSourceTemplateVersionNo() : template.getCurrentVersionNo());
+        pipeline.setSourceTemplateVars(CollUtil.isEmpty(vars) ? null : JsonUtil.toJson(vars));
+    }
+
+    /**
+     * 解析派生时的占位变量取值 JSON
+     *
+     * @param json 取值 JSON
+     * @return 变量取值，无记录时返回 null
+     */
+    private Map<String, String> parseVars(String json) {
+        if (StrUtil.isBlank(json)) {
+            return null;
+        }
+        Map<String, String> vars = new LinkedHashMap<>();
+        JsonNode node = JsonUtil.readTree(json);
+        node.properties().forEach(entry -> {
+            JsonNode value = entry.getValue();
+            if (value != null && value.isString()) {
+                vars.put(entry.getKey(), value.asString());
+            }
+        });
+        return vars;
     }
 }

@@ -69,4 +69,16 @@ public class PipelineController {
     public void export(@RequestBody PipelineQuery body, HttpServletResponse response) {
         service.export(body, response);
     }
+
+    @PostMapping("/template/ack")
+    @PreAuthorize("devops:pipeline:templateAck")
+    @Operation(summary = "流水线管理-模板同步确认", description = "把派生流水线记录的模板版本推进到模板当前版本，合并确认会同时记录合并时间", parameters = {
+            @Parameter(name = "pipelineId", description = "流水线id", required = true),
+            @Parameter(name = "merged", description = "是否为合并确认", required = true)
+    })
+    public R<String> templateAck(@RequestParam("pipelineId") Long pipelineId,
+                                 @RequestParam("merged") Boolean merged) {
+        boolean isSuccess = service.templateAck(pipelineId, merged);
+        return isSuccess ? R.success(Boolean.TRUE.equals(merged) ? "合并成功" : "已忽略") : R.fail("操作失败");
+    }
 }

@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ferry.devops.biz.mapper.PipelineTemplateMapper">
+
+    <sql id="Template_Columns">
+        t.id,
+        t.scope                    AS scope,
+        t.dept_id                  AS deptId,
+        t.name,
+        t.description,
+        t.status,
+        t.current_version_id       AS currentVersionId,
+        t.current_version_no       AS currentVersionNo,
+        t.stage_count              AS stageCount,
+        t.variable_count           AS variableCount,
+        t.create_user_name         AS createUserName,
+        t.create_time              AS createTime,
+        t.update_time              AS updateTime,
+        (SELECT COUNT(*)
+         FROM dev_pipeline dp
+         WHERE dp.source_template_id = t.id
+           AND dp.is_deleted = 0)    AS derivedCount
+    </sql>
+
+    <select id="selectOrgPageList" resultType="com.ferry.devops.api.vo.PipelineTemplateVO">
+        SELECT
+        <include refid="Template_Columns"/>
+        FROM dev_pipeline_template t
+        WHERE t.is_deleted = 0
+          AND t.scope = 0
+        <if test="query.keyword != null and query.keyword != ''">
+            AND t.name LIKE CONCAT('%', #{query.keyword}, '%')
+        </if>
+        <if test="query.status != null">
+            AND t.status = #{query.status}
+        </if>
+        ORDER BY t.update_time DESC
+    </select>
+
+    <select id="selectTeamPageList" resultType="com.ferry.devops.api.vo.PipelineTemplateVO">
+        SELECT
+        <include refid="Template_Columns"/>
+        FROM dev_pipeline_template t
+        WHERE t.is_deleted = 0
+          AND t.scope = 1
+        <if test="query.keyword != null and query.keyword != ''">
+            AND t.name LIKE CONCAT('%', #{query.keyword}, '%')
+        </if>
+        <if test="query.status != null">
+            AND t.status = #{query.status}
+        </if>
+        ORDER BY t.update_time DESC
+    </select>
+
+    <select id="selectOrgOptions" resultType="com.ferry.devops.api.vo.PipelineTemplateVO">
+        SELECT t.id,
+               t.scope              AS scope,
+               t.name,
+               t.description,
+               t.status,
+               t.current_version_no AS currentVersionNo,
+               t.stage_count        AS stageCount
+        FROM dev_pipeline_template t
+        WHERE t.is_deleted = 0
+          AND t.scope = 0
+          AND t.status = 1
+        <if test="keyword != null and keyword != ''">
+            AND t.name LIKE CONCAT('%', #{keyword}, '%')
+        </if>
+        ORDER BY t.update_time DESC
+        LIMIT 50
+    </select>
+
+    <select id="selectTeamOptions" resultType="com.ferry.devops.api.vo.PipelineTemplateVO">
+        SELECT t.id,
+               t.scope              AS scope,
+               t.name,
+               t.description,
+               t.status,
+               t.current_version_no AS currentVersionNo,
+               t.stage_count        AS stageCount
+        FROM dev_pipeline_template t
+        WHERE t.is_deleted = 0
+          AND t.scope = 1
+          AND t.status = 1
+        <if test="keyword != null and keyword != ''">
+            AND t.name LIKE CONCAT('%', #{keyword}, '%')
+        </if>
+        ORDER BY t.update_time DESC
+        LIMIT 50
+    </select>
+
+    <select id="selectDerivedTemplateIds" resultType="java.lang.Long">
+        SELECT DISTINCT source_template_id
+        FROM dev_pipeline
+        <where>
+            is_deleted = 0
+              AND source_template_id IN
+            <foreach collection="templateIds" item="templateId" open="(" separator="," close=")">
+                #{templateId}
+            </foreach>
+        </where>
+    </select>
+</mapper>

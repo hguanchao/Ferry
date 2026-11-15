@@ -28,11 +28,13 @@ import {
 import PageHeader from '@/components/PageHeader'
 import AppSelect from '@/components/AppSelect'
 import PipelineEditorDrawer from '@/components/PipelineEditorDrawer'
-import PipelineVersionPanel from '@/components/PipelineVersionPanel'
-import { pipelineApi, type PipelineFilter } from '@/api/devops'
+import PipelineVersionPanel, { type VersionPanelAdapter } from '@/components/PipelineVersionPanel'
+import TemplateMergeModal from '@/components/TemplateMergeModal'
+import { pipelineApi, pipelineVersionApi, type PipelineFilter } from '@/api/devops'
 import { userApi } from '@/api/system'
-import type { PipelineDetail, PipelineRow } from '@/api/types'
+import type { PipelineDetail, PipelineRow, PipelineVersionDetail } from '@/api/types'
 import { COL } from '@/lib/table'
+import { definitionToYaml } from '@/lib/pipeline'
 import { showError } from '@/lib/notify'
 import { useAuthStore } from '@/stores/auth'
 
@@ -45,6 +47,17 @@ interface MetaFormValues {
 interface EditorState {
   mode: 'create' | 'definition'
   pipeline: PipelineDetail | null
+}
+
+/** 版本面板的流水线侧适配器：面板 UI 与流水线版本 API 的对接 */
+const pipelineVersionAdapter: VersionPanelAdapter<PipelineVersionDetail> = {
+  list: pipelineVersionApi.list,
+  detail: pipelineVersionApi.detail,
+  yamlOf: (version) => definitionToYaml(version.definition),
+  rollback: (pipelineId, versionId) => pipelineVersionApi.rollback({ pipelineId, versionId }),
+  listKey: 'pipeline-versions',
+  detailKey: 'pipeline-version',
+  rollbackPerm: 'devops:pipeline:rollback',
 }
 
 export default function Pipeline() {
@@ -62,6 +75,7 @@ export default function Pipeline() {
   const [metaForm] = Form.useForm<MetaFormValues>()
   const [versionTarget, setVersionTarget] = useState<PipelineRow | null>(null)
   const [versionOpen, setVersionOpen] = useState(false)
+  const [mergeTarget, setMergeTarget] = useState<PipelineDetail | null>(null)
 
   const listQuery = useQuery({
     queryKey: ['pipelines', filters, page],
@@ -175,6 +189,19 @@ export default function Pipeline() {
     setVersionOpen(true)
   }
 
+  /** 打开模板合并弹窗前先取详情：合并需要定义与派生时的变量取值 */
+  const openMerge = async (record: PipelineRow) => {
+    try {
+      const detail = await queryClient.fetchQuery({
+        queryKey: ['pipeline-detail', record.id],
+        queryFn: () => pipelineApi.detail(record.id),
+      })
+      setMergeTarget(detail)
+    } catch (error) {
+      showError(error)
+    }
+  }
+
   const confirmDelete = (record: PipelineRow) => {
     modal.confirm({
       title: `删除流水线「${record.name}」？`,
@@ -206,7 +233,18 @@ export default function Pipeline() {
     {
       title: '流水线名称',
       dataIndex: 'name',
-      render: (value: string) => <span style={{ fontWeight: 550 }}>{value}</span>,
+      render: (value: string, record) => (
+        <span className="ferry-hstack" style={{ gap: 6 }}>
+          <span style={{ fontWeight: 550 }}>{value}</span>
+          {record.sourceTemplateOutdated && (
+            <Tooltip title="模板已发布新版本，点击查看差异">
+              <Tag color="orange" style={{ cursor: 'pointer' }} onClick={() => void openMerge(record)}>
+                有新版本模板
+              </Tag>
+            </Tooltip>
+          )}
+        </span>
+      ),
     },
     {
       title: '当前版本',
@@ -443,8 +481,16 @@ export default function Pipeline() {
 
       <PipelineVersionPanel
         open={versionOpen}
-        pipeline={versionTarget}
+        owner={versionTarget}
+        adapter={pipelineVersionAdapter}
         onClose={() => setVersionOpen(false)}
+        onChanged={invalidate}
+      />
+
+      <TemplateMergeModal
+        open={Boolean(mergeTarget)}
+        pipeline={mergeTarget}
+        onClose={() => setMergeTarget(null)}
         onChanged={invalidate}
       />
     </>

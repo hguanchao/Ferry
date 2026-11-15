@@ -52,6 +52,10 @@ CREATE TABLE `dev_pipeline`  (
   `current_version_id` bigint NULL DEFAULT NULL COMMENT '当前版本id',
   `current_version_no` int NULL DEFAULT NULL COMMENT '当前版本号',
   `stage_count` int NOT NULL DEFAULT 0 COMMENT '阶段数',
+  `source_template_id` bigint NULL DEFAULT NULL COMMENT '来源模板id，非模板派生为空',
+  `source_template_version_no` int NULL DEFAULT NULL COMMENT '派生或最后合并时的模板版本号',
+  `source_template_vars` text CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '派生时占位变量取值JSON',
+  `source_template_merged_time` datetime NULL DEFAULT NULL COMMENT '最后合并模板时间',
   `create_user` bigint NULL DEFAULT NULL COMMENT '创建人',
   `create_time` datetime NULL DEFAULT NULL COMMENT '创建时间',
   `update_user` bigint NULL DEFAULT NULL COMMENT '更新人',
@@ -59,6 +63,7 @@ CREATE TABLE `dev_pipeline`  (
   `is_deleted` tinyint(1) NOT NULL DEFAULT 0 COMMENT '是否删除 0：否 1：是',
   PRIMARY KEY (`id`) USING BTREE,
   INDEX `idx_app_name`(`app_id` ASC, `name` ASC) USING BTREE,
+  INDEX `idx_source_template`(`source_template_id` ASC) USING BTREE,
   INDEX `idx_update_time`(`update_time` ASC) USING BTREE
 ) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '流水线定义表' ROW_FORMAT = DYNAMIC;
 
@@ -82,6 +87,53 @@ CREATE TABLE `dev_pipeline_version`  (
   PRIMARY KEY (`id`) USING BTREE,
   UNIQUE INDEX `uk_pipeline_version`(`pipeline_id` ASC, `version_no` ASC) USING BTREE
 ) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '流水线版本表' ROW_FORMAT = DYNAMIC;
+
+-- ----------------------------
+-- Table structure for dev_pipeline_template
+-- ----------------------------
+DROP TABLE IF EXISTS `dev_pipeline_template`;
+CREATE TABLE `dev_pipeline_template`  (
+  `id` bigint NOT NULL COMMENT '数据id',
+  `scope` tinyint(1) NOT NULL COMMENT '模板层级 0：组织级 1：团队级',
+  `dept_id` bigint NULL DEFAULT NULL COMMENT '归属部门id，组织级为空',
+  `name` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '模板名称',
+  `description` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '适用场景',
+  `status` tinyint(1) NOT NULL DEFAULT 1 COMMENT '状态 0：停用 1：启用',
+  `current_version_id` bigint NULL DEFAULT NULL COMMENT '当前版本id',
+  `current_version_no` int NULL DEFAULT NULL COMMENT '当前版本号',
+  `stage_count` int NOT NULL DEFAULT 0 COMMENT '阶段数',
+  `variable_count` int NOT NULL DEFAULT 0 COMMENT '占位变量数',
+  `create_user_name` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '创建人名称快照',
+  `create_user` bigint NULL DEFAULT NULL COMMENT '创建人',
+  `create_time` datetime NULL DEFAULT NULL COMMENT '创建时间',
+  `update_user` bigint NULL DEFAULT NULL COMMENT '更新人',
+  `update_time` datetime NULL DEFAULT NULL COMMENT '更新时间',
+  `is_deleted` tinyint(1) NOT NULL DEFAULT 0 COMMENT '是否删除 0：否 1：是',
+  PRIMARY KEY (`id`) USING BTREE,
+  INDEX `idx_scope_name`(`scope` ASC, `dept_id` ASC, `name` ASC) USING BTREE,
+  INDEX `idx_update_time`(`update_time` ASC) USING BTREE
+) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '流水线模板表' ROW_FORMAT = DYNAMIC;
+
+-- ----------------------------
+-- Table structure for dev_pipeline_template_version
+-- ----------------------------
+DROP TABLE IF EXISTS `dev_pipeline_template_version`;
+CREATE TABLE `dev_pipeline_template_version`  (
+  `id` bigint NOT NULL COMMENT '数据id',
+  `template_id` bigint NOT NULL COMMENT '模板id',
+  `version_no` int NOT NULL COMMENT '版本号',
+  `content` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '定义快照，含阶段与占位变量',
+  `content_hash` char(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '内容hash',
+  `change_note` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '变更说明',
+  `create_user_name` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '变更人',
+  `create_user` bigint NULL DEFAULT NULL COMMENT '创建人',
+  `create_time` datetime NULL DEFAULT NULL COMMENT '创建时间',
+  `update_user` bigint NULL DEFAULT NULL COMMENT '更新人',
+  `update_time` datetime NULL DEFAULT NULL COMMENT '更新时间',
+  `is_deleted` tinyint(1) NOT NULL DEFAULT 0 COMMENT '是否删除 0：否 1：是',
+  PRIMARY KEY (`id`) USING BTREE,
+  UNIQUE INDEX `uk_template_version`(`template_id` ASC, `version_no` ASC) USING BTREE
+) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '流水线模板版本表' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
 -- Table structure for sys_config

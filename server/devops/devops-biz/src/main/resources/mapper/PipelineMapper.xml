@@ -22,20 +22,27 @@
 
     <select id="selectPageList" resultType="com.ferry.devops.api.vo.PipelineVO">
         SELECT p.id,
-               p.app_id             AS appId,
-               a.code               AS appCode,
-               a.name               AS appName,
+               p.app_id                                                                                  AS appId,
+               a.code                                                                                    AS appCode,
+               a.name                                                                                    AS appName,
                p.name,
                p.description,
-               p.current_version_id AS currentVersionId,
-               p.current_version_no AS currentVersionNo,
-               p.stage_count        AS stageCount,
-               a.repo_branch        AS defaultBranch,
-               a.owner_names        AS ownerNames,
-               p.create_time        AS createTime,
-               p.update_time        AS updateTime
+               p.current_version_id                                                                      AS currentVersionId,
+               p.current_version_no                                                                      AS currentVersionNo,
+               p.stage_count                                                                             AS stageCount,
+               a.repo_branch                                                                             AS defaultBranch,
+               a.owner_names                                                                             AS ownerNames,
+               p.source_template_id                                                                      AS sourceTemplateId,
+               st.name                                                                                   AS sourceTemplateName,
+               p.source_template_version_no                                                              AS sourceTemplateVersionNo,
+               p.source_template_merged_time                                                             AS sourceTemplateMergedTime,
+               (st.id IS NOT NULL AND st.current_version_no >
+                                      COALESCE(p.source_template_version_no, 0))                         AS sourceTemplateOutdated,
+               p.create_time                                                                             AS createTime,
+               p.update_time                                                                             AS updateTime
         FROM dev_pipeline p
                  INNER JOIN dev_app a ON a.id = p.app_id AND a.is_deleted = 0
+                 LEFT JOIN dev_pipeline_template st ON st.id = p.source_template_id AND st.is_deleted = 0
         <where>
             p.is_deleted = 0
             <if test="query.keyword != null and query.keyword != ''">
@@ -59,6 +66,9 @@
                     FIND_IN_SET(#{ownerId}, a.owner_ids) > 0
                 </foreach>
                 )
+            </if>
+            <if test="query.sourceTemplateId != null">
+                AND p.source_template_id = #{query.sourceTemplateId}
             </if>
         </where>
         ORDER BY p.update_time DESC

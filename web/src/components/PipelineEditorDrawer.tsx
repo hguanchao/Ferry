@@ -1,14 +1,23 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { App as AntApp, Drawer, Form, Input, Modal, Popover } from 'antd'
-import { Plus, RotateCcw, Save, Workflow, X } from 'lucide-react'
-import { pipelineApi, pipelineVersionApi } from '@/api/devops'
-import type { PipelineDefinition, PipelineDetail, PipelineStageType } from '@/api/types'
+import { FilePlus2, Plus, RotateCcw, Save, Workflow, X } from 'lucide-react'
+import { appApi, pipelineApi, pipelineTemplateApi, pipelineVersionApi } from '@/api/devops'
+import type {
+  AppRow,
+  PipelineDefinition,
+  PipelineDetail,
+  PipelineStageType,
+  PipelineTemplateDetail,
+  PipelineTemplateRow,
+} from '@/api/types'
 import AppSelect from '@/components/AppSelect'
 import PipelineDefinitionEditor, {
   StageTypeMenu,
   type PipelineDefinitionEditorHandle,
 } from '@/components/PipelineDefinitionEditor'
+import TemplatePickerModal from '@/components/TemplatePickerModal'
+import TemplateDeriveModal, { type DeriveResult } from '@/components/TemplateDeriveModal'
 import {
   STAGE_TYPES,
   collectDefinitionIssues,
@@ -32,6 +41,13 @@ interface CreateFormValues {
   description?: string
 }
 
+/** 从模板派生的来源记录，创建成功后随流水线落库 */
+interface SourceRef {
+  templateId: string
+  versionNo: number
+  vars: Record<string, string>
+}
+
 export default function PipelineEditorDrawer({
   open,
   mode,
@@ -40,6 +56,7 @@ export default function PipelineEditorDrawer({
   onSaved,
 }: PipelineEditorDrawerProps) {
   const { message } = AntApp.useApp()
+  const queryClient = useQueryClient()
   const [form] = Form.useForm<CreateFormValues>()
   const [definition, setDefinition] = useState<PipelineDefinition>({ stages: [] })
   const [original, setOriginal] = useState<PipelineDefinition | null>(null)
@@ -47,6 +64,11 @@ export default function PipelineEditorDrawer({
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [changeNote, setChangeNote] = useState('')
   const [stageMenuOpen, setStageMenuOpen] = useState(false)
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const [deriveOpen, setDeriveOpen] = useState(false)
+  const [deriveTemplate, setDeriveTemplate] = useState<PipelineTemplateDetail | null>(null)
+  const [deriveApp, setDeriveApp] = useState<AppRow | null>(null)
+  const [sourceRef, setSourceRef] = useState<SourceRef | null>(null)
   const editorRef = useRef<PipelineDefinitionEditorHandle>(null)
 
   useEffect(() => {
@@ -58,6 +80,9 @@ export default function PipelineEditorDrawer({
     setConfirmOpen(false)
     setChangeNote('')
     setStageMenuOpen(false)
+    setPickerOpen(false)
+    setDeriveOpen(false)
+    setSourceRef(null)
     if (mode === 'create') {
       const empty = { stages: [] }
       setDefinition(empty)
@@ -132,7 +157,50 @@ export default function PipelineEditorDrawer({
       name: values.name,
       description: values.description,
       definition,
+      ...(sourceRef
+        ? {
+            sourceTemplateId: sourceRef.templateId,
+            sourceTemplateVersionNo: sourceRef.versionNo,
+            sourceTemplateVars: sourceRef.vars,
+          }
+        : {}),
     })
+  }
+
+  /** 选模板 → 拉模板定义与应用信息（内置变量预填用）→ 进入变量填写 */
+  const handlePicked = async (option: PipelineTemplateRow) => {
+    const appId = form.getFieldValue('appId') as string | undefined
+    if (!appId) {
+      showError('请先选择所属应用')
+      return
+    }
+    try {
+      const [template, app] = await Promise.all([
+        queryClient.fetchQuery({
+          queryKey: ['pipeline-template-detail', option.id],
+          queryFn: () => pipelineTemplateApi.detail(option.id),
+        }),
+        queryClient.fetchQuery({
+          queryKey: ['app-detail', appId],
+          queryFn: () => appApi.detail(appId),
+        }),
+      ])
+      setDeriveTemplate(template)
+      setDeriveApp(app)
+      setPickerOpen(false)
+      setDeriveOpen(true)
+    } catch (error) {
+      showError(error)
+    }
+  }
+
+  const handleDerived = (result: DeriveResult) => {
+    setDefinition(normalizeDefinition(result.definition))
+    setSourceRef({ templateId: result.templateId, versionNo: result.templateVersionNo, vars: result.vars })
+    setDeriveOpen(false)
+    setDeriveTemplate(null)
+    setDeriveApp(null)
+    message.success('已按模板生成定义，可继续调整')
   }
 
   const submitDefinition = () => {
@@ -174,6 +242,7 @@ export default function PipelineEditorDrawer({
     editorRef.current?.reset()
     if (mode === 'create') {
       form.resetFields()
+      setSourceRef(null)
     }
     message.success('已重置')
   }
@@ -251,6 +320,9 @@ export default function PipelineEditorDrawer({
                         ? `V${pipeline.currentVersionNo}`
                         : '未配置'}
                   </span>
+                  {mode === 'create' && sourceRef && (
+                    <span className="ferry-studio__status">来自模板 V{sourceRef.versionNo}</span>
+                  )}
                 </div>
               </div>
 
@@ -287,6 +359,12 @@ export default function PipelineEditorDrawer({
               </div>
 
               <div className="ferry-studio__actions">
+                {mode === 'create' && (
+                  <button type="button" className="ferry-studio__btn is-ghost" onClick={() => setPickerOpen(true)}>
+                    <FilePlus2 size={13} />
+                    从模板创建
+                  </button>
+                )}
                 <button type="button" className="ferry-studio__btn is-ghost" onClick={resetDefinition}>
                   <RotateCcw size={13} />
                   重置
@@ -339,6 +417,27 @@ export default function PipelineEditorDrawer({
           </div>
         </Form>
       </Drawer>
+
+      {mode === 'create' && (
+        <>
+          <TemplatePickerModal
+            open={pickerOpen}
+            onClose={() => setPickerOpen(false)}
+            onPicked={(option) => void handlePicked(option)}
+          />
+          <TemplateDeriveModal
+            open={deriveOpen}
+            template={deriveTemplate}
+            app={deriveApp}
+            onClose={() => {
+              setDeriveOpen(false)
+              setDeriveTemplate(null)
+              setDeriveApp(null)
+            }}
+            onConfirm={handleDerived}
+          />
+        </>
+      )}
 
       <Modal
         open={confirmOpen}

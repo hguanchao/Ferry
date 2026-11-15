@@ -7,6 +7,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
 import java.util.Date;
+import java.util.Map;
 
 @Data
 public class PipelineVO {
@@ -55,4 +56,23 @@ public class PipelineVO {
     @Schema(description = "当前定义，仅详情返回")
     @JsonInclude(JsonInclude.Include.NON_NULL)
     private PipelineDefinitionVO definition;
+
+    @Schema(description = "来源模板id，非模板派生为空")
+    private Long sourceTemplateId;
+
+    @Schema(description = "来源模板名称")
+    private String sourceTemplateName;
+
+    @Schema(description = "派生或最后合并时的模板版本号")
+    private Integer sourceTemplateVersionNo;
+
+    @Schema(description = "派生时占位变量取值，仅详情返回")
+    private Map<String, String> sourceTemplateVars;
+
+    @Schema(description = "最后合并模板时间")
+    @JsonFormat(pattern = DateUtil.NORM_DATETIME_PATTERN)
+    private Date sourceTemplateMergedTime;
+
+    @Schema(description = "来源模板是否有比本记录更新的版本")
+    private Boolean sourceTemplateOutdated;
 }

@@ -56,4 +56,16 @@ public interface IPipelineService extends IService<Pipeline> {
      * @param response HTTP 响应，xlsx 直接写入响应流
      */
     void export(PipelineQuery body, HttpServletResponse response);
+
+    /**
+     * 流水线管理-模板同步确认
+     *
+     * <p>把派生流水线记录的模板版本号推进到模板当前版本：忽略提示或完成合并后调用；
+     * 合并确认额外记录合并时间。
+     *
+     * @param pipelineId 流水线id
+     * @param merged     是否为合并确认，合并会同时记录合并时间
+     * @return true 成功 || false 失败
+     */
+    boolean templateAck(Long pipelineId, Boolean merged);
 }

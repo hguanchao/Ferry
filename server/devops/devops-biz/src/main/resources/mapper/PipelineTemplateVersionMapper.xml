@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ferry.devops.biz.mapper.PipelineTemplateVersionMapper">
+    <select id="selectTemplateInfo" resultType="com.ferry.devops.api.entity.PipelineTemplate">
+        SELECT id, current_version_id AS currentVersionId, current_version_no AS currentVersionNo
+        FROM dev_pipeline_template
+        WHERE id = #{templateId}
+          AND is_deleted = 0
+    </select>
+
+    <update id="updateTemplate">
+        UPDATE dev_pipeline_template
+        SET current_version_id = #{currentVersionId},
+            current_version_no = #{currentVersionNo},
+            stage_count        = #{stageCount},
+            variable_count     = #{variableCount}
+        WHERE id = #{templateId}
+    </update>
+</mapper>
