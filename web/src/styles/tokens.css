@@ -109,7 +109,6 @@
   --sider-collapsed: 72px;
   --header-height: 56px;
   --content-max: 1600px;
-  --pipeline-inspector-width: 420px;
 
   /* ---------- 动效：克制的 160-220ms ---------- */
   --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);

@@ -14,7 +14,6 @@ public interface SysConst {
     String APPLICATION_GATEWAY_NAME = "ferry-gateway";
     String APPLICATION_AUTH_NAME    = "ferry-auth";
     String APPLICATION_SYSTEM_NAME  = "ferry-system";
-    String APPLICATION_DEVOPS_NAME  = "ferry-devops";
 
     String  TENANT_ID         = "Tenant-Id";
     String  DEFAULT_TENANT    = "000000";

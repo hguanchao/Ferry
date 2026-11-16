@@ -1,12 +1,10 @@
-import { get, post, ApiError } from './client'
+import { get, post } from './client'
 import type {
   ApiPage,
-  AppRow,
   AuditRow,
   ConfigRow,
   DeptNode,
   DictNode,
-  EnvRow,
   MenuNode,
   PostRow,
   RegionNode,
@@ -114,21 +112,6 @@ export const auditApi = {
 
 export const workbenchApi = {
   overview: () => get<WorkbenchOverview>('/ferry-system/workbench/overview'),
-}
-
-/** 数据权限的授权对象：应用 × 环境（由应用管理提供，未接入时降级为空） */
-export const appScopeApi = {
-  /** 应用管理尚未落地，404 视为「暂未接入」返回空清单，可选接口不把页面打挂也不弹错 */
-  options: async (): Promise<{ apps: AppRow[]; envs: EnvRow[] }> => {
-    try {
-      return await get<{ apps: AppRow[]; envs: EnvRow[] }>('/ferry-system/apps/scope-options', undefined, { silent: true })
-    } catch (error) {
-      if (error instanceof ApiError && error.code === 404) {
-        return { apps: [], envs: [] }
-      }
-      throw error
-    }
-  },
 }
 
 export const profileApi = {
