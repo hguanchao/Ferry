@@ -6,7 +6,7 @@
  Source Schema         : ferry
 */
 
--- 本文件只放建表语句，初始与演示数据见 ferry_data.sql
+-- 本文件只放建表语句，初始与演示数据见 ferry_data.sql，区域数据见 ferry_region_data.sql
 SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;
 
