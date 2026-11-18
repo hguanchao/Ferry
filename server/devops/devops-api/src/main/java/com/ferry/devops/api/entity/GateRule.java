@@ -2,8 +2,6 @@ package com.ferry.devops.api.entity;
 
 import java.io.Serializable;
 
-import com.baomidou.mybatisplus.annotation.FieldFill;
-import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.ferry.common.jdbc.base.BaseEntity;
@@ -20,9 +18,6 @@ public class GateRule extends BaseEntity implements Serializable {
 
     @TableId
     private Long id;
-
-    @TableField(fill = FieldFill.INSERT)
-    private String tenantId;
 
     /** 1 组织 2 应用 3 分支 */
     private Integer scopeType;

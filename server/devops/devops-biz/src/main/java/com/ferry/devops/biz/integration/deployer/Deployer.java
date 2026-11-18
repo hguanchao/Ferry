@@ -5,7 +5,8 @@ import java.util.List;
 /**
  * 部署执行器统一接口。
  *
- * <p>最小实现：三个实现仅记录关键动作日志并返回模拟结果，不引入远程依赖客户端。
+ * <p>三个实现通过 DevopsIntegrationProperties#getDeploy().isExecute() 控制：
+ * 开启时用 {@code ProcessBuilder} 真实执行 shell/CLI 命令，关闭时保留原模拟日志与模拟成功结果。
  */
 public interface Deployer {
 
@@ -79,6 +80,14 @@ public interface Deployer {
             return r;
         }
 
+        /** 真实执行结果工厂：由执行器按探测结论填充 */
+        public static HealthResult of(boolean pass, String detail) {
+            HealthResult r = new HealthResult();
+            r.pass = pass;
+            r.detail = detail;
+            return r;
+        }
+
         public boolean isPass() { return pass; }
         public String getDetail() { return detail; }
     }
@@ -106,6 +115,14 @@ public interface Deployer {
             DriftStatus s = new DriftStatus();
             s.drift = false;
             s.detail = "无漂移";
+            return s;
+        }
+
+        /** 真实执行结果工厂：由执行器按镜像/版本比对结论填充 */
+        public static DriftStatus of(boolean drift, String detail) {
+            DriftStatus s = new DriftStatus();
+            s.drift = drift;
+            s.detail = detail;
             return s;
         }
 

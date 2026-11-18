@@ -3,8 +3,6 @@ import java.util.Date;
 
 import java.io.Serializable;
 
-import com.baomidou.mybatisplus.annotation.FieldFill;
-import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.ferry.common.jdbc.base.BaseEntity;
@@ -22,10 +20,6 @@ public class Credential extends BaseEntity implements Serializable {
     /** 数据id */
     @TableId
     private Long id;
-
-    /** 租户编码 */
-    @TableField(fill = FieldFill.INSERT)
-    private String tenantId;
 
     /** 凭据名称 */
     private String name;

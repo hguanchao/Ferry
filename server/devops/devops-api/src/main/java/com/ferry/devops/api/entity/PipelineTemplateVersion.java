@@ -20,10 +20,6 @@ public class PipelineTemplateVersion implements Serializable {
     @TableId
     private Long id;
 
-    /** 租户编码 */
-    @TableField(fill = FieldFill.INSERT)
-    private String tenantId;
-
     /** 模板id */
     private Long templateId;
 

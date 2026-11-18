@@ -21,10 +21,6 @@ public class PipelineVersion implements Serializable {
     @TableId
     private Long id;
 
-    /** 租户编码 */
-    @TableField(fill = FieldFill.INSERT)
-    private String tenantId;
-
     /** 流水线id */
     private Long pipelineId;
 

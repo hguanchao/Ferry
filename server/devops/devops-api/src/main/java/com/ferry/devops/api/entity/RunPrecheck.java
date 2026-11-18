@@ -20,10 +20,6 @@ public class RunPrecheck implements Serializable {
     @TableId
     private Long id;
 
-    /** 租户编码 */
-    @TableField(fill = FieldFill.INSERT)
-    private String tenantId;
-
     /** 运行id */
     private Long runId;
 

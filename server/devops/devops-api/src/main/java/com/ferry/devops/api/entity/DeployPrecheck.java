@@ -1,7 +1,5 @@
 package com.ferry.devops.api.entity;
 
-import com.baomidou.mybatisplus.annotation.FieldFill;
-import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.fasterxml.jackson.annotation.JsonFormat;
@@ -20,9 +18,6 @@ public class DeployPrecheck implements Serializable {
     /** 数据id */
     @TableId
     private Long id;
-
-    /** 租户编码 */
-    private String tenantId;
 
     /** 部署id */
     private Long deployId;
