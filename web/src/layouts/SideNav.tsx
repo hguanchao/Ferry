@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { Menu, type MenuProps } from 'antd'
 import { renderMenuIcon } from '@/components/MenuIcon'
 import { isPathActive, normalizePath, type MenuNode } from '@/router/menu'
-import { LOCK_ICON, ROADMAP_NAV, WORKBENCH_NAV, plannedLabel } from '@/router/nav'
+import { WORKBENCH_NAV } from '@/router/nav'
 import { useMenuRoutes } from '@/router/useMenuRoutes'
 import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
@@ -90,18 +90,6 @@ export default function SideNav() {
         label: WORKBENCH_NAV.label,
       },
       ...menuToItems(tree),
-      {
-        key: ROADMAP_NAV.key,
-        icon: ROADMAP_NAV.icon,
-        label: ROADMAP_NAV.label,
-        popupClassName: 'ferry-menu-popup',
-        children: (ROADMAP_NAV.children ?? []).map((node) => ({
-          key: node.key,
-          icon: LOCK_ICON,
-          disabled: true,
-          label: plannedLabel(node),
-        })),
-      },
     ],
     [tree],
   )

@@ -36,7 +36,9 @@
         <lombok.version>1.18.48</lombok.version>
 
         <!-- devops 模块使用：部署执行器所需的三类客户端与制品存储客户端 -->
+        <!-- SSH 客户端改用社区维护 fork，与原 com.jcraft:jsch API 兼容且持续维护 -->
         <jsch.version>0.2.17</jsch.version>
+        <jsch-fork.version>2.24.7</jsch-fork.version>
         <kubernetes-client.version>7.9.0</kubernetes-client.version>
         <docker-java.version>3.7.1</docker-java.version>
         <awssdk.version>2.31.78</awssdk.version>
@@ -85,6 +87,47 @@
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
+            <!-- devops 集成层依赖：SSH 部署使用维护版 fork -->
+            <dependency>
+                <groupId>com.github.mwiede</groupId>
+                <artifactId>jsch</artifactId>
+                <version>${jsch-fork.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.fabric8</groupId>
+                <artifactId>kubernetes-client</artifactId>
+                <version>${kubernetes-client.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.github.docker-java</groupId>
+                <artifactId>docker-java</artifactId>
+                <version>${docker-java.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>software.amazon.awssdk</groupId>
+                <artifactId>bom</artifactId>
+                <version>${awssdk.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>net.javacrumbs.shedlock</groupId>
+                <artifactId>shedlock-bom</artifactId>
+                <version>${shedlock.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.springframework.retry</groupId>
+                <artifactId>spring-retry</artifactId>
+                <version>${spring-retry.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.redisson</groupId>
+                <artifactId>redisson-spring-boot-starter</artifactId>
+                <version>${redisson.version}</version>
+            </dependency>
+            <!-- /devops 集成层依赖 -->
             <dependency>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-starter</artifactId>

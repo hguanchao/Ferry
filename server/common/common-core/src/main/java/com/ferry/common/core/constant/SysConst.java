@@ -14,6 +14,7 @@ public interface SysConst {
     String APPLICATION_GATEWAY_NAME = "ferry-gateway";
     String APPLICATION_AUTH_NAME    = "ferry-auth";
     String APPLICATION_SYSTEM_NAME  = "ferry-system";
+    String APPLICATION_DEVOPS_NAME  = "ferry-devops";
 
     String  TENANT_ID         = "Tenant-Id";
     String  DEFAULT_TENANT    = "000000";
@@ -29,4 +30,5 @@ public interface SysConst {
     String GATEWAY_CACHE_PREFIX = APPLICATION_GATEWAY_NAME + StrConst.COLON;
     String AUTH_CACHE_PREFIX    = APPLICATION_AUTH_NAME + StrConst.COLON;
     String SYSTEM_CACHE_PREFIX  = APPLICATION_SYSTEM_NAME + StrConst.COLON;
+    String DEVOPS_CACHE_PREFIX  = APPLICATION_DEVOPS_NAME + StrConst.COLON;
 }

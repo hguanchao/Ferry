@@ -6,6 +6,7 @@ type PageLoader = () => Promise<{ default: ComponentType }>
 
 const MODULES = import.meta.glob<{ default: ComponentType }>([
   '../pages/system/*.tsx',
+  '../pages/devops/*.tsx',
 ])
 
 const lazyCache = new Map<string, PageComponent>()
