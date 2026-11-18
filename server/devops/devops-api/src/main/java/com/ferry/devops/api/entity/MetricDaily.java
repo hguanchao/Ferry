@@ -4,8 +4,6 @@ import java.io.Serializable;
 import java.math.BigDecimal;
 import java.util.Date;
 
-import com.baomidou.mybatisplus.annotation.FieldFill;
-import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.ferry.common.jdbc.base.BaseEntity;
@@ -23,10 +21,6 @@ public class MetricDaily extends BaseEntity implements Serializable {
     /** 数据id */
     @TableId
     private Long id;
-
-    /** 租户编码 */
-    @TableField(fill = FieldFill.INSERT)
-    private String tenantId;
 
     /** 统计日 */
     private Date statDate;

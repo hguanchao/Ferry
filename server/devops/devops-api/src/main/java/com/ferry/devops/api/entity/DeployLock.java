@@ -1,7 +1,5 @@
 package com.ferry.devops.api.entity;
 
-import com.baomidou.mybatisplus.annotation.FieldFill;
-import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -19,10 +17,6 @@ public class DeployLock implements Serializable {
 
     @TableId
     private Long id;
-
-    @TableField(fill = FieldFill.INSERT)
-    private String tenantId;
-
     private Long appId;
 
     private Long envId;

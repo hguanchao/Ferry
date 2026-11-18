@@ -13,6 +13,7 @@ import com.ferry.common.core.constant.IntConst;
 import com.ferry.common.core.exception.ServiceException;
 import com.ferry.common.core.utils.BeanUtil;
 import com.ferry.common.core.utils.CollUtil;
+import com.ferry.common.core.utils.JsonUtil;
 import com.ferry.common.core.utils.ObjUtil;
 import com.ferry.common.core.utils.StrUtil;
 import com.ferry.common.jdbc.base.ServiceImpl;
@@ -154,6 +155,7 @@ public class GateResultServiceImpl extends ServiceImpl<GateExemptionMapper, Gate
      * @param schemaVersion schema 版本
      * @return 写入的结果
      */
+    @Override
     @Transactional(rollbackFor = Exception.class)
     public GateResult judge(Long runId, Long stageId, Long appId, String branch, Integer ruleType,
                             String currentValue, String source, String schemaVersion) {
@@ -175,6 +177,42 @@ public class GateResultServiceImpl extends ServiceImpl<GateExemptionMapper, Gate
                     effective.getRuleType());
             result.setConclusion(pass ? GateConclusionEnum.PASS.getCode() : GateConclusionEnum.FAIL.getCode());
         }
+        resultMapper.insert(result);
+        return result;
+    }
+
+    /**
+     * 数据获取失败判定：报告缺失/schema 不完整/拉取失败写 FETCH_FAILED(5)。
+     *
+     * <p>按规则优先级记录生效规则快照（不存在规则时记空快照）以便追溯；该结论不可豁免，
+     * 且被 {@link #isRunBlocked(Long)} 计入阻塞汇总。
+     *
+     * @param runId         运行id
+     * @param stageId       阶段id
+     * @param appId         应用id
+     * @param branch        分支
+     * @param ruleType      规则类型
+     * @param source        报告来源
+     * @param schemaVersion schema 版本
+     * @param fetchError    失败原因
+     * @return 写入的结果
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public GateResult judgeFetchFailed(Long runId, Long stageId, Long appId, String branch, Integer ruleType,
+                                       String source, String schemaVersion, String fetchError) {
+        GateRule effective = pickStrictest(appId, branch, ruleType);
+        GateResult result = new GateResult();
+        result.setRunId(runId);
+        result.setStageId(stageId);
+        result.setRuleId(effective == null ? null : effective.getId());
+        result.setRuleSnapshot(effective == null ? "{}" : JsonUtil.toJson(effective));
+        result.setThreshold(effective == null ? null : effective.getThreshold());
+        result.setSource(source);
+        result.setSchemaVersion(schemaVersion);
+        result.setFetchError(fetchError);
+        result.setConclusion(GateConclusionEnum.FETCH_FAILED.getCode());
+        result.setCreateTime(new Date());
         resultMapper.insert(result);
         return result;
     }

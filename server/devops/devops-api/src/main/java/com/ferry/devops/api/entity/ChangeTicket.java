@@ -1,7 +1,5 @@
 package com.ferry.devops.api.entity;
 
-import com.baomidou.mybatisplus.annotation.FieldFill;
-import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.ferry.common.jdbc.base.BaseEntity;
@@ -21,10 +19,6 @@ public class ChangeTicket extends BaseEntity implements Serializable {
     /** 数据id */
     @TableId
     private Long id;
-
-    /** 租户编码 */
-    @TableField(fill = FieldFill.INSERT)
-    private String tenantId;
 
     /** 变更单号 */
     private String ticketNo;

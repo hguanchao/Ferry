@@ -7,6 +7,7 @@ import com.ferry.common.jdbc.base.IService;
 import com.ferry.devops.api.dto.GateExemptionDTO;
 import com.ferry.devops.api.dto.query.GateExemptionQuery;
 import com.ferry.devops.api.entity.GateExemption;
+import com.ferry.devops.api.entity.GateResult;
 import com.ferry.devops.api.vo.GateExemptionVO;
 import com.ferry.devops.api.vo.GateResultVO;
 
@@ -29,4 +30,18 @@ public interface IGateResultService extends IService<GateExemption> {
 
     /** 撤销豁免 */
     boolean revoke(Long id);
+
+    /**
+     * 门禁判定：按 分支>应用>组织 加载规则，比对当前值并写 gate_result。
+     * 供 Jenkins 报告回调等主链路调用。
+     */
+    GateResult judge(Long runId, Long stageId, Long appId, String branch, Integer ruleType,
+                     String currentValue, String source, String schemaVersion);
+
+    /**
+     * 数据获取失败判定：报告缺失/schema 不完整/拉取失败时写 FETCH_FAILED 结论，
+     * 该结论不可豁免且参与运行阻塞汇总。
+     */
+    GateResult judgeFetchFailed(Long runId, Long stageId, Long appId, String branch, Integer ruleType,
+                                String source, String schemaVersion, String fetchError);
 }

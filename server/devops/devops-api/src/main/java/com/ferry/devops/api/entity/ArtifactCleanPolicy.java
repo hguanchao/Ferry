@@ -2,8 +2,6 @@ package com.ferry.devops.api.entity;
 
 import java.io.Serializable;
 
-import com.baomidou.mybatisplus.annotation.FieldFill;
-import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
@@ -17,9 +15,6 @@ public class ArtifactCleanPolicy implements Serializable {
 
     @TableId
     private Long id;
-
-    @TableField(fill = FieldFill.INSERT)
-    private String tenantId;
 
     /** 应用id，全局策略写 0 */
     private Long appId;

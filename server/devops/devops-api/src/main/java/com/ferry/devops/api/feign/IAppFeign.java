@@ -9,17 +9,17 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 交付服务契约
+ * 应用服务内部契约
  */
-@FeignClient(name = SysConst.APPLICATION_DEVOPS_NAME, path = "/internal")
-public interface IDevopsFeign {
+@FeignClient(name = SysConst.APPLICATION_DEVOPS_NAME, path = "/internal/app")
+public interface IAppFeign {
 
     /**
      * 应用选项，供登录态与其他服务下拉使用
      *
      * @return 应用id到名称的映射
      */
-    @GetMapping(value = "/app/options")
+    @GetMapping(value = "/options")
     Map<String, String> appOptions();
 
     /**
@@ -28,15 +28,6 @@ public interface IDevopsFeign {
      * @param appId 应用id
      * @return 用户id集合
      */
-    @GetMapping(value = "/app/owner")
+    @GetMapping(value = "/owner")
     List<Long> appOwners(@RequestParam("appId") Long appId);
-
-    /**
-     * 环境选项，按应用过滤
-     *
-     * @param appId 应用id
-     * @return 环境id到名称的映射
-     */
-    @GetMapping(value = "/environment/options")
-    Map<String, String> environmentOptions(@RequestParam(value = "appId", required = false) Long appId);
 }

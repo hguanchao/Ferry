@@ -30,6 +30,7 @@ import com.ferry.devops.api.vo.DeployRecordVO;
 import com.ferry.devops.api.vo.DeployStartVO;
 import com.ferry.devops.api.vo.HealthSampleVO;
 import com.ferry.devops.api.vo.PrecheckTokenVO;
+import com.ferry.devops.biz.config.DevopsIntegrationProperties;
 import com.ferry.devops.biz.integration.deployer.Deployer;
 import com.ferry.devops.biz.integration.deployer.DeployerFactory;
 import com.ferry.devops.biz.mapper.DeployBatchMapper;
@@ -41,6 +42,7 @@ import com.ferry.devops.biz.mapper.HealthSampleMapper;
 import com.ferry.devops.biz.service.IDeployService;
 import com.ferry.devops.biz.wrapper.DeployWrapper;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -56,6 +58,7 @@ import java.util.UUID;
  * <p>生产环境部署由 Controller 的 devops:deploy:prod 权限控制；确认人与操作人不同在服务端校验。
  */
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class DeployServiceImpl extends ServiceImpl<DeployRecordMapper, DeployRecord> implements IDeployService {
 
@@ -65,9 +68,14 @@ public class DeployServiceImpl extends ServiceImpl<DeployRecordMapper, DeployRec
     private final HealthSampleMapper healthSampleMapper;
     private final EnvironmentMapper environmentMapper;
     private final DeployerFactory deployerFactory;
+    private final DevopsIntegrationProperties props;
 
     /** 校验令牌有效期 5 分钟 */
     private static final long TOKEN_TTL_MS = 5 * 60 * 1000L;
+    /** 健康连续不通过熔断阈值：配置缺失时用默认 2 次 */
+    private static final int DEFAULT_CIRCUIT_FAILURES = 2;
+    /** 健康探测采样检查项：1 存活（存活探测结论落此 checkType） */
+    private static final int HEALTH_CHECK_ALIVE = 1;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -164,7 +172,8 @@ public class DeployServiceImpl extends ServiceImpl<DeployRecordMapper, DeployRec
             batchMapper.insert(batch);
         }
 
-        // 调用执行器工厂（最小实现：仅日志 + 模拟结果）
+        // 调用执行器工厂：配置开启则真实执行（ProcessBuilder），关闭则走执行器模拟降级
+        boolean realExecute = props != null && props.getDeploy() != null && props.getDeploy().isExecute();
         Deployer deployer = deployerFactory.get(env.getDeployType());
         Deployer.DeployContext ctx = new Deployer.DeployContext();
         ctx.setDeployId(record.getId());
@@ -173,7 +182,15 @@ public class DeployServiceImpl extends ServiceImpl<DeployRecordMapper, DeployRec
         ctx.setArtifactId(body.getArtifactId());
         ctx.setArtifactDigest(JsonUtil.getStr(JsonUtil.toJson(baseMapper.selectArtifactInfo(body.getArtifactId())), "digest"));
         ctx.setTargetConfig(env.getTargetConfig());
-        deployer.prepare(ctx);
+        try {
+            deployer.prepare(ctx);
+        } catch (RuntimeException e) {
+            // 前置准备失败（如 SSH 逐台探活/备份校验失败）：立即中止，所有批次不执行
+            log.error("[部署] 前置准备失败 deployId={}", record.getId(), e);
+            cancelPendingBatches(record.getId(), 0);
+            return failDeploy(record, "部署前置准备失败：" + e.getMessage());
+        }
+        int circuitThreshold = circuitThreshold(env);
         for (DeployBatch batch : batchMapper.selectList(Wrappers.<DeployBatch>lambdaQuery()
                 .eq(DeployBatch::getDeployId, record.getId()).orderByAsc(DeployBatch::getBatchNo))) {
             Deployer.DeployBatch execBatch = new Deployer.DeployBatch();
@@ -181,21 +198,47 @@ public class DeployServiceImpl extends ServiceImpl<DeployRecordMapper, DeployRec
             execBatch.setBatchNo(batch.getBatchNo());
             execBatch.setTargetCount(batch.getTargetCount());
             execBatch.setTargetSnapshot(batch.getTargetSnapshot());
-            deployer.deploy(ctx, execBatch);
-            Deployer.HealthResult health = deployer.observe(ctx, execBatch);
-            batch.setHealthResult(health.isPass() ? IntConst.ONE : 2);
-            batch.setStatus(health.isPass() ? BatchStatusEnum.SUCCESS.getCode() : BatchStatusEnum.FAILURE.getCode());
-            batch.setEndTime(new Date());
-            batchMapper.updateById(batch);
-            if (!health.isPass()) {
-                record.setStatus(DeployStatusEnum.FAILURE.getCode());
-                record.setFailReason("批次 " + batch.getBatchNo() + " 健康检查不通过：" + health.getDetail());
-                updateById(record);
-                DeployStartVO vo = new DeployStartVO();
-                vo.setId(record.getId());
-                vo.setDeployNo(record.getDeployNo());
-                return vo;
+            // 批次执行异常：该批次失败、记录失败、后续批次取消，不再继续
+            try {
+                deployer.deploy(ctx, execBatch);
+            } catch (RuntimeException e) {
+                log.error("[部署] 批次执行异常 deployId={} batchNo={}", record.getId(), batch.getBatchNo(), e);
+                batch.setStatus(BatchStatusEnum.FAILURE.getCode());
+                batch.setEndTime(new Date());
+                batchMapper.updateById(batch);
+                cancelPendingBatches(record.getId(), batch.getBatchNo());
+                return failDeploy(record, e.getMessage());
             }
+            // 健康采样：真实调用执行器观察结论，落 dev_health_sample；连续 N 次不通过才判不通过并熔断。
+            // 一次通过即重置计数认本批次通过；连续 N 次不通过置批次失败并熔断停后续批次。
+            int consecutiveFailures = 0;
+            Deployer.HealthResult health = null;
+            for (int attempt = 0; attempt < circuitThreshold; attempt++) {
+                health = deployer.observe(ctx, execBatch);
+                int conclusion = health.isPass() ? IntConst.ONE : 2;
+                // 模拟降级不落采样，保持未配置环境行为不变；真实执行才写 dev_health_sample
+                if (realExecute) {
+                    saveHealthSample(record.getId(), batch.getId(), HEALTH_CHECK_ALIVE,
+                            health.getDetail(), "存活探测", conclusion);
+                }
+                if (health.isPass()) {
+                    consecutiveFailures = 0;
+                    break;
+                }
+                consecutiveFailures++;
+            }
+            batch.setHealthResult(health != null && health.isPass() ? IntConst.ONE : 2);
+            batch.setEndTime(new Date());
+            if (consecutiveFailures >= circuitThreshold) {
+                // 熔断：本批次失败，后续未执行批次置 7 已取消，记录失败
+                batch.setStatus(BatchStatusEnum.FAILURE.getCode());
+                batchMapper.updateById(batch);
+                cancelPendingBatches(record.getId(), batch.getBatchNo());
+                return failDeploy(record, "批次 " + batch.getBatchNo() + " 健康检查连续 "
+                        + consecutiveFailures + " 次不通过，已熔断：" + (health == null ? "" : health.getDetail()));
+            }
+            batch.setStatus(BatchStatusEnum.SUCCESS.getCode());
+            batchMapper.updateById(batch);
         }
         record.setStatus(DeployStatusEnum.SUCCESS.getCode());
         record.setEndTime(new Date());
@@ -282,6 +325,50 @@ public class DeployServiceImpl extends ServiceImpl<DeployRecordMapper, DeployRec
         sample.setConclusion(conclusion);
         sample.setSampledAt(new Date());
         return healthSampleMapper.insert(sample) > IntConst.ZERO;
+    }
+
+    /**
+     * 熔断连续不通过阈值：优先从环境 health_config 的 circuitFailures/consecutive 读取，
+     * 配置缺失时用默认 2 次（设计文档 5.10 默认 N=2）。
+     */
+    private int circuitThreshold(Environment env) {
+        String healthConfig = env == null ? null : env.getHealthConfig();
+        Integer configured = JsonUtil.getInt(healthConfig, "circuitFailures");
+        if (configured == null) {
+            configured = JsonUtil.getInt(healthConfig, "consecutive");
+        }
+        return configured == null || configured < 1 ? DEFAULT_CIRCUIT_FAILURES : configured;
+    }
+
+    /** 部署失败收敛：记录置失败(5)、写失败原因、结束时间 */
+    private DeployStartVO failDeploy(DeployRecord record, String failReason) {
+        record.setStatus(DeployStatusEnum.FAILURE.getCode());
+        record.setFailReason(failReason);
+        record.setEndTime(new Date());
+        if (record.getStartTime() != null) {
+            record.setDuration(record.getEndTime().getTime() - record.getStartTime().getTime());
+        }
+        updateById(record);
+        DeployStartVO vo = new DeployStartVO();
+        vo.setId(record.getId());
+        vo.setDeployNo(record.getDeployNo());
+        return vo;
+    }
+
+    /** 熔断/批次失败后：将当前批次之后仍未执行的批次置 7 已取消 */
+    private void cancelPendingBatches(Long deployId, Integer currentBatchNo) {
+        for (DeployBatch b : batchMapper.selectList(Wrappers.<DeployBatch>lambdaQuery()
+                .eq(DeployBatch::getDeployId, deployId)
+                .gt(DeployBatch::getBatchNo, currentBatchNo))) {
+            Integer st = b.getStatus();
+            if (st == null || (st != BatchStatusEnum.SUCCESS.getCode()
+                    && st != BatchStatusEnum.FAILURE.getCode()
+                    && st != BatchStatusEnum.ROLLED_BACK.getCode())) {
+                b.setStatus(BatchStatusEnum.CANCELLED.getCode());
+                b.setEndTime(new Date());
+                batchMapper.updateById(b);
+            }
+        }
     }
 
     private static <T> java.util.List<T> copyMaps(java.util.Collection<?> source, Class<T> clazz) {

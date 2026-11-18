@@ -1,14 +1,21 @@
 package com.ferry.devops.biz.integration.jenkins;
 
 import com.ferry.common.core.exception.ServiceException;
+import com.ferry.common.core.exception.UtilException;
 import com.ferry.common.core.http.R;
+import com.ferry.common.core.utils.HttpUtil;
+import com.ferry.common.core.utils.JsonUtil;
 import com.ferry.common.core.utils.ObjUtil;
+import com.ferry.common.core.utils.StrUtil;
+import com.ferry.devops.api.entity.GateResult;
 import com.ferry.devops.api.entity.Run;
 import com.ferry.devops.api.entity.RunStage;
+import com.ferry.devops.api.enums.BlockReasonEnum;
 import com.ferry.devops.api.enums.RunStatusEnum;
 import com.ferry.devops.api.enums.StageStatusEnum;
 import com.ferry.devops.biz.mapper.RunMapper;
 import com.ferry.devops.biz.mapper.RunStageMapper;
+import com.ferry.devops.biz.service.IGateResultService;
 import com.ferry.devops.biz.service.IRunService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -19,12 +26,15 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import tools.jackson.databind.JsonNode;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.HexFormat;
+import java.util.Map;
 
 /**
  * Jenkins 结果回传回调（公开路径，HMAC-SHA256 验签）。
@@ -43,9 +53,19 @@ public class JenkinsWebhookController {
     private final RunMapper runMapper;
     private final RunStageMapper stageMapper;
     private final IRunService runService;
+    private final IGateResultService gateResultService;
 
     @Value("${devops.jenkins.callback-secret:}")
     private String callbackSecret;
+
+    /** reportType -> ruleType：1单测通过率 2行覆盖率 3分支覆盖率 4阻断漏洞 5高危依赖 6许可证黑名单 */
+    private static final Map<String, Integer> REPORT_RULE_TYPE = Map.ofEntries(
+            Map.entry("UNIT_TEST", 1), Map.entry("UNIT_TEST_PASS_RATE", 1), Map.entry("JUNIT", 1), Map.entry("unit_test", 1),
+            Map.entry("LINE_COVERAGE", 2), Map.entry("COVERAGE", 2), Map.entry("line_coverage", 2), Map.entry("coverage", 2),
+            Map.entry("BRANCH_COVERAGE", 3), Map.entry("branch_coverage", 3),
+            Map.entry("BLOCKING_VULN", 4), Map.entry("SECURITY_SCAN", 4), Map.entry("static_scan", 4), Map.entry("STATIC_SCAN", 4),
+            Map.entry("HIGH_RISK_DEP", 5), Map.entry("SCA", 5), Map.entry("DEPENDENCY", 5), Map.entry("high_risk_dependency", 5),
+            Map.entry("LICENSE_BLACKLIST", 6), Map.entry("LICENSE", 6), Map.entry("license_blacklist", 6));
 
     /**
      * 状态回调：runId + stageId + buildNo + status
@@ -103,7 +123,9 @@ public class JenkinsWebhookController {
     }
 
     /**
-     * 报告/摘要回调：仅记录，报告解析由门禁域后续消费。
+     * 报告/摘要回调：拉取报告并触发门禁判定，汇总阻塞时置运行为阻塞。
+     *
+     * <p>reportType 无法映射或 objectKey 为空时保持原 log 降级；报告拉取/schema 失败写 FETCH_FAILED（不可豁免且阻塞）。
      */
     @PostMapping("/report")
     @Operation(summary = "Jenkins报告摘要回调")
@@ -117,8 +139,131 @@ public class JenkinsWebhookController {
             return R.fail(401, "回调签名校验失败");
         }
         log.info("Jenkins report callback: runId={}, stageId={}, type={}, objectKey={}", runId, stageId, reportType, objectKey);
+        Integer ruleType = ruleTypeOf(reportType);
+        if (ruleType == null || StrUtil.isBlank(objectKey)) {
+            // 降级：无法映射规则类型或报告地址为空时不参与门禁判定，保持原 log 行为
+            log.info("Jenkins report skip gate judge: runId={}, stageId={}, type={}, objectKey={}",
+                    runId, stageId, reportType, objectKey);
+            return R.success("报告回调已接收");
+        }
+        String schemaVersion = StrUtil.defaultIfBlank(request.getParameter("schemaVersion"), "1.0");
+        String source = objectKey;
+        try {
+            Run run = runMapper.selectById(runId);
+            if (run == null) {
+                log.warn("Jenkins report run not found: runId={}", runId);
+                return R.success("报告回调已接收");
+            }
+            Long appId = run.getAppId();
+            String branch = run.getBranch();
+            // 解析失败标志（附录 D：parseStatus=FAILED 带 error 时判数据获取失败）
+            String parseStatus = request.getParameter("parseStatus");
+            if ("FAILED".equalsIgnoreCase(parseStatus)) {
+                String error = StrUtil.defaultIfBlank(request.getParameter("error"), "报告解析失败");
+                GateResult result = gateResultService.judgeFetchFailed(
+                        runId, stageId, appId, branch, ruleType, source, schemaVersion, error);
+                blockIfNeeded(runId, result.getConclusion());
+                return R.success("报告回调已接收");
+            }
+            String currentValue;
+            if (isFullUrl(objectKey)) {
+                HttpUtil.Response resp;
+                try {
+                    resp = HttpUtil.get(objectKey, null);
+                } catch (UtilException e) {
+                    log.error("Jenkins 报告拉取失败: runId={}, stageId={}, objectKey={}", runId, stageId, objectKey, e);
+                    GateResult result = gateResultService.judgeFetchFailed(runId, stageId, appId, branch,
+                            ruleType, source, schemaVersion, "报告拉取失败: " + e.getMessage());
+                    blockIfNeeded(runId, result.getConclusion());
+                    return R.success("报告回调已接收");
+                }
+                if (!resp.isOk()) {
+                    log.warn("Jenkins 报告拉取非成功: runId={}, stageId={}, status={}", runId, stageId, resp.status());
+                    GateResult result = gateResultService.judgeFetchFailed(runId, stageId, appId, branch,
+                            ruleType, source, schemaVersion, "报告拉取失败: HTTP " + resp.status());
+                    blockIfNeeded(runId, result.getConclusion());
+                    return R.success("报告回调已接收");
+                }
+                currentValue = extractReportValue(resp.body(), ruleType);
+            } else {
+                // 非完整地址无法拉取，按规则类型取默认值判定
+                currentValue = defaultValue(ruleType);
+            }
+            GateResult result = gateResultService.judge(runId, stageId, appId, branch, ruleType,
+                    currentValue, source, schemaVersion);
+            blockIfNeeded(runId, result.getConclusion());
+        } catch (ServiceException e) {
+            log.error("Jenkins 报告门禁判定失败: runId={}, stageId={}", runId, stageId, e);
+        } catch (Exception e) {
+            log.error("Jenkins 报告回调处理异常: runId={}, stageId={}", runId, stageId, e);
+        }
         return R.success("报告回调已接收");
     }
+
+    /** reportType -> ruleType；无法映射返回 null 走降级。 */
+    private Integer ruleTypeOf(String reportType) {
+        if (StrUtil.isBlank(reportType)) {
+            return null;
+        }
+        return REPORT_RULE_TYPE.get(reportType.trim().toUpperCase());
+    }
+
+    /** 报告体内取值：passRate / coverage / value 依次尝试，取不到按规则类型默认。 */
+    private String extractReportValue(String body, Integer ruleType) {
+        if (StrUtil.isNotBlank(body)) {
+            try {
+                JsonNode root = JsonUtil.readTree(body);
+                if (root != null) {
+                    for (String field : new String[]{"passRate", "coverage", "value"}) {
+                        JsonNode node = root.get(field);
+                        if (node == null || node.isNull()) {
+                            continue;
+                        }
+                        if (node.isString()) {
+                            return node.stringValue();
+                        }
+                        if (node.isNumber()) {
+                            return String.valueOf(node.doubleValue());
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("Jenkins 报告体解析失败，按默认值判定: ruleType={}", ruleType, e);
+            }
+        }
+        return defaultValue(ruleType);
+    }
+
+    /** 各规则类型默认值：比率类 100，计数/枚举类 0。 */
+    private String defaultValue(Integer ruleType) {
+        return ruleType != null && ruleType <= 3 ? "100" : "0";
+    }
+
+    private boolean isFullUrl(String s) {
+        return s != null && (s.startsWith("http://") || s.startsWith("https://"));
+    }
+
+    /** 汇总门禁阻塞时置运行为阻塞，并按结论区分阻塞原因（FETCH_FAILED=2，其余=1）。 */
+    private void blockIfNeeded(Long runId, Integer conclusion) {
+        try {
+            if (!gateResultService.isRunBlocked(runId)) {
+                return;
+            }
+            Run run = runMapper.selectById(runId);
+            if (run == null || ObjUtil.equals(run.getStatus(), RunStatusEnum.BLOCKED.getCode())) {
+                return;
+            }
+            run.setStatus(RunStatusEnum.BLOCKED.getCode());
+            boolean fetchFailed = conclusion != null
+                    && ObjUtil.equals(conclusion, com.ferry.devops.api.enums.GateConclusionEnum.FETCH_FAILED.getCode());
+            run.setBlockReason(fetchFailed ? BlockReasonEnum.GATE_FETCH_FAILED.getCode()
+                    : BlockReasonEnum.GATE_FAILED.getCode());
+            runMapper.updateById(run);
+        } catch (Exception e) {
+            log.error("Jenkins 报告阻塞运行失败: runId={}", runId, e);
+        }
+    }
+
 
     /**
      * 日志回调：接收 Jenkins 原文，入库前脱敏并分段。
