@@ -26,5 +26,11 @@
             <artifactId>common-core</artifactId>
             <version>${revision}</version>
         </dependency>
+        <!-- 分布式锁：只用核心包，starter 绑定 Boot 3 不可用 -->
+        <dependency>
+            <groupId>org.redisson</groupId>
+            <artifactId>redisson</artifactId>
+            <version>${redisson.version}</version>
+        </dependency>
     </dependencies>
 </project>

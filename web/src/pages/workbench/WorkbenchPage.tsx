@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { App, Button, Empty, Tooltip } from 'antd'
-import { ArrowRight, FileSearch, Plus, RotateCw, Settings, ShieldCheck, User } from 'lucide-react'
+import { App, Button, Tooltip } from 'antd'
+import { ArrowRight, Plus, RotateCw, Settings, ShieldCheck, User } from 'lucide-react'
 import PageHeader from '@/components/PageHeader'
 import { useAuthStore } from '@/stores/auth'
 import type { WorkbenchOverview } from '@/api/types'
@@ -9,7 +9,6 @@ import type { WorkbenchOverview } from '@/api/types'
 const SHORTCUT_ICONS: Record<string, React.ReactNode> = {
   user: <User size={15} />,
   role: <ShieldCheck size={15} />,
-  audit: <FileSearch size={15} />,
   config: <Settings size={15} />,
 }
 
@@ -24,7 +23,6 @@ const PLACEHOLDER_STATS: WorkbenchOverview['stats'] = [
 const PLACEHOLDER_SHORTCUTS: WorkbenchOverview['shortcuts'] = [
   { key: 'user', label: '新增用户', desc: '创建账号并分配角色', path: '/system/user?action=create', perm: 'system:user:save' },
   { key: 'role', label: '配置角色权限', desc: '功能权限与数据权限', path: '/system/role', perm: 'system:role:pageList' },
-  { key: 'audit', label: '查看审计日志', desc: '全量写操作留痕', path: '/system/audit', perm: 'system:audit:pageList' },
   { key: 'config', label: '调整参数', desc: '登录策略与留存口径', path: '/system/config', perm: 'system:config:pageList' },
 ]
 
@@ -58,7 +56,7 @@ export default function WorkbenchPage() {
     <>
       <PageHeader
         title={greeting}
-        description="工作台汇总平台账号、权限与审计状态。统计数据待工作台接口接入，当前以 0 与空态占位。"
+        description="工作台汇总平台账号与权限状态。统计数据待工作台接口接入，当前以 0 与空态占位。"
         extra={
           <>
             <span className="ferry-env-chip">
@@ -136,7 +134,7 @@ export default function WorkbenchPage() {
                   <dd>0 项</dd>
                 </div>
                 <div>
-                  <dt>审计留存</dt>
+                  <dt>日志留存</dt>
                   <dd>365 天</dd>
                 </div>
                 <div>
@@ -150,38 +148,6 @@ export default function WorkbenchPage() {
           </section>
         </div>
 
-        <section className="ferry-panel" style={{ minHeight: 420 }}>
-          <div className="ferry-panel__head">
-            <span className="ferry-panel__title">最近写操作</span>
-            <span className="ferry-panel__extra">
-              <Button type="link" size="small" onClick={() => navigate('/system/audit')}>
-                查看全部
-              </Button>
-            </span>
-          </div>
-          <div style={{ padding: '4px 18px 12px' }}>
-            <Empty
-              image={Empty.PRESENTED_IMAGE_SIMPLE}
-              description="暂无写操作记录（审计接口待接入）"
-              style={{ padding: '36px 0' }}
-            />
-          </div>
-          <div
-            style={{
-              margin: '0 18px 16px',
-              padding: '10px 12px',
-              borderRadius: 8,
-              background: 'var(--bg-subtle)',
-              border: '1px dashed var(--border-1)',
-              fontSize: 12,
-              color: 'var(--text-3)',
-              lineHeight: 1.6,
-            }}
-          >
-            审计日志只插入、不修改、不删除；凭据类字段仅记录「已变更」，不落明文。当前登录账号：
-            {user?.nickname}（{user?.account}）。
-          </div>
-        </section>
       </div>
     </>
   )

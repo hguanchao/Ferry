@@ -1,7 +1,6 @@
 import { get, post } from './client'
 import type {
   ApiPage,
-  AuditRow,
   ConfigRow,
   DeptNode,
   DictNode,
@@ -102,12 +101,6 @@ export const regionApi = {
   detail: (id: string) => get<RegionNode>('/ferry-system/region/detail', { id }),
   save: (body: Record<string, unknown>) => post<string>('/ferry-system/region/save', body),
   deleted: (ids: string[]) => post<string>('/ferry-system/region/deleted', ids),
-}
-
-export const auditApi = {
-  pageList: (body: PageParams) => post<ApiPage<AuditRow>>('/ferry-system/audit/pageList', body),
-  detail: (id: string) => get<AuditRow>('/ferry-system/audit/detail', { id }),
-  exportLog: (rows: number, filters: string) => post<string>('/ferry-system/audit/export-log', { rows, filters }),
 }
 
 export const workbenchApi = {

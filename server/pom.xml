@@ -12,6 +12,7 @@
     <modules>
         <module>auth</module>
         <module>common</module>
+        <module>devops</module>
         <module>gateway</module>
         <module>system</module>
     </modules>
@@ -28,12 +29,22 @@
         <spring.cloud.alibaba.version>2025.1.0.0</spring.cloud.alibaba.version>
         <spring-ai.version>2.0.0</spring-ai.version>
         <mybatis-plus.version>3.5.18</mybatis-plus.version>
-        <jjwt.version>0.13.0</jjwt.version>
         <springdoc.version>3.1.1</springdoc.version>
         <swagger.version>2.2.55</swagger.version>
         <captcha.version>1.6.2</captcha.version>
         <easyexcel.version>4.0.3</easyexcel.version>
         <lombok.version>1.18.48</lombok.version>
+
+        <!-- devops 模块使用：部署执行器所需的三类客户端与制品存储客户端 -->
+        <jsch.version>0.2.17</jsch.version>
+        <kubernetes-client.version>7.9.0</kubernetes-client.version>
+        <docker-java.version>3.7.1</docker-java.version>
+        <awssdk.version>2.31.78</awssdk.version>
+        <!-- 多实例定时任务选主，替代手写调度锁 -->
+        <shedlock.version>6.9.2</shedlock.version>
+        <spring-retry.version>2.0.12</spring-retry.version>
+        <!-- 分布式锁：Redisson 提供可重入锁、看门狗自动续期与 Lua 原子释放 -->
+        <redisson.version>3.52.0</redisson.version>
     </properties>
 
     <dependencyManagement>
@@ -73,11 +84,6 @@
                 <version>${mybatis-plus.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
-            </dependency>
-            <dependency>
-                <groupId>com.alibaba</groupId>
-                <artifactId>easyexcel</artifactId>
-                <version>${easyexcel.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.springframework.boot</groupId>

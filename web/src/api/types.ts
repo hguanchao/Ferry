@@ -185,27 +185,6 @@ export interface RegionNode {
   children?: RegionNode[]
 }
 
-/* ------------------------------ 审计 ------------------------------ */
-
-export interface AuditRow {
-  id: ID
-  operateTime: string
-  operator: string
-  operatorAccount: string
-  /** 新增 / 修改 / 删除 / 授权 / 导出 / 登录 */
-  operateType: string
-  objectType: string
-  objectId: string
-  objectName: string
-  action: string
-  beforeValue?: string | null
-  afterValue?: string | null
-  ip: string
-  ticketNo?: string | null
-  result: '成功' | '失败'
-  remark?: string
-}
-
 /* ------------------------------ 工作台 ------------------------------ */
 
 export interface WorkbenchStat {
@@ -238,7 +217,7 @@ export interface WorkbenchOverview {
     accounts: number
     roles: number
     menus: number
-    auditRetention: string
+    logRetention: string
     lastBackup: string
   }
 }
