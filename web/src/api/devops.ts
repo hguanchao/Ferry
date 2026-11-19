@@ -10,7 +10,7 @@ import type {
   OpenTokenRow, PipelineDefinition, PipelineRow, PipelineVersionRow, PrecheckResult,
   PrecheckResultVO, ReleaseDetail, ReleaseRecordRow, ReleaseRow, ReleaseStrategyRow,
   RiskResult, RollbackCandidate, RollbackRow, RunDetail, RunRow, StageStatRow, StoragePolicyRow,
-  TemplateRow, TemplateVariable, TechDebtRow, TriggerRecordRow, TriggerResult, ValidateResult,
+  TemplateDetail, TemplateRow, TemplateVariable, TechDebtRow, TriggerRecordRow, TriggerResult, ValidateResult,
   WizardProgress,
 } from './types-devops'
 
@@ -65,7 +65,7 @@ export const pipelineApi = {
 }
 export const templateApi = {
   pageList: (body: Record<string, unknown>) => post<ApiPage<TemplateRow>>(`${B}/pipelineTemplate/pageList`, body),
-  detail: (id: string) => get<Record<string, unknown>>(`${B}/pipelineTemplate/detail`, { id }),
+  detail: (id: string) => get<TemplateDetail>(`${B}/pipelineTemplate/detail`, { id }),
   save: (body: Record<string, unknown>) => post<string>(`${B}/pipelineTemplate/save`, body),
   deleted: (ids: string[]) => post<string>(`${B}/pipelineTemplate/deleted`, ids),
   enable: (id: string) => post<string>(`${B}/pipelineTemplate/enable`, { id }),

@@ -1,4 +1,5 @@
 @import './tokens.css';
+@import './pipeline-canvas.css';
 
 /* ============================================================
    基础重置
@@ -698,6 +699,43 @@ a {
 }
 .ferry-stat[data-tone='danger'] .ferry-stat__stripe {
   background: linear-gradient(180deg, #f87171, var(--color-danger));
+}
+
+/* 指标卡作为筛选控件时的按钮形态与激活态 */
+button.ferry-stat {
+  appearance: none;
+  width: 100%;
+  min-height: 92px;
+  justify-content: space-between;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+button.ferry-stat:hover .ferry-stat__label {
+  color: var(--color-primary-ink);
+}
+
+button.ferry-stat .ferry-stat__label {
+  font-size: var(--fs-13);
+  font-weight: 600;
+  color: var(--text-2);
+}
+
+button.ferry-stat:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.ferry-stat[data-active='true'] {
+  border-color: var(--color-primary-border);
+  background: var(--color-primary-bg);
+}
+
+.ferry-stat[data-active='true'] .ferry-stat__label,
+.ferry-stat[data-active='true'] .ferry-stat__value {
+  color: var(--color-primary-ink);
 }
 
 /* ---------- 工作台 ---------- */

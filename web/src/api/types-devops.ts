@@ -73,8 +73,32 @@ export interface PipelineRow {
 export interface PipelineVersionRow { id: ID; pipelineId: ID; versionNo: number; changeNote: string; sourceType: number; createTime: string }
 export interface PipelineDefinition { json: string; yaml?: string; versionId?: ID }
 export interface ValidateResult { valid: boolean; errors: Array<{ line: number; message: string }> }
+/** 流水线阶段定义：与后端 PipelineStageDTO 对应 */
+export interface PipelineStageDef {
+  type: number
+  name: string
+  timeoutSeconds?: number
+  tasks: PipelineTaskDef[]
+  outputs?: string[]
+}
+/** 流水线任务定义：与后端 PipelineTaskDTO 对应 */
+export interface PipelineTaskDef {
+  name: string
+  executor: string
+  scriptRef?: string
+  params?: Record<string, unknown>
+}
 export interface DiffResult { left: string; right: string; lines: Array<{ type: string; leftNo?: number; rightNo?: number; text: string }> }
 export interface TemplateRow { id: ID; scope: number; teamId?: ID; name: string; scene?: string; isEnabled: number; derivedCount: number; createTime: string }
+/** 模板详情（当前版本）：与后端 PipelineTemplateVersionVO 对应 */
+export interface TemplateDetail {
+  id: ID
+  templateId: ID
+  versionNo: number
+  changeNote?: string
+  contentJson: string
+  contentYaml?: string
+}
 export interface TemplateVariable { name: string; description?: string; defaultValue?: string; isRequired: number }
 export interface DerivationRow { id: ID; pipelineId: ID; templateId: ID; isBehind: number; lastMergeTime?: string }
 export interface PrecheckItem { type: number; conclusion: number; detail?: string }

@@ -1,13 +1,14 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { App, Button, Form, Input, Modal, Select, Table, Tag, type TableColumnsType } from 'antd'
+import { App, Button, Drawer, Form, Input, Modal, Select, Table, Tag, Tooltip, type TableColumnsType } from 'antd'
 import {
-  CircleCheck, CirclePause, ExternalLink, OctagonAlert, Pencil, Play, Plus, RotateCw,
+  CircleCheck, CirclePause, CirclePlay, ExternalLink, OctagonAlert, Pencil, Play, Plus, RotateCw,
   Search, Trash2, XCircle,
 } from 'lucide-react'
 import PageHeader from '@/components/PageHeader'
-import { pipelineApi } from '@/api/devops'
-import type { PrecheckResult, TriggerResult } from '@/api/types-devops'
+import PipelineCanvasEditor from '@/components/PipelineCanvasEditor'
+import { appApi, pipelineApi, templateApi } from '@/api/devops'
+import type { AppOption, PipelineStageDef, PrecheckResult, TemplateDetail, TriggerResult } from '@/api/types-devops'
 import { useAuthStore } from '@/stores/auth'
 import { showError } from '@/lib/notify'
 import { COL } from '@/lib/table'
@@ -33,12 +34,37 @@ const STATUS_LABEL: Record<number, string> = {
   1: '排队中', 2: '运行中', 3: '阻塞', 4: '成功', 5: '失败', 6: '超时', 7: '已取消', 8: '结果待确认',
 }
 const CONCLUSION_LABEL: Record<number, string> = { 1: '通过', 2: '不通过', 3: '合并', 4: '复用' }
+
+/** 默认阶段模板：构建 + 单元测试，前四类带 jenkins 任务以满足校验 */
+function defaultStages(): PipelineStageDef[] {
+  return [
+    { type: 1, name: '构建', timeoutSeconds: 1800, tasks: [{ name: '构建', executor: 'jenkins', scriptRef: 'build' }], outputs: ['artifact'] },
+    { type: 2, name: '单元测试', timeoutSeconds: 1800, tasks: [{ name: '单元测试', executor: 'jenkins', scriptRef: 'test' }], outputs: [] },
+  ]
+}
+
+/** stages -> definition JSON，与后端 PipelineDefinitionDTO 结构一致 */
+function buildDefinition(stages: PipelineStageDef[]): string {
+  return JSON.stringify({ schemaVersion: 1, stages })
+}
+
+/** definition JSON -> stages，解析失败返回空 */
+function parseDefinition(json?: string): PipelineStageDef[] {
+  if (!json) return []
+  try {
+    const parsed = JSON.parse(json)
+    return Array.isArray(parsed?.stages) ? parsed.stages : []
+  } catch {
+    return []
+  }
+}
+
 const METRICS = [
-  { key: 'metricRunning', label: '运行中', icon: <RotateCw size={16} /> },
-  { key: 'metricFailedToday', label: '今日失败', icon: <XCircle size={16} /> },
-  { key: 'metricGateBlocked', label: '门禁阻塞', icon: <OctagonAlert size={16} /> },
-  { key: 'metricPendingAdmission', label: '待准入', icon: <CirclePause size={16} /> },
-  { key: 'metricObserving', label: '发布观察中', icon: <CircleCheck size={16} /> },
+  { key: 'metricRunning', label: '运行中', icon: <RotateCw size={15} />, tone: 'primary' },
+  { key: 'metricFailedToday', label: '今日失败', icon: <XCircle size={15} />, tone: 'danger' },
+  { key: 'metricGateBlocked', label: '门禁阻塞', icon: <OctagonAlert size={15} />, tone: 'warning' },
+  { key: 'metricPendingAdmission', label: '待准入', icon: <CirclePause size={15} />, tone: 'warning' },
+  { key: 'metricObserving', label: '发布观察中', icon: <CircleCheck size={15} />, tone: 'success' },
 ] as const
 
 function newRequestId() {
@@ -56,20 +82,62 @@ export default function Pipeline() {
   const [editing, setEditing] = useState<PipelineRowExt | null>(null)
   const [triggerRow, setTriggerRow] = useState<PipelineRowExt | null>(null)
   const [precheck, setPrecheck] = useState<PrecheckResult | null>(null)
-  const [filters, setFilters] = useState<Record<string, unknown>>({ metricRunning: 1 })
+  const [filters, setFilters] = useState<Record<string, unknown>>({})
   const [page, setPage] = useState({ current: 1, size: 30 })
+  const [stages, setStages] = useState<PipelineStageDef[]>([])
+  const originalDefinitionRef = useRef<string>('')
+  // 模板派生：新建时选模板，保存携带 templateId/templateVersionId 建立派生关系
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | undefined>()
+  const templateVersionRef = useRef<string | undefined>(undefined)
 
   const query = useQuery({
     queryKey: ['pipelines', filters, page],
     queryFn: () => pipelineApi.pageList({ ...filters, ...page }),
   })
+  const appOptionsQuery = useQuery({
+    queryKey: ['app-options'],
+    queryFn: () => appApi.options(),
+  })
+  const templateQuery = useQuery({
+    queryKey: ['template-options'],
+    queryFn: () => templateApi.pageList({ isEnabled: 1, size: 200 }),
+    retry: false,
+  })
+
+  const definitionQuery = useQuery({
+    queryKey: ['pipeline-definition', editing?.id],
+    queryFn: () => pipelineApi.definition(editing!.id),
+    enabled: open && !!editing?.id,
+    retry: false,
+  })
+
   const rows = (query.data?.records ?? []) as PipelineRowExt[]
 
   const invalidate = () => void queryClient.invalidateQueries({ queryKey: ['pipelines'] })
 
+  // 保存：新建时把 stages 转成 definition 随档案一起提交；编辑时先存档案再存定义生成新版本
   const saveMutation = useMutation({
-    mutationFn: (values: Record<string, unknown>) => pipelineApi.save(values),
-    onSuccess: (text) => { message.success(text || '保存成功'); setOpen(false); invalidate() },
+    mutationFn: async (values: Record<string, unknown>) => {
+      const definition = stages.length ? buildDefinition(stages) : undefined
+      const derived = !values.id && selectedTemplateId
+        ? { templateId: selectedTemplateId, templateVersionId: templateVersionRef.current }
+        : {}
+      const text = await pipelineApi.save({ ...values, ...derived, ...(definition ? { definition } : {}) })
+      return { text, base: values, definition, isNew: !values.id }
+    },
+    onSuccess: async ({ text, base, definition, isNew }) => {
+      // 编辑场景：仅当阶段定义确实变化时才保存生成新版本（避免"内容未变更"报错）
+      if (!isNew && definition && definition !== originalDefinitionRef.current) {
+        try {
+          await pipelineApi.saveDefinition({ id: base.id, definition, mode: 1, changeNote: '画布编辑阶段配置' })
+        } catch (error) {
+          showError(error)
+        }
+      }
+      message.success(text || '保存成功')
+      setOpen(false)
+      invalidate()
+    },
     onError: showError,
   })
   const deleteMutation = useMutation({
@@ -106,11 +174,42 @@ export default function Pipeline() {
   const openEditor = (record: PipelineRowExt | null) => {
     setEditing(record)
     form.resetFields()
+    originalDefinitionRef.current = ''
+    setSelectedTemplateId(undefined)
+    templateVersionRef.current = undefined
     if (record) {
       form.setFieldsValue({ id: record.id, appId: record.appId, name: record.name, ownerId: record.ownerId })
+      setStages([])
+    } else {
+      setStages(defaultStages())
     }
     setOpen(true)
   }
+
+  // 选模板：拉当前版本定义灌入画布，并记录模板/版本用于派生
+  const handleTemplateChange = async (templateId?: string) => {
+    setSelectedTemplateId(templateId)
+    templateVersionRef.current = undefined
+    if (!templateId) return
+    try {
+      const detail: TemplateDetail = await templateApi.detail(templateId)
+      templateVersionRef.current = detail.id
+      const loaded = parseDefinition(detail.contentJson)
+      if (loaded.length) setStages(loaded)
+      else message.warning('该模板定义为空或格式不兼容')
+    } catch (error) {
+      showError(error)
+    }
+  }
+
+  // 编辑时 definition 异步返回后回填画布阶段
+  useEffect(() => {
+    if (editing && definitionQuery.data?.json) {
+      const loaded = parseDefinition(definitionQuery.data.json)
+      originalDefinitionRef.current = buildDefinition(loaded)
+      if (loaded.length) setStages(loaded)
+    }
+  }, [editing, definitionQuery.data])
 
   const openTrigger = (record: PipelineRowExt | null) => {
     setTriggerRow(record)
@@ -130,7 +229,7 @@ export default function Pipeline() {
 
   const columns: TableColumnsType<PipelineRowExt> = [
     { title: 'ID', dataIndex: 'id', width: COL.code, render: (v: string) => <span className="ferry-mono">{v}</span> },
-    { title: '流水线名称', dataIndex: 'name' },
+    { title: '流水线名称', dataIndex: 'name', minWidth: 220, ellipsis: true },
     { title: '应用', dataIndex: 'appName', width: 140 },
     { title: '当前版本', dataIndex: 'currentVersionId', width: 100,
       render: (v: string, r) => v ? `V${r.currentVersionNo ?? '—'}` : '—' },
@@ -139,31 +238,45 @@ export default function Pipeline() {
     { title: '最近分支', dataIndex: 'lastBranch', width: 120 },
     { title: '最近运行时间', dataIndex: 'lastRunTime', width: COL.time },
     {
-      title: '操作', width: COL.actionWide, fixed: 'right',
+      title: '操作', width: 160, fixed: 'right',
       render: (_: unknown, record) => (
-        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 2, flexWrap: 'nowrap', whiteSpace: 'nowrap' }}>
           {can('devops:run:detail') && (
-            <Button type="link" size="small" icon={<ExternalLink />}
-              onClick={() => { window.location.hash = `#/devops/run/${record.lastRunId ?? ''}` }}>运行</Button>
+            <Tooltip title="查看最近运行">
+              <Button type="link" size="small" icon={<ExternalLink size={15} />}
+                onClick={() => { window.location.hash = `#/devops/run/${record.lastRunId ?? ''}` }} />
+            </Tooltip>
           )}
           {can('devops:pipeline:trigger') && (
-            <Button type="link" size="small" icon={<Play />} onClick={() => openTrigger(record)}>触发</Button>
+            <Tooltip title="触发运行">
+              <Button type="link" size="small" icon={<Play size={15} />} onClick={() => openTrigger(record)} />
+            </Tooltip>
           )}
           {can('devops:pipeline:save') && (
-            <Button type="link" size="small" icon={<Pencil />} onClick={() => openEditor(record)}>编辑</Button>
+            <Tooltip title="编辑">
+              <Button type="link" size="small" icon={<Pencil size={15} />} onClick={() => openEditor(record)} />
+            </Tooltip>
           )}
           {can('devops:pipeline:enable') && record.isEnabled === 0 && (
-            <Button type="link" size="small" onClick={() => enableMutation.mutate({ id: record.id })}>启用</Button>
+            <Tooltip title="启用">
+              <Button type="link" size="small" icon={<CirclePlay size={15} />}
+                onClick={() => enableMutation.mutate({ id: record.id })} />
+            </Tooltip>
           )}
           {can('devops:pipeline:disable') && record.isEnabled === 1 && (
-            <Button type="link" size="small" onClick={() => disableMutation.mutate({ id: record.id, reason: '页面停用' })}>停用</Button>
+            <Tooltip title="停用">
+              <Button type="link" size="small" icon={<CirclePause size={15} />}
+                onClick={() => disableMutation.mutate({ id: record.id, reason: '页面停用' })} />
+            </Tooltip>
           )}
           {can('devops:pipeline:deleted') && (
-            <Button type="link" size="small" danger icon={<Trash2 />}
-              onClick={() => modal.confirm({
-                title: '删除流水线', content: '确认删除所选流水线？有活动运行时将拒绝删除。', okText: '删除', okButtonProps: { danger: true },
-                onOk: async () => { await deleteMutation.mutateAsync([record.id]) },
-              })}>删除</Button>
+            <Tooltip title="删除">
+              <Button type="link" size="small" danger icon={<Trash2 size={15} />}
+                onClick={() => modal.confirm({
+                  title: '删除流水线', content: '确认删除所选流水线？有活动运行时将拒绝删除。', okText: '删除', okButtonProps: { danger: true },
+                  onOk: async () => { await deleteMutation.mutateAsync([record.id]) },
+                })} />
+            </Tooltip>
           )}
         </div>
       ),
@@ -183,23 +296,29 @@ export default function Pipeline() {
         }
       />
 
-      <div className="ferry-panel" style={{ marginBottom: 12, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-        {METRICS.map((m) => (
-          <button
-            key={m.key}
-            type="button"
-            className={`ferry-metric ${filters[m.key] ? 'is-active' : ''}`}
-            onClick={() => setFilters((prev) => ({ ...prev, [m.key]: prev[m.key] ? undefined : 1 }))}
-            style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', border: '1px solid var(--border-1)', borderRadius: 6 }}
-          >
-            {m.icon}
-            <span>{m.label}</span>
-          </button>
-        ))}
+      <div className="ferry-stat-grid" style={{ gridTemplateColumns: 'repeat(5, minmax(0, 1fr))', marginBottom: 12 }}>
+        {METRICS.map((m) => {
+          const active = !!filters[m.key]
+          return (
+            <button
+              key={m.key}
+              type="button"
+              className="ferry-stat"
+              data-tone={m.tone}
+              data-active={active}
+              aria-pressed={active}
+              onClick={() => setFilters((prev) => ({ ...prev, [m.key]: prev[m.key] ? undefined : 1 }))}
+            >
+              <span className="ferry-stat__stripe" />
+              <span className="ferry-stat__label">{m.icon}{m.label}</span>
+              <span className="ferry-stat__hint">{active ? '已筛选 · 点击取消' : '点击筛选此类'}</span>
+            </button>
+          )
+        })}
       </div>
 
       <div className="ferry-panel">
-        <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+        <div className="ferry-toolbar">
           <Input prefix={<Search size={14} />} allowClear placeholder="流水线名称"
             value={filters.name as string ?? ''}
             onChange={(e) => setFilters((p) => ({ ...p, name: e.target.value || undefined }))}
@@ -210,30 +329,74 @@ export default function Pipeline() {
             onChange={(v) => setFilters((p) => ({ ...p, statuses: v.length ? v : undefined }))}
             options={Object.entries(STATUS_LABEL).map(([k, v]) => ({ value: Number(k), label: v }))}
           />
+          <div className="ferry-toolbar__spacer" />
+          {METRICS.filter((m) => filters[m.key]).map((m) => (
+            <Tag key={m.key} closable color="blue" onClose={() => setFilters((p) => ({ ...p, [m.key]: undefined }))}>
+              {m.label}
+            </Tag>
+          ))}
+          <Button size="small" icon={<RotateCw size={14} />}
+            onClick={() => setFilters({})}>重置</Button>
         </div>
-        <Table
-          rowKey="id" columns={columns} dataSource={rows} loading={query.isFetching}
-          pagination={{
-            current: page.current, pageSize: page.size, total: query.data?.total ?? 0,
-            showSizeChanger: true, pageSizeOptions: ['30', '100', '200', '500', '1000'],
-            onChange: (current, size) => setPage({ current, size }),
-          }}
-        />
+        <div className="ferry-table-wrap">
+          <Table
+            rowKey="id" columns={columns} dataSource={rows} loading={query.isFetching}
+            pagination={{
+              current: page.current, pageSize: page.size, total: query.data?.total ?? 0,
+              showSizeChanger: true, pageSizeOptions: ['30', '100', '200', '500', '1000'],
+              onChange: (current, size) => setPage({ current, size }),
+            }}
+          />
+        </div>
       </div>
 
-      <Modal open={open} title={editing ? '编辑流水线' : '新建流水线'} onCancel={() => setOpen(false)}
-        onOk={() => form.submit()} okText="保存" destroyOnHidden>
-        <Form form={form} layout="vertical" onFinish={(v) => saveMutation.mutate(v)}>
-          {editing && <Form.Item name="id" hidden><Input /></Form.Item>}
-          <Form.Item name="appId" label="应用id" rules={[{ required: true, message: '请输入应用id' }]}>
-            <Input placeholder="应用id" />
-          </Form.Item>
-          <Form.Item name="name" label="流水线名称" rules={[{ required: true, message: '请输入流水线名称' }]}>
-            <Input placeholder="流水线名称" />
-          </Form.Item>
-          <Form.Item name="ownerId" label="负责人id"><Input placeholder="负责人用户id" /></Form.Item>
-        </Form>
-      </Modal>
+      <Drawer open={open} title={editing ? `编辑流水线 · ${editing.name}` : '新建流水线'}
+        onClose={() => setOpen(false)} width="100%" placement="right"
+        destroyOnHidden styles={{ body: { padding: 0, display: 'flex', flexDirection: 'column' } }}
+        extra={
+          <div style={{ display: 'flex', gap: 8 }}>
+            <Button onClick={() => setOpen(false)}>取消</Button>
+            <Button type="primary" loading={saveMutation.isPending} onClick={() => form.submit()}>保存</Button>
+          </div>
+        }>
+        <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+          <Form form={form} layout="vertical" onFinish={(v) => saveMutation.mutate(v)}
+            style={{ padding: '16px 20px 0' }}>
+            {editing && <Form.Item name="id" hidden><Input /></Form.Item>}
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)', marginBottom: 12,
+              paddingLeft: 8, borderLeft: '3px solid var(--color-primary)' }}>基础信息</div>
+            {!editing && (
+              <Form.Item label="流水线模板" extra="选填，选择后以模板当前版本的定义填充画布，可在画布中继续调整">
+                <Select allowClear showSearch placeholder="从模板创建（不选则从空白构建）"
+                  loading={templateQuery.isLoading} value={selectedTemplateId}
+                  onChange={(v) => void handleTemplateChange(v)}
+                  optionFilterProp="label"
+                  options={(templateQuery.data?.records ?? []).map((t) => ({
+                    value: t.id, label: `${t.name}${t.scene ? ` · ${t.scene}` : ''}`,
+                  }))}
+                />
+              </Form.Item>
+            )}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '0 16px' }}>
+              <Form.Item name="appId" label="所属应用" rules={[{ required: true, message: '请选择应用' }]}>
+                <Select showSearch allowClear placeholder="选择应用"
+                  loading={appOptionsQuery.isLoading}
+                  options={(appOptionsQuery.data ?? []).map((a: AppOption) => ({ value: a.value, label: `${a.label}（${a.code}）` }))}
+                />
+              </Form.Item>
+              <Form.Item name="name" label="流水线名称" rules={[{ required: true, message: '请输入流水线名称' }]}>
+                <Input placeholder="例如 主干流水线" maxLength={100} />
+              </Form.Item>
+              <Form.Item name="ownerId" label="负责人（用户id）" extra="选填">
+                <Input placeholder="负责人用户id" />
+              </Form.Item>
+            </div>
+          </Form>
+          <div style={{ flex: 1, minHeight: 0, padding: '8px 20px 16px' }}>
+            <PipelineCanvasEditor value={stages} onChange={setStages} />
+          </div>
+        </div>
+      </Drawer>
 
       <Modal open={triggerOpen} title="手动触发" onCancel={() => setTriggerOpen(false)}
         onOk={submitTrigger} okText="校验并运行" confirmLoading={triggerMutation.isPending || precheckMutation.isPending}
