@@ -28,12 +28,6 @@ public interface PipelineMapper extends BaseMapper<Pipeline> {
     String selectAppName(@Param("appId") Long appId);
 
     /**
-     * 应用主仓库地址（触发预校验：仓库可达检查）
-     */
-    @Select("SELECT repo_url FROM dev_app_repo WHERE is_deleted = 0 AND app_id = #{appId} AND is_main = 1 LIMIT 1")
-    String selectRepoUrl(@Param("appId") Long appId);
-
-    /**
      * 应用默认分支（触发预校验：分支存在检查）
      */
     @Select("SELECT default_branch FROM dev_app_repo WHERE is_deleted = 0 AND app_id = #{appId} AND is_main = 1 LIMIT 1")

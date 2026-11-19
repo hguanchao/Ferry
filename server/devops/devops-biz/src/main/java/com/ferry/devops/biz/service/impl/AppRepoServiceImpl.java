@@ -74,6 +74,7 @@ public class AppRepoServiceImpl extends ServiceImpl<AppRepoMapper, AppRepo> impl
         repo.setPlatform(JsonUtil.getInt(data, "platform"));
         repo.setRepoPath(JsonUtil.getStr(data, "repoPath"));
         repo.setRepoUrl(JsonUtil.getStr(data, "repoUrl"));
+        repo.setRepoToken(JsonUtil.getStr(data, "repoToken"));
         repo.setDefaultBranch(JsonUtil.getStr(data, "defaultBranch"));
         repo.setIsMain(IntConst.ONE);
         baseMapper.insert(repo);

@@ -4,7 +4,7 @@ import type { ApiPage } from './types'
 import type {
   ActionCatalogRow, ActionRecordRow, AiFeedbackRow, AiOutputRow, AppAiLevelRow, AppDetail,
   AppOption, AppOverview, AppRepoRow, AppDependencyRow, AppRow, ArtifactRow, BaselineRow,
-  ChangeTicketRow, CleanPolicyRow, CleanTaskRow, ClosureRow, CredentialRow, DeployBatchRow,
+  ChangeTicketRow, CleanPolicyRow, CleanTaskRow, ClosureRow, DeployBatchRow,
   DeployRecordRow, DerivationRow, DiffResult, EnvironmentRow, EnvConfigRow, GateExemptionRow,
   GateResultRow, GateRuleRow, ImpactResult, MetricRow, NotifyChannelRow, NotifyTemplateRow,
   OpenTokenRow, PipelineDefinition, PipelineRow, PipelineVersionRow, PrecheckResult,
@@ -49,13 +49,6 @@ export const envConfigApi = {
   save: (body: Record<string, unknown>) => post<string>(`${B}/envConfig/save`, body),
   diff: (envId: string) => get<Array<Record<string, unknown>>>(`${B}/envConfig/diff`, { envId }),
 }
-export const credentialApi = {
-  pageList: (body: Record<string, unknown>) => post<ApiPage<CredentialRow>>(`${B}/credential/pageList`, body),
-  save: (body: Record<string, unknown>) => post<string>(`${B}/credential/save`, body),
-  rotate: (id: string, body: Record<string, unknown>) => post<string>(`${B}/credential/rotate/${id}`, body),
-  deleted: (ids: string[]) => post<string>(`${B}/credential/deleted`, ids),
-}
-
 export const pipelineApi = {
   pageList: (body: Record<string, unknown>) => post<ApiPage<PipelineRow>>(`${B}/pipeline/pageList`, body),
   detail: (id: string) => get<Record<string, unknown>>(`${B}/pipeline/detail`, { id }),

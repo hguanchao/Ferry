@@ -44,13 +44,6 @@ public class EnvConfigServiceImpl extends ServiceImpl<EnvConfigMapper, EnvConfig
     @Override
     @Transactional(rollbackFor = Exception.class)
     public boolean save(EnvConfigDTO body) {
-        if (ObjUtil.equals(body.getValueType(), IntConst.TWO)) {
-            if (ObjUtil.isEmpty(body.getCredentialId())) {
-                throw new ServiceException("凭据类配置必须绑定凭据");
-            }
-            // 凭据类配置不落明文，配置值置空
-            body.setConfigValue(null);
-        }
         long count = count(Wrappers.<EnvConfig>lambdaQuery()
                 .eq(EnvConfig::getEnvId, body.getEnvId())
                 .eq(EnvConfig::getConfigKey, body.getConfigKey())
@@ -83,7 +76,7 @@ public class EnvConfigServiceImpl extends ServiceImpl<EnvConfigMapper, EnvConfig
             item.put("configKey", config.getConfigKey());
             item.put("valueType", config.getValueType());
             item.put("version", config.getVersion());
-            // 凭据类只展示已变更标记，绝不返回明文
+            // 敏感配置读取时返回掩码，存储为明文
             item.put("configValue", ObjUtil.equals(config.getValueType(), IntConst.TWO)
                     ? "******" : StrUtil.isBlank(config.getConfigValue()) ? "" : config.getConfigValue());
             item.put("changed", true);

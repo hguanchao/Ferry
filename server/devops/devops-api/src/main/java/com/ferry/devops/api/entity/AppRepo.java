@@ -32,8 +32,8 @@ public class AppRepo extends BaseEntity implements Serializable {
     /** 完整 Git 地址 */
     private String repoUrl;
 
-    /** 凭据id */
-    private Long credentialId;
+    /** 仓库访问令牌，明文存储（内部系统使用） */
+    private String repoToken;
 
     /** 是否主仓库 */
     private Integer isMain;

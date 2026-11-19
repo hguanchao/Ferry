@@ -279,7 +279,7 @@ CREATE TABLE `dev_app_repo`  (
   `platform` tinyint NOT NULL COMMENT '平台枚举，与 dev_app.platform 一致',
   `repo_path` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT 'group/project 路径',
   `repo_url` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '完整 Git 地址',
-  `credential_id` bigint NULL COMMENT '凭据id',
+  `repo_token` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '仓库访问令牌，明文存储（内部系统使用）',
   `is_main` tinyint(1) NOT NULL DEFAULT 0 COMMENT '是否主仓库',
   `default_branch` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '该仓库默认分支',
   `is_public` tinyint(1) NOT NULL DEFAULT 0 COMMENT '是否公开仓库',
@@ -949,8 +949,7 @@ CREATE TABLE `dev_env_config`  (
   `env_id` bigint NOT NULL COMMENT '环境id',
   `config_key` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '配置键',
   `config_value` text CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '配置值',
-  `value_type` tinyint NOT NULL DEFAULT 1 COMMENT '1 普通 2 凭据',
-  `credential_id` bigint NULL COMMENT '凭据id',
+  `value_type` tinyint NOT NULL DEFAULT 1 COMMENT '1 普通 2 敏感',
   `version` int NOT NULL DEFAULT 1 COMMENT '配置版本',
   `is_encrypted` tinyint(1) NOT NULL DEFAULT 0 COMMENT '是否加密',
   `create_user` bigint NULL COMMENT '创建人',
@@ -961,27 +960,6 @@ CREATE TABLE `dev_env_config`  (
   PRIMARY KEY (`id`) USING BTREE,
   UNIQUE KEY `uk_env_config` (`env_id`,`config_key`) USING BTREE
 ) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '环境配置表' ROW_FORMAT = DYNAMIC;
-
--- ----------------------------
--- Table structure for dev_credential
--- ----------------------------
-DROP TABLE IF EXISTS `dev_credential`;
-CREATE TABLE `dev_credential`  (
-  `id` bigint NOT NULL COMMENT '主键',
-  `name` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '凭据名称',
-  `type` tinyint NOT NULL COMMENT '1 SSH 密钥 2 对象存储 AK/SK 3 Registry 账号 4 K8s 凭据 5 第三方 Token',
-  `cipher_text` text CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT 'AES 密文',
-  `ref_count` int NOT NULL DEFAULT 0 COMMENT '引用数',
-  `last_rotate_time` datetime(3) NULL COMMENT '最近轮换',
-  `create_user` bigint NULL COMMENT '创建人',
-  `create_time` datetime(3) NULL COMMENT '创建时间',
-  `update_user` bigint NULL COMMENT '更新人',
-  `update_time` datetime(3) NULL COMMENT '更新时间',
-  `is_deleted` tinyint(1) NULL DEFAULT 0 COMMENT '是否删除 0：否 1：是',
-  PRIMARY KEY (`id`) USING BTREE,
-  KEY `idx_cred_type` (`type`) USING BTREE,
-  KEY `idx_cred_name` (`name`) USING BTREE
-) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '凭据表' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
 -- Table structure for dev_deploy_lock

@@ -1,11 +1,11 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { App, Button, Form, Input, Modal, Select, Table, Tag, Tooltip, type TableColumnsType } from 'antd'
-import { Pencil, Plus, RotateCw, Search, Trash2, WandSparkles } from 'lucide-react'
+import { Pencil, Plus, RotateCw, Search, Trash2, WandSparkles, GitBranch } from 'lucide-react'
 import PageHeader from '@/components/PageHeader'
 import { RoleTag } from '@/components/StatusTag'
 import { appApi } from '@/api/devops'
-import type { AppRow } from '@/api/types-devops'
+import type { AppRepoRow, AppRow } from '@/api/types-devops'
 import { useAuthStore } from '@/stores/auth'
 import { showError } from '@/lib/notify'
 import { COL } from '@/lib/table'
@@ -18,8 +18,13 @@ export default function AppList() {
   const queryClient = useQueryClient()
   const can = useAuthStore((state) => state.can)
   const [form] = Form.useForm()
+  const [repoForm] = Form.useForm()
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<AppRow | null>(null)
+  const [repoOpen, setRepoOpen] = useState(false)
+  const [repoApp, setRepoApp] = useState<AppRow | null>(null)
+  const [repoId, setRepoId] = useState<string | undefined>()
+  const [repoLoading, setRepoLoading] = useState(false)
   const [draft, setDraft] = useState<{ code?: string; name?: string; platform?: number; isCore?: number }>({})
   const [filters, setFilters] = useState<Record<string, unknown>>({})
   const [page, setPage] = useState({ current: 1, size: 30 })
@@ -39,6 +44,16 @@ export default function AppList() {
     onSuccess: (text) => {
       message.success(text || '保存成功')
       setOpen(false)
+      invalidate()
+    },
+    onError: showError,
+  })
+
+  const saveRepoMutation = useMutation({
+    mutationFn: (values: Record<string, unknown>) => appApi.saveRepo(values),
+    onSuccess: (text) => {
+      message.success(text || '保存成功')
+      setRepoOpen(false)
       invalidate()
     },
     onError: showError,
@@ -69,6 +84,27 @@ export default function AppList() {
       })
     }
     setOpen(true)
+  }
+
+  const openRepo = async (record: AppRow) => {
+    setRepoApp(record)
+    setRepoId(undefined)
+    repoForm.resetFields()
+    repoForm.setFieldsValue({ platform: record.platform, isPublic: 0 })
+    setRepoOpen(true)
+    setRepoLoading(true)
+    try {
+      const repos = await appApi.repoList(record.id)
+      const main = repos.find((repo: AppRepoRow) => repo.isMain === 1) ?? repos[0]
+      if (main) {
+        setRepoId(main.id)
+        repoForm.setFieldsValue({ ...main, repoToken: main.repoToken ?? '' })
+      }
+    } catch (error) {
+      showError(error)
+    } finally {
+      setRepoLoading(false)
+    }
   }
 
   const columns: TableColumnsType<AppRow> = [
@@ -103,6 +139,7 @@ export default function AppList() {
           {can('devops:app:save') && (
             <Button type="link" size="small" icon={<Pencil size={14} />} onClick={() => openEditor(record)}>编辑</Button>
           )}
+          <Button type="link" size="small" icon={<GitBranch size={14} />} onClick={() => void openRepo(record)}>代码源</Button>
           <Button type="link" size="small" icon={<WandSparkles size={14} />}>向导</Button>
           {can('devops:app:deleted') && (
             <Button type="link" size="small" danger icon={<Trash2 size={14} />}
@@ -188,6 +225,37 @@ export default function AppList() {
           </Form.Item>
           <Form.Item name="isCore" label="核心链路">
             <Select options={[{ value: 0, label: '否' }, { value: 1, label: '是' }]} />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      <Modal open={repoOpen} title={repoApp ? `代码源 · ${repoApp.name}` : '代码源'}
+        okText="保存" cancelText="取消" width={560} confirmLoading={saveRepoMutation.isPending || repoLoading}
+        onCancel={() => setRepoOpen(false)}
+        onOk={async () => {
+          const values = await repoForm.validateFields()
+          saveRepoMutation.mutate({ ...values, id: repoId, appId: repoApp?.id, isMain: 1 })
+        }}
+        destroyOnHidden>
+        <Form form={repoForm} layout="vertical" requiredMark="optional">
+          <Form.Item name="platform" label="代码托管平台" rules={[{ required: true, message: '请选择平台' }]}>
+            <Select options={[{ value: 1, label: 'GitLab' }, { value: 2, label: 'GitHub' }, { value: 3, label: 'Gitee' }]} />
+          </Form.Item>
+          <Form.Item name="repoUrl" label="仓库地址（Git）" rules={[{ required: true, message: '请输入仓库地址' }]}>
+            <Input placeholder="例如 https://gitlab.example.com/group/repo.git" />
+          </Form.Item>
+          <Form.Item name="repoPath" label="仓库路径" rules={[{ required: true, message: '请输入仓库路径' }]}
+            extra="group/project 形式，供代码平台接口定位仓库">
+            <Input placeholder="例如 group/repo" />
+          </Form.Item>
+          <Form.Item name="defaultBranch" label="默认分支">
+            <Input placeholder="例如 main" />
+          </Form.Item>
+          <Form.Item name="repoToken" label="仓库访问令牌" extra="明文保存；公开仓库可留空">
+            <Input.Password placeholder="私有仓库填写 Token" autoComplete="new-password" />
+          </Form.Item>
+          <Form.Item name="isPublic" label="仓库可见性">
+            <Select options={[{ value: 0, label: '私有' }, { value: 1, label: '公开' }]} />
           </Form.Item>
         </Form>
       </Modal>

@@ -24,8 +24,8 @@ public class AppRepoVO {
     @Schema(description = "仓库地址")
     private String repoUrl;
 
-    @Schema(description = "凭据id")
-    private Long credentialId;
+    @Schema(description = "仓库访问令牌，明文存储（内部系统使用）")
+    private String repoToken;
 
     @Schema(description = "是否主仓库")
     private Integer isMain;

@@ -5,10 +5,8 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.ferry.common.core.constant.IntConst;
 import com.ferry.common.core.exception.ServiceException;
-import com.ferry.common.core.exception.UtilException;
 import com.ferry.common.core.utils.BeanUtil;
 import com.ferry.common.core.utils.CryptoUtil;
-import com.ferry.common.core.utils.HttpUtil;
 import com.ferry.common.core.utils.JsonUtil;
 import com.ferry.common.core.utils.ObjUtil;
 import com.ferry.common.core.utils.StrUtil;
@@ -33,7 +31,6 @@ import com.ferry.devops.api.entity.RunTask;
 import com.ferry.devops.api.entity.RunTrigger;
 import com.ferry.devops.api.enums.BlockReasonEnum;
 import com.ferry.devops.api.enums.DevopsStateMachine;
-import com.ferry.devops.api.enums.RepoTypeEnum;
 import com.ferry.devops.api.enums.RunStatusEnum;
 import com.ferry.devops.api.enums.StageStatusEnum;
 import com.ferry.devops.api.enums.TriggerResultEnum;
@@ -44,7 +41,6 @@ import com.ferry.devops.api.vo.RunStageVO;
 import com.ferry.devops.api.vo.RunTaskVO;
 import com.ferry.devops.api.vo.TriggerResultVO;
 import com.ferry.devops.biz.integration.jenkins.JenkinsClient;
-import com.ferry.devops.biz.config.DevopsIntegrationProperties;
 import com.ferry.devops.biz.mapper.AppRepoMapper;
 import com.ferry.devops.biz.mapper.PipelineMapper;
 import com.ferry.devops.biz.mapper.PipelineVersionMapper;
@@ -62,13 +58,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
@@ -101,7 +94,6 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
     private final RunIdempotencyMapper idempotencyMapper;
     private final JenkinsClient jenkinsClient;
     private final AppRepoMapper appRepoMapper;
-    private final DevopsIntegrationProperties properties;
 
     @Override
     public IPage<RunVO> pageList(RunQuery body) {
@@ -441,7 +433,7 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
     // ==================== 内部实现 ====================
 
     /**
-     * 五项预校验（仓库可达、分支存在、提交可达、定义匹配、幂等检查）。
+     * 五项预校验（仓库信息、分支、提交、定义匹配、幂等检查）。
      */
     private PrecheckResultVO doPrecheck(RunTriggerDTO body) {
         Long appId = body.getAppId();
@@ -449,60 +441,31 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
         String branch = body.getBranch();
         String commitId = body.getCommitId();
         List<PrecheckItemVO> items = new ArrayList<>();
-        DevopsIntegrationProperties.Repo repoCfg = properties == null ? null : properties.getRepo();
-        boolean apiCheck = repoCfg != null && StrUtil.isNotBlank(repoCfg.getApiBase());
-        AppRepo appRepo = apiCheck
-                ? appRepoMapper.selectOne(Wrappers.<AppRepo>lambdaQuery()
-                        .eq(AppRepo::getAppId, appId).eq(AppRepo::getIsMain, IntConst.ONE)
-                        .orderByAsc(AppRepo::getId).last("LIMIT 1"))
-                : null;
+        AppRepo appRepo = appRepoMapper.selectOne(Wrappers.<AppRepo>lambdaQuery()
+                .eq(AppRepo::getAppId, appId).eq(AppRepo::getIsMain, IntConst.ONE)
+                .orderByAsc(AppRepo::getId).last("LIMIT 1"));
 
-        // 1 仓库可达：apiBase 配置后调用代码平台 API 校验仓库/凭据，否则仅校验地址非空
-        String repoUrl = pipelineMapper.selectRepoUrl(appId);
-        boolean gitlab = appRepo != null && ObjUtil.equals(appRepo.getPlatform(), RepoTypeEnum.GITLAB.getCode());
+        // 1 仓库信息：校验应用管理登记的主仓库信息完整
         PrecheckItemVO repoItem;
-        if (apiCheck && appRepo != null && StrUtil.isNotBlank(appRepo.getRepoPath())) {
-            HttpUtil.Response resp = safeRepoGet(repoCfg, repoApiPath(appRepo, ""), gitlab);
-            boolean reachable = resp != null && resp.isOk();
-            String detail = reachable ? "仓库可达：" + appRepo.getRepoPath()
-                    : "仓库不可达或凭据无效：" + (resp == null ? "网络失败" : "HTTP " + resp.status());
-            repoItem = item(1, reachable, detail);
+        if (appRepo == null) {
+            repoItem = item(1, false, "应用未配置主仓库");
+        } else if (StrUtil.isBlank(appRepo.getRepoUrl())) {
+            repoItem = item(1, false, "应用主仓库未填写仓库地址");
+        } else if (StrUtil.isBlank(appRepo.getRepoPath())) {
+            repoItem = item(1, false, "应用主仓库未填写仓库路径");
         } else {
-            repoItem = item(1, StrUtil.isNotBlank(repoUrl), StrUtil.isNotBlank(repoUrl)
-                    ? "仓库地址已登记：" + repoUrl : "应用未配置仓库地址");
+            repoItem = item(1, true, "仓库信息已登记：" + appRepo.getRepoUrl());
         }
         items.add(repoItem);
 
-        // 2 分支存在：apiBase 配置后实时查询分支，否则仅校验分支非空
-        PrecheckItemVO branchItem;
-        if (apiCheck && appRepo != null && StrUtil.isNotBlank(appRepo.getRepoPath())
-                && StrUtil.isNotBlank(branch)) {
-            String path = repoApiPath(appRepo, "/repository/branches/" + urlEncode(branch));
-            HttpUtil.Response resp = safeRepoGet(repoCfg, path, gitlab);
-            boolean exists = resp != null && resp.isOk();
-            branchItem = item(2, exists, exists ? "分支存在：" + branch
-                    : "分支不存在：" + branch + "（" + (resp == null ? "网络失败" : "HTTP " + resp.status()) + "）");
-        } else {
-            branchItem = item(2, StrUtil.isNotBlank(branch), StrUtil.isNotBlank(branch)
-                    ? "分支已指定：" + branch : "分支不能为空");
-        }
-        items.add(branchItem);
+        // 2 分支存在：校验触发时指定分支非空
+        items.add(item(2, StrUtil.isNotBlank(branch), StrUtil.isNotBlank(branch)
+                ? "分支已指定：" + branch : "分支不能为空"));
 
-        // 3 提交可达：apiBase 配置后查询 commit/ref，否则仅校验 7–40 位 hex 或合法 Git ref
-        boolean commitOk;
-        String commitDetail;
-        if (apiCheck && appRepo != null && StrUtil.isNotBlank(appRepo.getRepoPath())
-                && StrUtil.isNotBlank(commitId) && isRef(body)) {
-            String suffix = "/repository/commits/" + urlEncode(commitId);
-            HttpUtil.Response resp = safeRepoGet(repoCfg, repoApiPath(appRepo, suffix), gitlab);
-            commitOk = resp != null && resp.isOk();
-            commitDetail = commitOk ? "提交可达：" + commitId
-                    : "提交不可达：" + commitId + "（" + (resp == null ? "网络失败" : "HTTP " + resp.status()) + "）";
-        } else {
-            commitOk = isRef(body);
-            commitDetail = commitOk ? "提交引用格式合法" : "提交必须为 7–40 位十六进制或合法 Git ref";
-        }
-        items.add(item(3, commitOk, commitDetail));
+        // 3 提交可达：校验 7–40 位 hex 或合法 Git ref
+        boolean commitOk = isRef(body);
+        items.add(item(3, commitOk, commitOk
+                ? "提交引用格式合法" : "提交必须为 7–40 位十六进制或合法 Git ref"));
 
         // 4 定义匹配：流水线启用 + 存在当前版本
         Pipeline pipeline = pipelineMapper.selectById(pipelineId);
@@ -540,44 +503,6 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
             result.setArtifactDigest(null);
         }
         return result;
-    }
-
-    /** 按代码平台类型拼 API 路径：GitLab /projects/{urlencoded path}，GitHub/Gitee /repos/{path}。 */
-    private String repoApiPath(AppRepo repo, String suffix) {
-        Integer platform = repo.getPlatform();
-        boolean gitlab = ObjUtil.equals(platform, RepoTypeEnum.GITLAB.getCode());
-        String base = gitlab
-                ? "/projects/" + urlEncode(repo.getRepoPath())
-                : "/repos/" + urlEncode(repo.getRepoPath());
-        return base + (suffix == null ? "" : suffix);
-    }
-
-    /** 带平台认证头的 GET；网络失败返回 null，业务层置该项不通过。 */
-    private HttpUtil.Response safeRepoGet(DevopsIntegrationProperties.Repo cfg, String path, boolean gitlab) {
-        String url = trimTrailingSlash(cfg.getApiBase()) + path;
-        Map<String, String> headers = new HashMap<>();
-        if (StrUtil.isNotBlank(cfg.getToken())) {
-            // GitLab 用 PRIVATE-TOKEN；GitHub/Gitee 用 Bearer
-            if (gitlab) {
-                headers.put("PRIVATE-TOKEN", cfg.getToken());
-            } else {
-                headers.put("Authorization", "Bearer " + cfg.getToken());
-            }
-        }
-        try {
-            return HttpUtil.get(url, headers);
-        } catch (UtilException e) {
-            // 网络失败：返回 null，由调用方写「网络失败」detail
-            return null;
-        }
-    }
-
-    private String urlEncode(String s) {
-        return URLEncoder.encode(s, StandardCharsets.UTF_8);
-    }
-
-    private String trimTrailingSlash(String s) {
-        return s.endsWith("/") ? s.substring(0, s.length() - 1) : s;
     }
 
     private boolean isRef(RunTriggerDTO body) {

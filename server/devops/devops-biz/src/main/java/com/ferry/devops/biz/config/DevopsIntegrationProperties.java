@@ -7,7 +7,7 @@ import org.springframework.context.annotation.Configuration;
 /**
  * 交付域外部集成配置。
  *
- * <p>所有对外部系统（Jenkins / 代码平台 / 大模型 / 部署目标）的调用均通过这里配置；
+ * <p>所有对外部系统（Jenkins / 大模型 / 部署目标）的调用均通过这里配置；
  * 端点为空时对应实现走本地模拟，保证无外部环境时主流程仍可编译运行。
  */
 @Data
@@ -17,9 +17,6 @@ public class DevopsIntegrationProperties {
 
     /** Jenkins 集成 */
     private Jenkins jenkins = new Jenkins();
-
-    /** 代码平台集成 */
-    private Repo repo = new Repo();
 
     /** 大模型集成 */
     private Ai ai = new Ai();
@@ -39,16 +36,6 @@ public class DevopsIntegrationProperties {
         private String token = "";
         /** 回调验签密钥（复用现有 webhook 配置，这里给出默认对接项） */
         private String callbackSecret = "";
-    }
-
-    @Data
-    public static class Repo {
-        /** 代码平台 API 基址（如 GitLab 的 http://gitlab/api/v4），为空时预校验只做格式校验 */
-        private String apiBase = "";
-        /** 平台访问令牌 */
-        private String token = "";
-        /** 私有化平台域名，用于仓库地址与平台匹配校验 */
-        private String selfHostedDomain = "";
     }
 
     @Data

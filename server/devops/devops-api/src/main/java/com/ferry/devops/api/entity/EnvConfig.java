@@ -29,11 +29,8 @@ public class EnvConfig extends BaseEntity implements Serializable {
     /** 配置值 */
     private String configValue;
 
-    /** 值类型 1普通 2凭据 */
+    /** 值类型 1普通 2敏感 */
     private Integer valueType;
-
-    /** 凭据id */
-    private Long credentialId;
 
     /** 配置版本 */
     private Integer version;

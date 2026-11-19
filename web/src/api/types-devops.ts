@@ -28,7 +28,7 @@ export interface AppRepoRow {
   platform: number
   repoPath: string
   repoUrl: string
-  credentialId?: ID
+  repoToken?: string
   isMain: number
   defaultBranch?: string
   isPublic: number
@@ -76,7 +76,6 @@ export interface EnvironmentRow {
 }
 
 export interface EnvConfigRow { id: ID; envId: ID; configKey: string; configValue?: string; valueType: number; version: number; isEncrypted: number }
-export interface CredentialRow { id: ID; name: string; type: number; refCount: number; lastRotateTime?: string; createTime: string }
 export interface StoragePolicyRow { id: ID; scope: string; retentionDays: number; maxSizeGb: number; description?: string }
 
 /* ------------------------------ 流水线 ------------------------------ */

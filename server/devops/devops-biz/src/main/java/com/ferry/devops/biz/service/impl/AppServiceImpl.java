@@ -13,6 +13,7 @@ import com.ferry.common.jdbc.provider.Page;
 import com.ferry.devops.api.dto.AppDTO;
 import com.ferry.devops.api.dto.query.AppQuery;
 import com.ferry.devops.api.entity.App;
+import com.ferry.devops.api.entity.AppRepo;
 import com.ferry.devops.api.vo.AppDetailVO;
 import com.ferry.devops.api.vo.AppOptionVO;
 import com.ferry.devops.api.vo.AppVO;
@@ -46,6 +47,15 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements IAppS
         AppWrapper wrapper = AppWrapper.build();
         IPage<App> pages = page(Page.create(body), wrapper.lambda(body));
         IPage<AppVO> result = wrapper.pageVo(pages);
+        List<Long> appIds = result.getRecords().stream().map(AppVO::getId).collect(Collectors.toList());
+        if (!appIds.isEmpty()) {
+            Map<Long, String> repoUrls = repoService.list(Wrappers.<AppRepo>lambdaQuery()
+                            .in(AppRepo::getAppId, appIds)
+                            .eq(AppRepo::getIsMain, IntConst.ONE))
+                    .stream().collect(Collectors.toMap(
+                            AppRepo::getAppId, AppRepo::getRepoUrl, (left, right) -> left));
+            result.getRecords().forEach(vo -> vo.setRepoUrl(repoUrls.get(vo.getId())));
+        }
         for (AppVO vo : result.getRecords()) {
             vo.setOwnerNames(ownerService.ownerNames(vo.getId(), vo.getOwnerIds()));
         }
