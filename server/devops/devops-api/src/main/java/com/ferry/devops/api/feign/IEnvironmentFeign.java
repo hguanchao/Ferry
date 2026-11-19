@@ -10,7 +10,7 @@ import java.util.Map;
 /**
  * 环境服务内部契约
  */
-@FeignClient(name = SysConst.APPLICATION_DEVOPS_NAME, path = "/internal/environment")
+@FeignClient(name = SysConst.APPLICATION_DEVOPS_NAME, contextId = "devopsEnvironmentClient", path = "/internal/environment")
 public interface IEnvironmentFeign {
 
     /**

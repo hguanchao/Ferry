@@ -11,7 +11,7 @@ import java.util.Map;
 /**
  * 应用服务内部契约
  */
-@FeignClient(name = SysConst.APPLICATION_DEVOPS_NAME, path = "/internal/app")
+@FeignClient(name = SysConst.APPLICATION_DEVOPS_NAME, contextId = "devopsAppClient", path = "/internal/app")
 public interface IAppFeign {
 
     /**
