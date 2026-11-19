@@ -142,7 +142,7 @@ export default function RunDetail() {
     { title: '操作', width: 100,
       render: (_: unknown, r) => can('devops:run:detail') && (
         <Tooltip title="日志">
-          <Button type="link" size="small" icon={<Search />} onClick={() => setLogTask(r)} />
+          <Button type="link" size="small" icon={<Search size={14} />} onClick={() => setLogTask(r)} />
         </Tooltip>
       ) },
   ]
@@ -160,16 +160,16 @@ export default function RunDetail() {
             <Input placeholder="运行id" value={inputId} onChange={(e) => setInputId(e.target.value)} style={{ width: 160 }} />
             <Button onClick={() => setRunId(inputId || null)}>查询</Button>
             {can('devops:run:pause') && (status === 1 || status === 2) && (
-              <Button icon={<CirclePause />} onClick={() => pauseMutation.mutate({ id: runId, reason: '页面暂停' })}>暂停</Button>
+              <Button icon={<CirclePause size={14} />} onClick={() => pauseMutation.mutate({ id: runId, reason: '页面暂停' })}>暂停</Button>
             )}
             {can('devops:run:resume') && status === 3 && (
-              <Button icon={<CirclePlay />} onClick={() => resumeMutation.mutate(runId!)}>继续</Button>
+              <Button icon={<CirclePlay size={14} />} onClick={() => resumeMutation.mutate(runId!)}>继续</Button>
             )}
             {can('devops:run:abort') && (status === 1 || status === 2) && (
-              <Button danger icon={<OctagonX />} onClick={() => setAbortOpen(true)}>中止</Button>
+              <Button danger icon={<OctagonX size={14} />} onClick={() => setAbortOpen(true)}>中止</Button>
             )}
             {can('devops:run:rerun') && canRerun && (
-              <Button icon={<RotateCcw />} onClick={() => setRerunOpen(true)}>断点重跑</Button>
+              <Button icon={<RotateCcw size={14} />} onClick={() => setRerunOpen(true)}>断点重跑</Button>
             )}
           </Space>
         }

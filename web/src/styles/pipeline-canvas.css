@@ -592,3 +592,23 @@
   background: rgba(22, 119, 255, 0.14);
   color: #e6f4ff;
 }
+
+/* 空画布：唯一的「添加阶段」引导框，直接在视口中央，不受画布 pan/zoom 影响 */
+.ferry-canvas__add-stage.is-empty {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: var(--empty-add-w, 320px);
+  min-height: var(--empty-add-h, 160px);
+  gap: 12px;
+  border-width: 2px;
+  border-radius: 18px;
+  font-size: var(--fs-15);
+  background: rgba(22, 119, 255, 0.08);
+}
+
+.ferry-canvas__add-stage.is-empty svg {
+  width: 32px;
+  height: 32px;
+}
