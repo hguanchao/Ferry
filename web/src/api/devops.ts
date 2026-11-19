@@ -2,8 +2,8 @@
 import { get, post } from './client'
 import type { ApiPage } from './types'
 import type {
-  ActionCatalogRow, ActionRecordRow, AiFeedbackRow, AiOutputRow, AppAiLevelRow, AppDetail,
-  AppOption, AppOverview, AppRepoRow, AppDependencyRow, AppRow, ArtifactRow, BaselineRow,
+  ActionCatalogRow, ActionRecordRow, AiFeedbackRow, AiOutputRow, AppAiLevelRow,
+  AppOption, AppOverview, AppDependencyRow, AppRow, ArtifactRow, BaselineRow,
   ChangeTicketRow, CleanPolicyRow, CleanTaskRow, ClosureRow, DeployBatchRow,
   DeployRecordRow, DerivationRow, DiffResult, EnvironmentRow, EnvConfigRow, GateExemptionRow,
   GateResultRow, GateRuleRow, ImpactResult, MetricRow, NotifyChannelRow, NotifyTemplateRow,
@@ -18,13 +18,10 @@ const B = '/ferry-devops'
 
 export const appApi = {
   pageList: (body: Record<string, unknown>) => post<ApiPage<AppRow>>(`${B}/app/pageList`, body),
-  detail: (id: string) => get<AppDetail>(`${B}/app/detail`, { id }),
   save: (body: Record<string, unknown>) => post<string>(`${B}/app/save`, body),
   deleted: (ids: string[]) => post<string>(`${B}/app/deleted`, ids),
   options: (keyword?: string) => get<AppOption[]>(`${B}/app/options`, { keyword }),
-  repoList: (appId: string) => get<AppRepoRow[]>(`${B}/app/repo/list`, { appId }),
-  saveRepo: (body: Record<string, unknown>) => post<string>(`${B}/app/repo/save`, body),
-  deletedRepo: (ids: string[]) => post<string>(`${B}/app/repo/deleted`, ids),
+  // TODO(dev_app-schema): dev_app_repo 已删除，repoList/saveRepo/deletedRepo 接口已移除。
   dependencyList: (appId: string) => get<AppDependencyRow[]>(`${B}/app/dependency/list`, { appId }),
   saveDependency: (body: Record<string, unknown>) => post<string>(`${B}/app/dependency/save`, body),
   deletedDependency: (ids: string[]) => post<string>(`${B}/app/dependency/deleted`, ids),

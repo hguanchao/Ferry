@@ -1,38 +1,133 @@
-import { useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { App, Button, Form, Input, Modal, Select, Table, Tag, Tooltip, type TableColumnsType } from 'antd'
-import { Pencil, Plus, RotateCw, Search, Trash2, WandSparkles, GitBranch } from 'lucide-react'
+import { App, Button, Form, Input, Modal, Select, Table, Tag, Tooltip, TreeSelect, type SelectProps, type TableColumnsType } from 'antd'
+import { Pencil, Plus, RotateCw, Search, Trash2, WandSparkles } from 'lucide-react'
 import PageHeader from '@/components/PageHeader'
-import { RoleTag } from '@/components/StatusTag'
 import { appApi } from '@/api/devops'
-import type { AppRepoRow, AppRow } from '@/api/types-devops'
+import { deptApi, userApi } from '@/api/system'
+import type { DeptNode, UserRow } from '@/api/types'
+// TODO(dev_app-schema): dev_app_repo 已删除，AppRepoRow 及相关代码源功能已移除。
+import type { AppRow } from '@/api/types-devops'
 import { useAuthStore } from '@/stores/auth'
 import { showError } from '@/lib/notify'
 import { COL } from '@/lib/table'
 
 const PLATFORM_LABEL: Record<number, string> = { 1: 'GitLab', 2: 'GitHub', 3: 'Gitee' }
-const SETUP_LABEL: Record<number, string> = { 1: '待完善', 2: '已完善' }
+const STATUS_LABEL: Record<number, string> = { 0: '停用', 1: '启用', 2: '草稿', 3: '完善' }
+
+const USER_PAGE_SIZE = 20
+
+interface TreeNodeOption {
+  value: string
+  title: string
+  children?: TreeNodeOption[]
+}
+
+function toTreeSelect(nodes: DeptNode[]): TreeNodeOption[] {
+  return nodes.map((node) => ({
+    value: node.id,
+    title: node.name,
+    children: node.children?.length ? toTreeSelect(node.children) : undefined,
+  }))
+}
+
+interface UserOption {
+  value: string
+  label: string
+}
+
+function toUserOption(user: UserRow): UserOption {
+  return { value: user.id, label: `${user.nickname}（${user.account}）` }
+}
+
+function mergeOptions(...groups: UserOption[][]): UserOption[] {
+  const map = new Map<string, UserOption>()
+  for (const group of groups) {
+    for (const option of group) map.set(option.value, option)
+  }
+  return [...map.values()]
+}
+
+function SectionTitle({ title }: { title: string }) {
+  return (
+    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)', margin: '4px 0 12px',
+      paddingLeft: 8, borderLeft: '3px solid var(--color-primary)' }}>{title}</div>
+  )
+}
 
 export default function AppList() {
   const { message, modal } = App.useApp()
   const queryClient = useQueryClient()
   const can = useAuthStore((state) => state.can)
   const [form] = Form.useForm()
-  const [repoForm] = Form.useForm()
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<AppRow | null>(null)
-  const [repoOpen, setRepoOpen] = useState(false)
-  const [repoApp, setRepoApp] = useState<AppRow | null>(null)
-  const [repoId, setRepoId] = useState<string | undefined>()
-  const [repoLoading, setRepoLoading] = useState(false)
-  const [draft, setDraft] = useState<{ code?: string; name?: string; platform?: number; isCore?: number }>({})
+  const [draft, setDraft] = useState<{ code?: string; name?: string; repoTypes?: number[]; coreLink?: number }>({})
   const [filters, setFilters] = useState<Record<string, unknown>>({})
   const [page, setPage] = useState({ current: 1, size: 30 })
+
+  // 用户下拉：分页加载 + 搜索，已加载选项去重累加
+  const [userOptions, setUserOptions] = useState<UserOption[]>([])
+  // 编辑回显的负责人选项：单独保存，避免被分页刷新覆盖
+  const [presetOptions, setPresetOptions] = useState<UserOption[]>([])
+  const userPageRef = useRef(1)
+  const userTotalRef = useRef(0)
+  const userKeywordRef = useRef('')
+  const [userLoading, setUserLoading] = useState(false)
 
   const query = useQuery({
     queryKey: ['apps', filters, page],
     queryFn: () => appApi.pageList({ ...filters, ...page }),
   })
+
+  const deptTreeQuery = useQuery({
+    queryKey: ['dept-tree-options'],
+    queryFn: () => deptApi.treeList(),
+  })
+
+  const deptTreeData = useMemo(
+    () => toTreeSelect(deptTreeQuery.data ?? []),
+    [deptTreeQuery.data],
+  )
+
+  // 选中负责人的标签选项（含编辑回显）始终可见，不受搜索分页刷新影响
+  const userSelectOptions = useMemo(
+    () => mergeOptions(userOptions, presetOptions),
+    [presetOptions, userOptions],
+  )
+
+  const loadUsers = async (keyword: string, reset: boolean) => {
+    if (userLoading) return
+    if (reset) {
+      userPageRef.current = 1
+      userTotalRef.current = 0
+    } else if (userTotalRef.current > 0 && (userPageRef.current - 1) * USER_PAGE_SIZE >= userTotalRef.current) {
+      return
+    }
+    setUserLoading(true)
+    try {
+      const result = await userApi.pageList({ current: userPageRef.current, size: USER_PAGE_SIZE, nickname: keyword || undefined })
+      userTotalRef.current = result.total
+      setUserOptions((prev) => mergeOptions(reset ? [] : prev, result.records.map(toUserOption)))
+      userPageRef.current += 1
+    } catch (error) {
+      showError(error)
+    } finally {
+      setUserLoading(false)
+    }
+  }
+
+  const handleUserSearch: SelectProps['onSearch'] = (value) => {
+    userKeywordRef.current = value ?? ''
+    void loadUsers(userKeywordRef.current, true)
+  }
+
+  const handleUserScroll: SelectProps['onPopupScroll'] = (e) => {
+    const target = e.target as HTMLDivElement
+    if (target.scrollTop + target.clientHeight >= target.scrollHeight - 20) {
+      void loadUsers(userKeywordRef.current, false)
+    }
+  }
 
   const invalidate = () => {
     void queryClient.invalidateQueries({ queryKey: ['apps'] })
@@ -44,16 +139,6 @@ export default function AppList() {
     onSuccess: (text) => {
       message.success(text || '保存成功')
       setOpen(false)
-      invalidate()
-    },
-    onError: showError,
-  })
-
-  const saveRepoMutation = useMutation({
-    mutationFn: (values: Record<string, unknown>) => appApi.saveRepo(values),
-    onSuccess: (text) => {
-      message.success(text || '保存成功')
-      setRepoOpen(false)
       invalidate()
     },
     onError: showError,
@@ -71,40 +156,29 @@ export default function AppList() {
   const openEditor = (record: AppRow | null) => {
     setEditing(record)
     form.resetFields()
+    userKeywordRef.current = ''
+    setPresetOptions([])
+    void loadUsers('', true)
     if (record) {
+      const ownerId = record.ownerId ? String(record.ownerId) : undefined
+      if (ownerId) {
+        const preset: UserOption[] = [{ value: ownerId, label: record.ownerName ? `${record.ownerName}（${ownerId}）` : ownerId }]
+        setPresetOptions(preset)
+      }
       form.setFieldsValue({
         code: record.code,
         name: record.name,
-        teamId: record.teamId,
-        ownerIds: record.ownerIds,
-        platform: record.platform,
-        isCore: record.isCore,
-        repoPath: record.defaultBranch ? '' : undefined,
-        description: undefined,
+        deptId: record.deptId,
+        ownerId,
+        coreLink: record.coreLink,
+        repoType: record.repoType,
+        repoUrl: record.repoUrl,
+        repoBranch: record.repoBranch,
+        repoCommitId: record.repoCommitId,
+        description: record.description,
       })
     }
     setOpen(true)
-  }
-
-  const openRepo = async (record: AppRow) => {
-    setRepoApp(record)
-    setRepoId(undefined)
-    repoForm.resetFields()
-    repoForm.setFieldsValue({ platform: record.platform, isPublic: 0 })
-    setRepoOpen(true)
-    setRepoLoading(true)
-    try {
-      const repos = await appApi.repoList(record.id)
-      const main = repos.find((repo: AppRepoRow) => repo.isMain === 1) ?? repos[0]
-      if (main) {
-        setRepoId(main.id)
-        repoForm.setFieldsValue({ ...main, repoToken: main.repoToken ?? '' })
-      }
-    } catch (error) {
-      showError(error)
-    } finally {
-      setRepoLoading(false)
-    }
   }
 
   const columns: TableColumnsType<AppRow> = [
@@ -116,19 +190,22 @@ export default function AppList() {
       render: (value: string, record) => (
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <span style={{ fontWeight: 500, color: 'var(--text-1)' }}>{value}</span>
-          {record.isCore === 1 && <Tag color="red" style={{ fontSize: 10 }}>核心</Tag>}
+          {record.coreLink === 1 && <Tag color="red" style={{ fontSize: 10 }}>核心</Tag>}
         </div>
       ),
     },
-    { title: '负责人', dataIndex: 'ownerNames', width: 140 },
-    { title: '代码平台', dataIndex: 'platform', width: 100,
+    { title: '所属团队', dataIndex: 'deptName', width: 120,
+      render: (value?: string) => value || '—',
+    },
+    { title: '负责人', dataIndex: 'ownerName', width: 120 },
+    { title: '代码平台', dataIndex: 'repoType', width: 100,
       render: (value: number) => PLATFORM_LABEL[value] ?? '—',
     },
     { title: '仓库地址', dataIndex: 'repoUrl',
       render: (value?: string) => <Tooltip title={value}><span className="ferry-mono" style={{ fontSize: 12 }}>{value || '—'}</span></Tooltip>,
     },
-    { title: '接入状态', dataIndex: 'setupStatus', width: 100,
-      render: (value: number) => <Tag color={value === 2 ? 'green' : 'orange'}>{SETUP_LABEL[value] ?? '—'}</Tag>,
+    { title: '应用状态', dataIndex: 'status', width: 100,
+      render: (value: number) => <Tag color={value === 3 ? 'green' : value === 0 ? 'default' : 'orange'}>{STATUS_LABEL[value] ?? '—'}</Tag>,
     },
     { title: '创建时间', dataIndex: 'createTime', width: COL.time,
       render: (value: string) => <span className="ferry-mono" style={{ fontSize: 12, color: 'var(--text-3)' }}>{value ?? '—'}</span>,
@@ -139,7 +216,7 @@ export default function AppList() {
           {can('devops:app:save') && (
             <Button type="link" size="small" icon={<Pencil size={14} />} onClick={() => openEditor(record)}>编辑</Button>
           )}
-          <Button type="link" size="small" icon={<GitBranch size={14} />} onClick={() => void openRepo(record)}>代码源</Button>
+          {/* TODO(dev_app-schema): dev_app_repo 已删除，代码源操作移除；仓库信息在应用表单维护。 */}
           <Button type="link" size="small" icon={<WandSparkles size={14} />}>向导</Button>
           {can('devops:app:deleted') && (
             <Button type="link" size="small" danger icon={<Trash2 size={14} />}
@@ -159,7 +236,6 @@ export default function AppList() {
   return (
     <>
       <PageHeader title="应用管理" description="应用是交付域的主数据，编码创建后不可修改。建档后可配置代码源、接入向导与详情聚合。"
-        tag={<RoleTag>共 {query.data?.total ?? 0} 项</RoleTag>}
         extra={can('devops:app:save') && (
           <Button type="primary" icon={<Plus size={14} />} onClick={() => openEditor(null)}>新建应用</Button>
         )}
@@ -171,12 +247,12 @@ export default function AppList() {
             onChange={(e) => setDraft((prev) => ({ ...prev, code: e.target.value }))}
             onPressEnter={() => { setFilters(draft); setPage((p) => ({ ...p, current: 1 })) }}
           />
-          <Select allowClear placeholder="代码平台" style={{ width: 130 }} value={draft.platform}
-            onChange={(value) => setDraft((prev) => ({ ...prev, platform: value }))}
+          <Select allowClear placeholder="代码平台" style={{ width: 130 }} value={draft.repoTypes?.[0]}
+            onChange={(value) => setDraft((prev) => ({ ...prev, repoTypes: value == null ? undefined : [value] }))}
             options={[{ value: 1, label: 'GitLab' }, { value: 2, label: 'GitHub' }, { value: 3, label: 'Gitee' }]}
           />
-          <Select allowClear placeholder="核心链路" style={{ width: 120 }} value={draft.isCore}
-            onChange={(value) => setDraft((prev) => ({ ...prev, isCore: value }))}
+          <Select allowClear placeholder="核心链路" style={{ width: 120 }} value={draft.coreLink}
+            onChange={(value) => setDraft((prev) => ({ ...prev, coreLink: value }))}
             options={[{ value: 1, label: '是' }, { value: 0, label: '否' }]}
           />
           <Button type="primary" icon={<Search size={15} />}
@@ -197,66 +273,78 @@ export default function AppList() {
       </section>
 
       <Modal open={open} title={editing ? `编辑应用 · ${editing.name}` : '新建应用'}
-        okText="保存" cancelText="取消" width={560} confirmLoading={saveMutation.isPending}
+        okText="保存" cancelText="取消" width={720} confirmLoading={saveMutation.isPending}
         onCancel={() => setOpen(false)}
         onOk={async () => {
           const values = await form.validateFields()
-          saveMutation.mutate({ ...values, id: editing?.id,
-            ownerIds: Array.isArray(values.ownerIds) ? values.ownerIds.join(',') : values.ownerIds })
+          saveMutation.mutate({ ...values, id: editing?.id })
         }}
         destroyOnHidden>
         <Form form={form} layout="vertical" requiredMark="optional">
-          <Form.Item name="code" label="应用编码" rules={[{ required: true, message: '请输入应用编码' }, { pattern: /^[a-z0-9-]{2,40}$/, message: '小写字母、数字、中划线，2-40 位' }]}
-            extra="创建后不可修改">
-            <Input placeholder="例如 order-service" maxLength={40} disabled={!!editing} />
-          </Form.Item>
-          <Form.Item name="name" label="应用名称" rules={[{ required: true, message: '请输入应用名称' }]}>
-            <Input placeholder="例如 订单服务" maxLength={100} />
-          </Form.Item>
-          <Form.Item name="teamId" label="所属团队" rules={[{ required: true, message: '请选择所属团队' }]}>
-            <Input placeholder="团队id" />
-          </Form.Item>
-          <Form.Item name="ownerIds" label="应用负责人（1-3 人）" rules={[{ required: true, message: '请输入负责人用户id，逗号分隔' }]}
-            extra="多个用户id用逗号分隔，负责人变更立即生效">
-            <Input placeholder="例如 1001,1002" />
-          </Form.Item>
-          <Form.Item name="platform" label="代码托管平台" rules={[{ required: true, message: '请选择平台' }]}>
-            <Select options={[{ value: 1, label: 'GitLab' }, { value: 2, label: 'GitHub' }, { value: 3, label: 'Gitee' }]} />
-          </Form.Item>
-          <Form.Item name="isCore" label="核心链路">
-            <Select options={[{ value: 0, label: '否' }, { value: 1, label: '是' }]} />
-          </Form.Item>
-        </Form>
-      </Modal>
+          <SectionTitle title="基础信息" />
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '0 16px' }}>
+            <Form.Item name="code" label="应用编码" rules={[{ required: true, message: '请输入应用编码' }, { pattern: /^[a-z0-9-]{2,40}$/, message: '小写字母、数字、中划线，2-40 位' }]}
+              extra="创建后不可修改">
+              <Input placeholder="例如 order-service" maxLength={40} disabled={!!editing} />
+            </Form.Item>
+            <Form.Item name="name" label="应用名称" rules={[{ required: true, message: '请输入应用名称' }]}>
+              <Input placeholder="例如 订单服务" maxLength={100} />
+            </Form.Item>
+            <Form.Item name="deptId" label="所属团队" rules={[{ required: true, message: '请选择所属团队' }]}>
+              <TreeSelect
+                treeData={deptTreeData}
+                treeDefaultExpandAll
+                showSearch
+                treeNodeFilterProp="title"
+                allowClear
+                placeholder="请选择所属团队"
+                loading={deptTreeQuery.isLoading}
+              />
+            </Form.Item>
+            <Form.Item name="ownerId" label="应用负责人" rules={[{ required: true, message: '请选择应用负责人' }]}
+              extra="负责人关联 sys_user，变更后立即生效">
+              <Select
+                showSearch
+                allowClear
+                placeholder="搜索并选择负责人"
+                options={userSelectOptions}
+                loading={userLoading}
+                filterOption={false}
+                onSearch={handleUserSearch}
+                onPopupScroll={handleUserScroll}
+                onFocus={() => { if (userOptions.length === 0) void loadUsers('', true) }}
+              />
+            </Form.Item>
+          </div>
 
-      <Modal open={repoOpen} title={repoApp ? `代码源 · ${repoApp.name}` : '代码源'}
-        okText="保存" cancelText="取消" width={560} confirmLoading={saveRepoMutation.isPending || repoLoading}
-        onCancel={() => setRepoOpen(false)}
-        onOk={async () => {
-          const values = await repoForm.validateFields()
-          saveRepoMutation.mutate({ ...values, id: repoId, appId: repoApp?.id, isMain: 1 })
-        }}
-        destroyOnHidden>
-        <Form form={repoForm} layout="vertical" requiredMark="optional">
-          <Form.Item name="platform" label="代码托管平台" rules={[{ required: true, message: '请选择平台' }]}>
-            <Select options={[{ value: 1, label: 'GitLab' }, { value: 2, label: 'GitHub' }, { value: 3, label: 'Gitee' }]} />
-          </Form.Item>
-          <Form.Item name="repoUrl" label="仓库地址（Git）" rules={[{ required: true, message: '请输入仓库地址' }]}>
-            <Input placeholder="例如 https://gitlab.example.com/group/repo.git" />
-          </Form.Item>
-          <Form.Item name="repoPath" label="仓库路径" rules={[{ required: true, message: '请输入仓库路径' }]}
-            extra="group/project 形式，供代码平台接口定位仓库">
-            <Input placeholder="例如 group/repo" />
-          </Form.Item>
-          <Form.Item name="defaultBranch" label="默认分支">
-            <Input placeholder="例如 main" />
-          </Form.Item>
-          <Form.Item name="repoToken" label="仓库访问令牌" extra="明文保存；公开仓库可留空">
-            <Input.Password placeholder="私有仓库填写 Token" autoComplete="new-password" />
-          </Form.Item>
-          <Form.Item name="isPublic" label="仓库可见性">
-            <Select options={[{ value: 0, label: '私有' }, { value: 1, label: '公开' }]} />
-          </Form.Item>
+          <SectionTitle title="仓库信息" />
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '0 16px' }}>
+            <Form.Item name="repoType" label="代码平台" rules={[{ required: true, message: '请选择代码平台' }]}>
+              <Select options={[{ value: 1, label: 'GitLab' }, { value: 2, label: 'GitHub' }, { value: 3, label: 'Gitee' }]} />
+            </Form.Item>
+            <Form.Item name="repoBranch" label="仓库分支">
+              <Input placeholder="例如 main" />
+            </Form.Item>
+            <Form.Item name="repoUrl" label="仓库 Git 地址" rules={[{ required: true, message: '请输入仓库地址' }]}>
+              <Input placeholder="例如 https://gitlab.example.com/group/repo.git" />
+            </Form.Item>
+            <Form.Item name="repoToken" label="仓库访问令牌" extra="公开仓库可留空">
+              <Input.Password placeholder="私有仓库填写 Token" autoComplete="new-password" />
+            </Form.Item>
+          </div>
+
+          <SectionTitle title="补充信息" />
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '0 16px' }}>
+            <Form.Item name="coreLink" label="核心链路">
+              <Select options={[{ value: 0, label: '否' }, { value: 1, label: '是' }]} />
+            </Form.Item>
+            <Form.Item name="repoCommitId" label="指定提交 Id">
+              <Input placeholder="可选，指定构建提交" />
+            </Form.Item>
+            <Form.Item name="description" label="应用描述" style={{ gridColumn: '1 / -1' }}>
+              <Input.TextArea placeholder="应用用途说明" rows={2} maxLength={500} />
+            </Form.Item>
+          </div>
         </Form>
       </Modal>
     </>

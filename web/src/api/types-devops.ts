@@ -7,14 +7,18 @@ export interface AppRow {
   id: ID
   code: string
   name: string
-  teamId: ID
-  ownerIds?: string
-  ownerNames?: string
-  isCore: number
-  platform: number
+  deptId: ID
+  deptName?: string
+  ownerId?: ID
+  ownerName?: string
+  coreLink: number
+  repoType: number
   repoUrl?: string
-  defaultBranch?: string
-  setupStatus: number
+  repoToken?: string
+  repoBranch?: string
+  repoCommitId?: string
+  description?: string
+  status: number
   prodDeployTypes?: string
   pipelineCount?: number
   lastRunStatus?: number
@@ -22,18 +26,7 @@ export interface AppRow {
   createTime: string
 }
 
-export interface AppRepoRow {
-  id: ID
-  appId: ID
-  platform: number
-  repoPath: string
-  repoUrl: string
-  repoToken?: string
-  isMain: number
-  defaultBranch?: string
-  isPublic: number
-}
-
+// TODO(dev_app-schema): dev_app_repo 已删除，AppRepoRow 类型已移除。
 export interface AppDependencyRow {
   id: ID
   appId: ID
@@ -42,22 +35,8 @@ export interface AppDependencyRow {
   versionRange?: string
 }
 
-export interface AppDetail extends AppRow {
-  defaultCommitId?: string
-  storageBucket?: string
-  storagePath?: string
-  registryRepo?: string
-  monitorType?: string
-  monitorDashboard?: string
-  alertGroup?: string
-  oncallWindow?: string
-  description?: string
-  repos: AppRepoRow[]
-  dependencies: AppDependencyRow[]
-}
-
 export interface AppOption { value: ID; label: string; code: string }
-export interface WizardProgress { appId: ID; completedSteps: number[]; skippedSteps: number[]; setupStatus: number }
+export interface WizardProgress { appId: ID; completedSteps: number[]; skippedSteps: number[]; status: number }
 export interface AppOverview { appId: ID; pipelineCount: number; envCount: number; runningCount: number; prodArtifactDigest?: string; prodDeployType?: string; blockers: Array<Record<string, unknown>> }
 
 /* ------------------------------ 环境 ------------------------------ */
