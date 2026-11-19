@@ -23,7 +23,7 @@ public class RunPrecheck implements Serializable {
     /** 运行id */
     private Long runId;
 
-    /** 1仓库可达 2分支存在 3提交可达 4定义匹配 5幂等检查 */
+    /** 1仓库信息 2分支 3提交格式 4定义匹配 5幂等检查 */
     private Integer itemType;
 
     /** 1通过 2不通过 3合并 4复用 */
