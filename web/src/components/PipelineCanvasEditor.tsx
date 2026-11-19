@@ -135,16 +135,11 @@ export default function PipelineCanvasEditor({ value, onChange }: PipelineCanvas
 
   const addStage = (type: number) => {
     if (usedTypes.has(type)) return
-    const isJenkinsNeeded = type <= 4
     const stage: PipelineStageDef = {
       type,
       name: STAGE_LABEL[type],
       timeoutSeconds: 1800,
-      tasks: [{
-        name: isJenkinsNeeded ? 'Jenkins 任务' : '任务',
-        executor: isJenkinsNeeded ? 'jenkins' : type === 5 || type === 6 ? 'deployer' : type === 7 ? 'gate' : 'release',
-        scriptRef: isJenkinsNeeded ? 'build' : 'run',
-      }],
+      tasks: [],
       outputs: type === 4 ? ['artifact'] : [],
     }
     update([...stages, stage])

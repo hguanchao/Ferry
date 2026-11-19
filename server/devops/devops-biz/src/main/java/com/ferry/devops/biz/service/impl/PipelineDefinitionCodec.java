@@ -45,7 +45,10 @@ final class PipelineDefinitionCodec {
     }
 
     /**
-     * 结构化校验：阶段 1–8、类型唯一、任务 1–30、超时 60–86400、执行器任务要求
+     * 结构化校验：阶段 1–8、类型唯一、任务 0–30、超时 60–86400、执行器任务要求。
+     *
+     * <p>阶段允许零任务（画布可先建空阶段再补任务）；空阶段/空任务的完整性与可执行性
+     * 交由运行触发预校验（RunServiceImpl#doPrecheck）提示，不在保存阶段拦截。
      */
     static ValidateResultVO validate(String definition, Integer mode) {
         ValidateResultVO result = new ValidateResultVO();
@@ -82,9 +85,10 @@ final class PipelineDefinitionCodec {
                     errors.add(error(line, "超时须在 60–86400 秒之间"));
                 }
                 List<com.ferry.devops.api.dto.PipelineTaskDTO> tasks = stage.getTasks();
-                if (tasks == null || tasks.isEmpty() || tasks.size() > 30) {
-                    errors.add(error(line, "单阶段任务数量须在 1–30 之间"));
-                } else if (stage.getType() != null && stage.getType() <= 4) {
+                int taskCount = tasks == null ? 0 : tasks.size();
+                if (taskCount > 30) {
+                    errors.add(error(line, "单阶段任务数量不能超过 30"));
+                } else if (taskCount > 0 && stage.getType() != null && stage.getType() <= 4) {
                     boolean hasJenkins = tasks.stream().anyMatch(t -> "jenkins".equals(t.getExecutor()));
                     if (!hasJenkins) {
                         errors.add(error(line, "前四类阶段须包含至少一个 executor=jenkins 的任务"));

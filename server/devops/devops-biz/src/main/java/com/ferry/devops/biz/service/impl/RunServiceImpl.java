@@ -464,11 +464,23 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
         items.add(item(3, commitOk, commitOk
                 ? "提交引用格式合法" : "提交必须为 7–40 位十六进制或合法 Git ref"));
 
-        // 4 定义匹配：流水线启用 + 存在当前版本
+        // 4 定义匹配：流水线启用 + 存在当前版本 + 定义中无空阶段/空任务
         Pipeline pipeline = pipelineMapper.selectById(pipelineId);
         boolean defOk = pipeline != null && ObjUtil.equals(pipeline.getIsEnabled(), IntConst.ONE)
                 && ObjUtil.isNotEmpty(pipeline.getCurrentVersionId());
-        items.add(item(4, defOk, defOk ? "流水线已启用且存在当前版本" : "流水线未启用或无当前版本"));
+        String defDetail;
+        if (!defOk) {
+            defDetail = "流水线未启用或无当前版本";
+        } else {
+            // 保存阶段允许空任务，运行时才拦截：给出明确提示让用户在画布补齐后再触发
+            defDetail = checkRunnableDefinition(pipeline.getCurrentVersionId());
+            if (defDetail == null) {
+                defDetail = "流水线已启用且存在当前版本";
+            } else {
+                defOk = false;
+            }
+        }
+        items.add(item(4, defOk, defDetail));
         // 5 幂等检查：按 60 秒键查活动/成功运行
         String idemKey = idemKey(appId, branch, commitId,
                 pipeline == null ? null : pipeline.getCurrentVersionId());
@@ -573,6 +585,32 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
         } catch (Exception e) {
             return Collections.emptyList();
         }
+    }
+
+    /**
+     * 运行前检查版本定义的完整性：存在不可执行的空阶段/空任务时返回提示，否则返回 null。
+     * 保存阶段放宽为空任务，仅在此处（触发运行）拦截并提示。
+     *
+     * @param versionId 流水线当前版本 id
+     * @return 不可运行的提示文本；定义可运行则为 null
+     */
+    private String checkRunnableDefinition(Long versionId) {
+        PipelineVersion version = versionMapper.selectById(versionId);
+        if (version == null || StrUtil.isBlank(version.getContentJson())) {
+            return "流水线当前版本无定义内容";
+        }
+        List<PipelineStageDTO> stages = parseStages(version.getContentJson());
+        if (stages.isEmpty()) {
+            return "流水线定义未配置任何阶段";
+        }
+        int seq = 1;
+        for (PipelineStageDTO stage : stages) {
+            if (stage.getTasks() == null || stage.getTasks().isEmpty()) {
+                return "第 " + seq + " 个阶段「" + stage.getName() + "」未添加任务，请先在画布中补充";
+            }
+            seq++;
+        }
+        return null;
     }
 
     /**
