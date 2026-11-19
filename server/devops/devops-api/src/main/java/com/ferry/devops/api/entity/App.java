@@ -16,9 +16,15 @@ import lombok.EqualsAndHashCode;
 @EqualsAndHashCode(callSuper = true)
 public class App extends BaseEntity implements Serializable {
 
-    /** 数据id */
+    /** 主键id */
     @TableId
     private Long id;
+
+    /** 所属团队id，关联 sys_dept.id */
+    private Long deptId;
+
+    /** 应用负责人id，关联 sys_user.id */
+    private Long ownerId;
 
     /** 应用编码 */
     private String code;
@@ -26,45 +32,27 @@ public class App extends BaseEntity implements Serializable {
     /** 应用名称 */
     private String name;
 
-    /** 所属团队 */
-    private Long teamId;
-
-    /** 核心链路 0 否 1 是 */
-    private Integer isCore;
-
-    /** 代码平台 1 GitLab 2 GitHub 3 Gitee */
-    private Integer platform;
-
-    /** 默认分支 */
-    private String defaultBranch;
-
-    /** 默认提交 */
-    private String defaultCommitId;
-
-    /** 对象存储 bucket */
-    private String storageBucket;
-
-    /** 对象存储路径前缀 */
-    private String storagePath;
-
-    /** OCI Registry 仓库名 */
-    private String registryRepo;
-
-    /** 监控系统类型 */
-    private String monitorType;
-
-    /** 监控大盘地址 */
-    private String monitorDashboard;
-
-    /** 告警规则组 */
-    private String alertGroup;
-
-    /** 值班时段 */
-    private String oncallWindow;
-
-    /** 接入完善度 1 待完善 2 已完善 */
-    private Integer setupStatus;
-
-    /** 描述 */
+    /** 应用描述 */
     private String description;
+
+    /** 核心链路 0否 1是 */
+    private Integer coreLink;
+
+    /** 代码平台 1GitLab 2GitHub 3Gitee */
+    private Integer repoType;
+
+    /** 仓库分支 */
+    private String repoBranch;
+
+    /** 仓库提交id */
+    private String repoCommitId;
+
+    /** 仓库git地址 */
+    private String repoUrl;
+
+    /** 仓库访问令牌 */
+    private String repoToken;
+
+    /** 应用状态 0停用 1启用 2草稿 3完善 */
+    private Integer status;
 }

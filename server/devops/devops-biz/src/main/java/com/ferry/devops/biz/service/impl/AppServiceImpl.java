@@ -13,16 +13,10 @@ import com.ferry.common.jdbc.provider.Page;
 import com.ferry.devops.api.dto.AppDTO;
 import com.ferry.devops.api.dto.query.AppQuery;
 import com.ferry.devops.api.entity.App;
-import com.ferry.devops.api.entity.AppRepo;
-import com.ferry.devops.api.vo.AppDetailVO;
 import com.ferry.devops.api.vo.AppOptionVO;
 import com.ferry.devops.api.vo.AppVO;
 import com.ferry.devops.biz.mapper.AppMapper;
-import com.ferry.devops.biz.service.IAppDependencyService;
-import com.ferry.devops.biz.service.IAppOwnerService;
-import com.ferry.devops.biz.service.IAppRepoService;
 import com.ferry.devops.biz.service.IAppService;
-import com.ferry.devops.biz.wrapper.AppWrapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -38,51 +32,17 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements IAppService {
-    private final IAppOwnerService ownerService;
-    private final IAppRepoService repoService;
-    private final IAppDependencyService dependencyService;
 
     @Override
     public IPage<AppVO> pageList(AppQuery body) {
-        AppWrapper wrapper = AppWrapper.build();
-        IPage<App> pages = page(Page.create(body), wrapper.lambda(body));
-        IPage<AppVO> result = wrapper.pageVo(pages);
-        List<Long> appIds = result.getRecords().stream().map(AppVO::getId).collect(Collectors.toList());
-        if (!appIds.isEmpty()) {
-            Map<Long, String> repoUrls = repoService.list(Wrappers.<AppRepo>lambdaQuery()
-                            .in(AppRepo::getAppId, appIds)
-                            .eq(AppRepo::getIsMain, IntConst.ONE))
-                    .stream().collect(Collectors.toMap(
-                            AppRepo::getAppId, AppRepo::getRepoUrl, (left, right) -> left));
-            result.getRecords().forEach(vo -> vo.setRepoUrl(repoUrls.get(vo.getId())));
-        }
-        for (AppVO vo : result.getRecords()) {
-            vo.setOwnerNames(ownerService.ownerNames(vo.getId(), vo.getOwnerIds()));
-        }
-        return result;
-    }
-
-    @Override
-    public AppDetailVO detail(Long id) {
-        App app = requireApp(id);
-        AppDetailVO vo = BeanUtil.copy(app, AppDetailVO.class);
-        vo.setRepos(repoService.repoList(id));
-        vo.setOwners(BeanUtil.copy(ownerService.list(Wrappers.<com.ferry.devops.api.entity.AppOwner>lambdaQuery()
-                .eq(com.ferry.devops.api.entity.AppOwner::getAppId, id)
-                .orderByAsc(com.ferry.devops.api.entity.AppOwner::getSort)),
-                com.ferry.devops.api.vo.AppOwnerVO.class));
-        vo.setDependencies(dependencyService.dependencyList(id));
-        return vo;
+        // 联表 sys_dept / sys_user 由 XML 一次查出部门名称与负责人名称
+        return baseMapper.selectPageList(Page.create(body), body);
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public boolean save(AppDTO body) {
         checkCode(body.getCode(), body.getId());
-        List<Long> owners = CollUtil.toLongList(body.getOwnerIds());
-        if (owners.size() < IntConst.ONE || owners.size() > 3) {
-            throw new ServiceException("应用负责人需 1-3 人");
-        }
         if (ObjUtil.isNotEmpty(body.getId())) {
             App old = requireApp(body.getId());
             if (!ObjUtil.equals(old.getCode(), body.getCode())) {
@@ -90,9 +50,7 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements IAppS
             }
         }
         App app = BeanUtil.copy(body, App.class);
-        boolean success = saveOrUpdate(app);
-        ownerService.replace(app.getId(), body.getOwnerIds(), body.getBackupOwnerIds());
-        return success;
+        return saveOrUpdate(app);
     }
 
     @Override

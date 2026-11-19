@@ -29,7 +29,8 @@ public interface PipelineMapper extends BaseMapper<Pipeline> {
 
     /**
      * 应用默认分支（触发预校验：分支存在检查）
+     * TODO(dev_app-schema): dev_app_repo 已删除，分支字段改为 dev_app.repo_branch。
      */
-    @Select("SELECT default_branch FROM dev_app_repo WHERE is_deleted = 0 AND app_id = #{appId} AND is_main = 1 LIMIT 1")
+    @Select("SELECT repo_branch FROM dev_app WHERE is_deleted = 0 AND id = #{appId} LIMIT 1")
     String selectDefaultBranch(@Param("appId") Long appId);
 }

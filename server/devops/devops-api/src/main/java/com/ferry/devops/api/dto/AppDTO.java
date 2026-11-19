@@ -22,54 +22,34 @@ public class AppDTO {
     @NotBlank(message = "应用名称不能为空")
     private String name;
 
-    @Schema(description = "所属团队")
+    @Schema(description = "所属团队id")
     @NotNull(message = "所属团队不能为空")
-    private Long teamId;
+    private Long deptId;
 
-    @Schema(description = "负责人用户id，逗号分隔，1-3 人")
-    @NotBlank(message = "应用负责人不能为空")
-    private String ownerIds;
+    @Schema(description = "应用负责人用户id")
+    @NotNull(message = "应用负责人不能为空")
+    private Long ownerId;
 
-    @Schema(description = "备份负责人用户id，逗号分隔")
-    private String backupOwnerIds;
+    @Schema(description = "核心链路 0否 1是")
+    private Integer coreLink;
 
-    @Schema(description = "核心链路 0 否 1 是")
-    private Integer isCore;
-
-    @Schema(description = "代码平台 1 GitLab 2 GitHub 3 Gitee")
+    @Schema(description = "代码平台 1GitLab 2GitHub 3Gitee")
     @NotNull(message = "代码平台不能为空")
-    private Integer platform;
+    private Integer repoType;
 
-    @Schema(description = "仓库路径")
-    private String repoPath;
+    @Schema(description = "仓库git地址")
+    @NotBlank(message = "仓库地址不能为空")
+    private String repoUrl;
 
-    @Schema(description = "默认分支")
-    private String defaultBranch;
+    @Schema(description = "仓库访问令牌，公开仓库可留空")
+    private String repoToken;
 
-    @Schema(description = "指定提交id")
-    private String defaultCommitId;
+    @Schema(description = "仓库分支")
+    private String repoBranch;
 
-    @Schema(description = "对象存储 bucket")
-    private String storageBucket;
+    @Schema(description = "仓库提交id")
+    private String repoCommitId;
 
-    @Schema(description = "对象存储路径前缀")
-    private String storagePath;
-
-    @Schema(description = "OCI Registry 仓库名")
-    private String registryRepo;
-
-    @Schema(description = "监控系统类型")
-    private String monitorType;
-
-    @Schema(description = "监控大盘地址")
-    private String monitorDashboard;
-
-    @Schema(description = "告警规则组")
-    private String alertGroup;
-
-    @Schema(description = "值班时段")
-    private String oncallWindow;
-
-    @Schema(description = "描述")
+    @Schema(description = "应用描述")
     private String description;
 }

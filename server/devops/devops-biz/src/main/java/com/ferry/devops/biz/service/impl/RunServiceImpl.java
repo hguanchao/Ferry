@@ -18,9 +18,9 @@ import com.ferry.devops.api.dto.PipelineStageDTO;
 import com.ferry.devops.api.dto.PipelineTaskDTO;
 import com.ferry.devops.api.dto.RunTriggerDTO;
 import com.ferry.devops.api.dto.query.RunQuery;
+import com.ferry.devops.api.entity.App;
 import com.ferry.devops.api.entity.Pipeline;
 import com.ferry.devops.api.entity.PipelineVersion;
-import com.ferry.devops.api.entity.AppRepo;
 import com.ferry.devops.api.entity.Run;
 import com.ferry.devops.api.entity.RunIdempotency;
 import com.ferry.devops.api.entity.RunLogSegment;
@@ -41,7 +41,7 @@ import com.ferry.devops.api.vo.RunStageVO;
 import com.ferry.devops.api.vo.RunTaskVO;
 import com.ferry.devops.api.vo.TriggerResultVO;
 import com.ferry.devops.biz.integration.jenkins.JenkinsClient;
-import com.ferry.devops.biz.mapper.AppRepoMapper;
+import com.ferry.devops.biz.mapper.AppMapper;
 import com.ferry.devops.biz.mapper.PipelineMapper;
 import com.ferry.devops.biz.mapper.PipelineVersionMapper;
 import com.ferry.devops.biz.mapper.RunIdempotencyMapper;
@@ -93,7 +93,7 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
     private final RunOperationMapper operationMapper;
     private final RunIdempotencyMapper idempotencyMapper;
     private final JenkinsClient jenkinsClient;
-    private final AppRepoMapper appRepoMapper;
+    private final AppMapper appMapper;
 
     @Override
     public IPage<RunVO> pageList(RunQuery body) {
@@ -441,20 +441,17 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
         String branch = body.getBranch();
         String commitId = body.getCommitId();
         List<PrecheckItemVO> items = new ArrayList<>();
-        AppRepo appRepo = appRepoMapper.selectOne(Wrappers.<AppRepo>lambdaQuery()
-                .eq(AppRepo::getAppId, appId).eq(AppRepo::getIsMain, IntConst.ONE)
-                .orderByAsc(AppRepo::getId).last("LIMIT 1"));
+        // TODO(dev_app-schema): dev_app_repo 已删除，仓库信息改为读取 dev_app 内联字段 repo_url。
+        App app = appMapper.selectById(appId);
 
-        // 1 仓库信息：校验应用管理登记的主仓库信息完整
+        // 1 仓库信息：校验应用管理登记的仓库信息完整
         PrecheckItemVO repoItem;
-        if (appRepo == null) {
-            repoItem = item(1, false, "应用未配置主仓库");
-        } else if (StrUtil.isBlank(appRepo.getRepoUrl())) {
-            repoItem = item(1, false, "应用主仓库未填写仓库地址");
-        } else if (StrUtil.isBlank(appRepo.getRepoPath())) {
-            repoItem = item(1, false, "应用主仓库未填写仓库路径");
+        if (app == null) {
+            repoItem = item(1, false, "应用不存在");
+        } else if (StrUtil.isBlank(app.getRepoUrl())) {
+            repoItem = item(1, false, "应用未填写仓库地址");
         } else {
-            repoItem = item(1, true, "仓库信息已登记：" + appRepo.getRepoUrl());
+            repoItem = item(1, true, "仓库信息已登记：" + app.getRepoUrl());
         }
         items.add(repoItem);
 

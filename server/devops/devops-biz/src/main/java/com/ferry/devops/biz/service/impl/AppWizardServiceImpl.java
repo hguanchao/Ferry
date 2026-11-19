@@ -5,12 +5,12 @@ import com.ferry.common.core.constant.IntConst;
 import com.ferry.common.core.exception.ServiceException;
 import com.ferry.common.core.utils.JsonUtil;
 import com.ferry.common.core.utils.ObjUtil;
+import com.ferry.common.core.utils.StrUtil;
 import com.ferry.devops.api.dto.WizardStepDTO;
 import com.ferry.devops.api.entity.App;
 import com.ferry.devops.api.vo.AppOverviewVO;
 import com.ferry.devops.api.vo.WizardProgressVO;
 import com.ferry.devops.biz.mapper.AppMapper;
-import com.ferry.devops.biz.service.IAppRepoService;
 import com.ferry.devops.biz.service.IAppService;
 import com.ferry.devops.biz.service.IAppWizardService;
 import lombok.RequiredArgsConstructor;
@@ -28,7 +28,6 @@ import java.util.List;
 public class AppWizardServiceImpl implements IAppWizardService {
     private final AppMapper appMapper;
     private final IAppService appService;
-    private final IAppRepoService repoService;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -41,8 +40,9 @@ public class AppWizardServiceImpl implements IAppWizardService {
             }
             return appService.saveOrUpdateApp(app);
         } else if (ObjUtil.equals(body.getStep(), 2)) {
-            repoService.saveWizardRepo(app.getId(), body.getData());
-            return true;
+            // TODO(dev_app-schema): dev_app_repo 已删除，仓库信息改为内联写入 dev_app。
+            applyStepTwo(app, body.getData());
+            return appService.saveOrUpdateApp(app);
         }
         return true;
     }
@@ -52,10 +52,11 @@ public class AppWizardServiceImpl implements IAppWizardService {
         App app = requireApp(appId);
         WizardProgressVO vo = new WizardProgressVO();
         vo.setAppId(appId);
-        vo.setSetupStatus(app.getSetupStatus());
+        vo.setStatus(app.getStatus());
         List<Integer> completed = new ArrayList<>();
         completed.add(IntConst.ONE);
-        if (repoService.hasRepo(appId)) {
+        // TODO(dev_app-schema): dev_app_repo 已删除，改为按应用内联仓库地址判断是否已完善。
+        if (StrUtil.isNotBlank(app.getRepoUrl())) {
             completed.add(2);
         }
         vo.setCompletedSteps(completed);
@@ -87,6 +88,15 @@ public class AppWizardServiceImpl implements IAppWizardService {
     private void applyStepOne(App app, String data) {
         app.setCode(JsonUtil.getStr(data, "code"));
         app.setName(JsonUtil.getStr(data, "name"));
-        app.setTeamId(JsonUtil.getLong(data, "teamId"));
+        app.setDeptId(JsonUtil.getLong(data, "deptId"));
+    }
+
+    /** 接入向导第二步：仓库信息内联写入 dev_app。 */
+    private void applyStepTwo(App app, String data) {
+        app.setRepoType(JsonUtil.getInt(data, "repoType"));
+        app.setRepoBranch(JsonUtil.getStr(data, "repoBranch"));
+        app.setRepoUrl(JsonUtil.getStr(data, "repoUrl"));
+        app.setRepoToken(JsonUtil.getStr(data, "repoToken"));
+        app.setStatus(3);
     }
 }

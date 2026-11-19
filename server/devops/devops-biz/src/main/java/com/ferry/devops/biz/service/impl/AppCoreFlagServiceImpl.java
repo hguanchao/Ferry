@@ -53,7 +53,7 @@ public class AppCoreFlagServiceImpl implements IAppCoreFlagService {
         if (Boolean.TRUE.equals(body.getPass())) {
             App app = appMapper.selectById(apply.getAppId());
             if (app != null) {
-                app.setIsCore(apply.getIsTargetCore());
+                app.setCoreLink(apply.getIsTargetCore());
                 appMapper.updateById(app);
             }
         }

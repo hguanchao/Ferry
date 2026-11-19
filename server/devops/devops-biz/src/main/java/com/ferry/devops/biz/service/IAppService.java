@@ -5,7 +5,6 @@ import com.ferry.common.jdbc.base.IService;
 import com.ferry.devops.api.dto.AppDTO;
 import com.ferry.devops.api.dto.query.AppQuery;
 import com.ferry.devops.api.entity.App;
-import com.ferry.devops.api.vo.AppDetailVO;
 import com.ferry.devops.api.vo.AppOptionVO;
 import com.ferry.devops.api.vo.AppVO;
 
@@ -18,8 +17,6 @@ import java.util.Map;
 public interface IAppService extends IService<App> {
 
     IPage<AppVO> pageList(AppQuery body);
-
-    AppDetailVO detail(Long id);
 
     boolean save(AppDTO body);
 

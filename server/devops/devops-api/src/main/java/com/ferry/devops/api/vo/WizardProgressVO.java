@@ -18,6 +18,6 @@ public class WizardProgressVO {
     @Schema(description = "已跳过步骤")
     private java.util.List<Integer> skippedSteps;
 
-    @Schema(description = "接入完善度")
-    private Integer setupStatus;
+    @Schema(description = "应用状态 0停用 1启用 2草稿 3完善")
+    private Integer status;
 }

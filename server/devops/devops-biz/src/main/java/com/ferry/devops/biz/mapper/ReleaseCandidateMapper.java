@@ -20,6 +20,6 @@ public interface ReleaseCandidateMapper extends BaseMapper<ReleaseCandidate> {
     java.util.List<java.util.Map<String, Object>> selectArtifactCandidates(@Param("appId") Long appId);
 
     /** 应用是否核心链路 */
-    @org.apache.ibatis.annotations.Select("SELECT id, is_core AS isCore FROM dev_app WHERE is_deleted = 0 AND id = #{appId}")
+    @org.apache.ibatis.annotations.Select("SELECT id, core_link AS coreLink FROM dev_app WHERE is_deleted = 0 AND id = #{appId}")
     com.ferry.devops.api.entity.App selectAppCore(@Param("appId") Long appId);
 }

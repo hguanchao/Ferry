@@ -5,7 +5,6 @@ import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
-import java.util.List;
 import java.util.Map;
 
 /**
@@ -22,12 +21,5 @@ public interface IAppFeign {
     @GetMapping(value = "/options")
     Map<String, String> appOptions();
 
-    /**
-     * 查询应用负责人用户id
-     *
-     * @param appId 应用id
-     * @return 用户id集合
-     */
-    @GetMapping(value = "/owner")
-    List<Long> appOwners(@RequestParam("appId") Long appId);
+    // TODO(dev_app-schema): dev_app_owner 已删除，appOwners 内部接口移除；负责人改为 dev_app.owner_id 单值。
 }

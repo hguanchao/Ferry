@@ -6,12 +6,10 @@ import com.ferry.common.core.utils.ObjUtil;
 import com.ferry.common.security.annotation.PreAuthorize;
 import com.ferry.devops.api.dto.AppDTO;
 import com.ferry.devops.api.dto.query.AppQuery;
-import com.ferry.devops.api.vo.AppDetailVO;
 import com.ferry.devops.api.vo.AppOptionVO;
 import com.ferry.devops.api.vo.AppVO;
 import com.ferry.devops.biz.service.IAppService;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.AllArgsConstructor;
@@ -41,12 +39,7 @@ public class AppController {
         return R.data(service.pageList(body));
     }
 
-    @GetMapping("/detail")
-    @PreAuthorize("devops:app:detail")
-    @Operation(summary = "应用管理-详情", parameters = @Parameter(name = "id", description = "应用id", required = true))
-    public R<AppDetailVO> detail(@RequestParam("id") Long id) {
-        return R.data(service.detail(id));
-    }
+    // TODO(dev_app-schema): /app/detail 已移除——详情与分页返回同一 AppVO，前端复用列表数据，无独立调用方。
 
     @PostMapping("/save")
     @PreAuthorize("devops:app:save")

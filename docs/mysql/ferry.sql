@@ -238,80 +238,36 @@ CREATE TABLE `sys_user_role`  (
 
 -- ----------------------------
 -- Table structure for dev_app
+-- TODO(dev_app-schema): 字段已重命名/精简，后端 App 实体通过 @TableField 映射旧 Java 字段名，
+-- 业务代码暂保留旧命名并加 TODO 占位，待后续统一重构；dev_app_repo 已删除，仓库信息内联到本表。
 -- ----------------------------
 DROP TABLE IF EXISTS `dev_app`;
 CREATE TABLE `dev_app`  (
-  `id` bigint NOT NULL COMMENT '主键',
-  `code` varchar(40) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '应用编码，小写字母/数字/中划线，创建后不可改',
+  `id` bigint NOT NULL COMMENT '主键id',
+  `dept_id` bigint NOT NULL COMMENT '所属团队id',
+  `owner_id` bigint NOT NULL COMMENT '应用负责人id',
+  `code` varchar(40) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '应用编码',
   `name` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '应用名称',
-  `team_id` bigint NOT NULL COMMENT '所属团队，对应 sys_dept.id',
-  `is_core` tinyint(1) NOT NULL DEFAULT 0 COMMENT '核心链路 0 否 1 是',
-  `platform` tinyint NOT NULL COMMENT '代码平台 1 GitLab 2 GitHub 3 Gitee',
-  `default_branch` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '默认分支',
-  `default_commit_id` varchar(40) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '默认提交',
-  `storage_bucket` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '对象存储 bucket',
-  `storage_path` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '对象存储路径前缀',
-  `registry_repo` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT 'OCI Registry 仓库名',
-  `monitor_type` varchar(30) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '监控系统类型',
-  `monitor_dashboard` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '监控大盘地址',
-  `alert_group` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '告警规则组',
-  `oncall_window` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '值班时段',
-  `setup_status` tinyint NOT NULL DEFAULT 1 COMMENT '接入完善度 1 待完善 2 已完善',
-  `description` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '描述',
+  `description` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '应用描述',
+  `core_link` tinyint(1) NOT NULL DEFAULT 0 COMMENT '核心链路 0否 1是',
+  `repo_type` tinyint NOT NULL COMMENT '代码平台 1GitLab 2GitHub 3Gitee',
+  `repo_branch` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '仓库分支',
+  `repo_commit_id` varchar(40) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '仓库提交id',
+  `repo_url` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '仓库git地址',
+  `repo_token` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '仓库访问令牌',
+  `status` tinyint NOT NULL DEFAULT 1 COMMENT '应用状态 0停用 1启用 2草稿 3完善',
   `create_user` bigint NULL COMMENT '创建人',
   `create_time` datetime(3) NULL COMMENT '创建时间',
   `update_user` bigint NULL COMMENT '更新人',
   `update_time` datetime(3) NULL COMMENT '更新时间',
-  `is_deleted` tinyint(1) NULL DEFAULT 0 COMMENT '是否删除 0：否 1：是',
+  `is_deleted` tinyint(1) NULL DEFAULT 0 COMMENT '是否删除 0否 1是',
   PRIMARY KEY (`id`) USING BTREE,
   UNIQUE KEY `uk_app_code` (`code`) USING BTREE,
-  KEY `idx_app_team` (`team_id`) USING BTREE,
+  KEY `idx_app_dept` (`dept_id`) USING BTREE,
   KEY `idx_app_name` (`name`) USING BTREE
 ) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '应用档案表' ROW_FORMAT = DYNAMIC;
 
--- ----------------------------
--- Table structure for dev_app_repo
--- ----------------------------
-DROP TABLE IF EXISTS `dev_app_repo`;
-CREATE TABLE `dev_app_repo`  (
-  `id` bigint NOT NULL COMMENT '主键',
-  `app_id` bigint NOT NULL COMMENT '应用id',
-  `platform` tinyint NOT NULL COMMENT '平台枚举，与 dev_app.platform 一致',
-  `repo_path` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT 'group/project 路径',
-  `repo_url` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '完整 Git 地址',
-  `repo_token` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '仓库访问令牌，明文存储（内部系统使用）',
-  `is_main` tinyint(1) NOT NULL DEFAULT 0 COMMENT '是否主仓库',
-  `default_branch` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '该仓库默认分支',
-  `is_public` tinyint(1) NOT NULL DEFAULT 0 COMMENT '是否公开仓库',
-  `create_user` bigint NULL COMMENT '创建人',
-  `create_time` datetime(3) NULL COMMENT '创建时间',
-  `update_user` bigint NULL COMMENT '更新人',
-  `update_time` datetime(3) NULL COMMENT '更新时间',
-  `is_deleted` tinyint(1) NULL DEFAULT 0 COMMENT '是否删除 0：否 1：是',
-  PRIMARY KEY (`id`) USING BTREE,
-  KEY `idx_app_repo_app` (`app_id`) USING BTREE,
-  KEY `idx_app_repo_main` (`app_id`,`is_main`) USING BTREE
-) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '应用代码源表' ROW_FORMAT = DYNAMIC;
-
--- ----------------------------
--- Table structure for dev_app_owner
--- ----------------------------
-DROP TABLE IF EXISTS `dev_app_owner`;
-CREATE TABLE `dev_app_owner`  (
-  `id` bigint NOT NULL COMMENT '主键',
-  `app_id` bigint NOT NULL COMMENT '应用id',
-  `user_id` bigint NOT NULL COMMENT '用户id',
-  `type` tinyint NOT NULL COMMENT '1 负责人 2 备份负责人',
-  `sort` int NOT NULL DEFAULT 0 COMMENT '顺序',
-  `create_user` bigint NULL COMMENT '创建人',
-  `create_time` datetime(3) NULL COMMENT '创建时间',
-  `update_user` bigint NULL COMMENT '更新人',
-  `update_time` datetime(3) NULL COMMENT '更新时间',
-  `is_deleted` tinyint(1) NULL DEFAULT 0 COMMENT '是否删除 0：否 1：是',
-  PRIMARY KEY (`id`) USING BTREE,
-  KEY `idx_app_owner_app` (`app_id`,`type`,`sort`) USING BTREE,
-  UNIQUE KEY `uk_app_owner` (`app_id`,`user_id`) USING BTREE
-) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '应用负责人表' ROW_FORMAT = DYNAMIC;
+-- TODO(dev_app-schema): dev_app_repo 已删除，仓库字段（repo_type/repo_branch/repo_commit_id/repo_url/repo_token）内联到 dev_app。
 
 -- ----------------------------
 -- Table structure for dev_app_dependency
@@ -923,8 +879,8 @@ CREATE TABLE `dev_environment`  (
   `category` tinyint NOT NULL COMMENT '1 测试 2 预发 3 生产',
   `deploy_type` tinyint NOT NULL COMMENT '1 SSH 2 Docker 3 Kubernetes',
   `is_protected` tinyint(1) NOT NULL DEFAULT 0 COMMENT '保护标记，生产自动置 1',
-  `target_config` json CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '目标资源，结构见 5.8',
-  `health_config` json CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '健康检查配置',
+  `target_config` json NOT NULL COMMENT '目标资源，结构见 5.8',
+  `health_config` json NULL COMMENT '健康检查配置',
   `observe_minutes` int NULL COMMENT '观察时长分钟',
   `config_version` int NOT NULL DEFAULT 0 COMMENT '配置版本',
   `current_artifact_id` bigint NULL COMMENT '当前生效制品',
@@ -1120,7 +1076,7 @@ CREATE TABLE `dev_change_ticket`  (
   `window_start` datetime(3) NOT NULL COMMENT '计划窗口开始',
   `window_end` datetime(3) NOT NULL COMMENT '计划窗口结束',
   `rollback_plan` text CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '回滚方案',
-  `impact_json` json CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '影响评估',
+  `impact_json` json NULL COMMENT '影响评估',
   `status` tinyint NOT NULL DEFAULT 1 COMMENT '1 草稿 2 待审批 3 已批准 4 已实施 5 已关闭 6 已取消',
   `applicant` bigint NOT NULL COMMENT '申请人',
   `approver` bigint NULL COMMENT '审批人',
@@ -1162,7 +1118,7 @@ CREATE TABLE `dev_release_candidate`  (
   `risk_level` tinyint NULL COMMENT '1 低 2 中 3 高',
   `risk_score` decimal(4,2) NULL COMMENT '加权分',
   `risk_detail` varchar(1000) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '五因子明细 JSON',
-  `impact_json` json CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '三层影响面',
+  `impact_json` json NULL COMMENT '三层影响面',
   `window_start` datetime(3) NOT NULL COMMENT '计划窗口开始',
   `window_end` datetime(3) NOT NULL COMMENT '计划窗口结束',
   `change_ticket_id` bigint NULL COMMENT '变更单id',
@@ -1235,7 +1191,7 @@ DROP TABLE IF EXISTS `dev_release_strategy`;
 CREATE TABLE `dev_release_strategy`  (
   `id` bigint NOT NULL COMMENT '主键',
   `app_id` bigint NOT NULL COMMENT '应用id',
-  `windows_json` json CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '多段发布窗口',
+  `windows_json` json NOT NULL COMMENT '多段发布窗口',
   `is_closure_excluded` tinyint(1) NOT NULL DEFAULT 0 COMMENT '是否排除封网',
   `observe_minutes` int NULL COMMENT '默认观察期覆盖值',
   PRIMARY KEY (`id`) USING BTREE,
@@ -1270,8 +1226,8 @@ CREATE TABLE `dev_release_record`  (
   `env_id` bigint NOT NULL COMMENT '环境id',
   `deploy_type` tinyint NOT NULL COMMENT '部署类型',
   `artifact_id` bigint NOT NULL COMMENT '制品id',
-  `batch_detail` json CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '批次明细快照',
-  `health_snapshot` json CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '健康检查快照',
+  `batch_detail` json NULL COMMENT '批次明细快照',
+  `health_snapshot` json NULL COMMENT '健康检查快照',
   `result` tinyint NOT NULL COMMENT '1 成功 2 失败 3 已回滚 4 已取消',
   `operator` bigint NOT NULL COMMENT '操作人',
   `confirmer` bigint NULL COMMENT '确认人',
@@ -1319,7 +1275,7 @@ CREATE TABLE `dev_ai_output`  (
   `category` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '根因类别',
   `conclusion` varchar(1000) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '结论',
   `confidence` tinyint NULL COMMENT '1 高 2 中 3 低',
-  `suggestion_json` json CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '建议',
+  `suggestion_json` json NULL COMMENT '建议',
   `model_version` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '模型版本',
   `prompt_version` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '提示版本',
   `rule_version` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '规则版本',
@@ -1373,7 +1329,7 @@ CREATE TABLE `dev_action_catalog`  (
   `action_id` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '动作标识',
   `name` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '名称',
   `level` tinyint NOT NULL COMMENT '0–3',
-  `params_schema` json CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '参数约束',
+  `params_schema` json NOT NULL COMMENT '参数约束',
   `precondition` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '前置条件',
   `undo_mode` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '撤销方式',
   `is_undoable` tinyint(1) NOT NULL DEFAULT 0 COMMENT '是否可撤销',
@@ -1396,9 +1352,9 @@ CREATE TABLE `dev_action_record`  (
   `biz_id` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '业务id',
   `app_id` bigint NULL COMMENT '应用id',
   `env_id` bigint NULL COMMENT '环境id',
-  `params_json` json CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '参数',
+  `params_json` json NULL COMMENT '参数',
   `reason` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '理由',
-  `evidence_json` json CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '证据',
+  `evidence_json` json NULL COMMENT '证据',
   `operator` bigint NOT NULL COMMENT '执行人',
   `model_version` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '模型版本',
   `prompt_version` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '提示版本',
@@ -1548,7 +1504,7 @@ CREATE TABLE `sys_notify_channel`  (
   `tenant_id` varchar(12) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '租户编码',
   `name` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '渠道名',
   `type` tinyint NOT NULL COMMENT '1 IM 2 邮件 3 Webhook',
-  `config_json` json CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '连接配置，敏感项加密',
+  `config_json` json NOT NULL COMMENT '连接配置，敏感项加密',
   `status` tinyint NOT NULL DEFAULT 1 COMMENT '1 正常 2 异常',
   `last_send_time` datetime(3) NULL COMMENT '最近发送',
   `last_error` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '最近失败',

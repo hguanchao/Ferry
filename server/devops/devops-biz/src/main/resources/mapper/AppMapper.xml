@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ferry.devops.biz.mapper.AppMapper">
+
+    <!-- 公共列 + 联表：统一获取部门名称与负责人名称 -->
+    <sql id="App_From">
+        FROM dev_app a
+                 LEFT JOIN sys_dept d ON d.id = a.dept_id AND d.is_deleted = 0
+                 LEFT JOIN sys_user u ON u.id = a.owner_id AND u.is_deleted = 0
+    </sql>
+
+    <sql id="App_Columns">
+        a.id              AS id,
+        a.code            AS code,
+        a.`name`          AS name,
+        a.dept_id         AS deptId,
+        d.`name`          AS deptName,
+        a.owner_id        AS ownerId,
+        u.nickname        AS ownerName,
+        a.core_link       AS coreLink,
+        a.repo_type       AS repoType,
+        a.repo_url        AS repoUrl,
+        a.repo_branch     AS repoBranch,
+        a.repo_commit_id  AS repoCommitId,
+        a.`status`        AS status,
+        a.description     AS description,
+        a.create_time     AS createTime
+    </sql>
+
+    <select id="selectPageList" resultType="com.ferry.devops.api.vo.AppVO">
+        SELECT <include refid="App_Columns"/>
+        <include refid="App_From"/>
+        <where>
+            a.is_deleted = 0
+            <if test="query.code != null and query.code != ''">
+                AND (a.code LIKE CONCAT('%', CONCAT(#{query.code}, '%'))
+                    OR a.`name` LIKE CONCAT('%', CONCAT(#{query.code}, '%')))
+            </if>
+            <if test="query.name != null and query.name != ''">
+                AND a.`name` LIKE CONCAT('%', CONCAT(#{query.name}, '%'))
+            </if>
+            <if test="query.deptIds != null and query.deptIds.size() > 0">
+                AND a.dept_id IN
+                <foreach collection="query.deptIds" item="deptId" open="(" separator="," close=")">
+                    #{deptId}
+                </foreach>
+            </if>
+            <if test="query.repoTypes != null and query.repoTypes.size() > 0">
+                AND a.repo_type IN
+                <foreach collection="query.repoTypes" item="repoType" open="(" separator="," close=")">
+                    #{repoType}
+                </foreach>
+            </if>
+            <if test="query.coreLink != null">
+                AND a.core_link = #{query.coreLink}
+            </if>
+            <if test="query.ownerIds != null and query.ownerIds.size() > 0">
+                AND a.owner_id IN
+                <foreach collection="query.ownerIds" item="ownerId" open="(" separator="," close=")">
+                    #{ownerId}
+                </foreach>
+            </if>
+        </where>
+        ORDER BY a.create_time DESC
+    </select>
+
+</mapper>

@@ -1,13 +1,11 @@
 package com.ferry.devops.biz.feign;
 
 import com.ferry.devops.api.feign.IAppFeign;
-import com.ferry.devops.biz.service.IAppOwnerService;
 import com.ferry.devops.biz.service.IAppService;
 import lombok.AllArgsConstructor;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.List;
 import java.util.Map;
 
 /**
@@ -18,15 +16,10 @@ import java.util.Map;
 @AllArgsConstructor
 public class AppFeignController implements IAppFeign {
     private final IAppService appService;
-    private final IAppOwnerService ownerService;
 
     @Override
     public Map<String, String> appOptions() {
         return appService.optionMap();
     }
-
-    @Override
-    public List<Long> appOwners(Long appId) {
-        return ownerService.ownerIds(appId);
-    }
+    // TODO(dev_app-schema): dev_app_owner 已删除，appOwners 内部接口移除；负责人改为 dev_app.owner_id 单值。
 }

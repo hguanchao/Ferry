@@ -494,7 +494,7 @@ public class ReleaseServiceImpl extends ServiceImpl<ReleaseCandidateMapper, Rele
         double coreScore = 1.0;
         for (Long appId : appIds) {
             com.ferry.devops.api.entity.App app = baseMapper.selectAppCore(appId);
-            if (app != null && ObjUtil.equals(app.getIsCore(), IntConst.ONE)) {
+            if (app != null && ObjUtil.equals(app.getCoreLink(), IntConst.ONE)) {
                 coreScore = 5.0;
             }
             long deps = dependencyMapper.selectCount(Wrappers.<AppDependency>lambdaQuery()
