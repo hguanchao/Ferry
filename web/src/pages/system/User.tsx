@@ -11,14 +11,15 @@ import {
   Radio,
   Select,
   Table,
+  Tooltip,
   Tree,
   type MenuProps,
   type TableColumnsType,
 } from 'antd'
 import {
-  ChevronDown,
   Download,
   KeyRound,
+  MoreHorizontal,
   Pencil,
   Plus,
   RotateCw,
@@ -335,28 +336,28 @@ export default function User() {
         return (
           <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
             {can('system:user:save') && (
-              <Button type="link" size="small" icon={<Pencil size={14} />} onClick={() => openEdit(record)}>
-                编辑
-              </Button>
+              <Tooltip title="编辑">
+                <Button type="link" size="small" icon={<Pencil size={14} />} onClick={() => openEdit(record)} />
+              </Tooltip>
             )}
-            <Dropdown
-              trigger={['click']}
-              menu={{
-                items: moreItems,
-                onClick: ({ key }) => {
-                  if (key === 'role') {
-                    setRoleTarget(record)
-                    roleForm.setFieldsValue({ roleId: record.roleId ?? undefined })
-                  }
-                  if (key === 'reset') confirmReset(record)
-                  if (key === 'delete') confirmDelete([record])
-                },
-              }}
-            >
-              <Button type="link" size="small">
-                更多 <ChevronDown size={10} style={{ fontSize: 9 }} />
-              </Button>
-            </Dropdown>
+            <Tooltip title="更多">
+              <Dropdown
+                trigger={['click']}
+                menu={{
+                  items: moreItems,
+                  onClick: ({ key }) => {
+                    if (key === 'role') {
+                      setRoleTarget(record)
+                      roleForm.setFieldsValue({ roleId: record.roleId ?? undefined })
+                    }
+                    if (key === 'reset') confirmReset(record)
+                    if (key === 'delete') confirmDelete([record])
+                  },
+                }}
+              >
+                <Button type="link" size="small" icon={<MoreHorizontal size={16} />} />
+              </Dropdown>
+            </Tooltip>
           </div>
         )
       },

@@ -82,14 +82,18 @@ export default function NotifyTemplate() {
       render: (_, record) => (
         <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
           {can('system:notify:templateSave') && (
-            <Button type="link" size="small" icon={<Pencil size={14} />} onClick={() => openEditor(record)}>编辑</Button>
+            <Tooltip title="编辑">
+              <Button type="link" size="small" icon={<Pencil size={14} />} onClick={() => openEditor(record)} />
+            </Tooltip>
           )}
           {can('system:notify:templateSave') && (
-            <Button type="link" size="small" danger icon={<Trash2 size={14} />}
-              onClick={() => modal.confirm({
-                title: `删除模板「${record.event}」？`, okText: '删除', okButtonProps: { danger: true }, cancelText: '取消',
-                onOk: () => deleteMutation.mutateAsync([record.id]),
-              })} />
+            <Tooltip title="删除">
+              <Button type="link" size="small" danger icon={<Trash2 size={14} />}
+                onClick={() => modal.confirm({
+                  title: `删除模板「${record.event}」？`, okText: '删除', okButtonProps: { danger: true }, cancelText: '取消',
+                  onOk: () => deleteMutation.mutateAsync([record.id]),
+                })} />
+            </Tooltip>
           )}
         </div>
       ),

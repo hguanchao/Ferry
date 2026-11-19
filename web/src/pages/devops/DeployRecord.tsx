@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { App, Button, Descriptions, Drawer, Form, Input, Select, Space, Table, Tag, type TableColumnsType } from 'antd'
+import { App, Button, Descriptions, Drawer, Form, Input, Select, Space, Table, Tag, Tooltip, type TableColumnsType } from 'antd'
 import { Activity, CircleCheck, CircleX, Pause, Play, RotateCw, Search, ShieldAlert } from 'lucide-react'
 import PageHeader from '@/components/PageHeader'
 import { RoleTag } from '@/components/StatusTag'
@@ -67,12 +67,18 @@ export default function DeployRecord() {
     { title: '开始时间', dataIndex: 'startTime', width: COL.time, render: (v?: string) => <span className="ferry-mono" style={{ fontSize: 12, color: 'var(--text-3)' }}>{v ?? '—'}</span> },
     { title: '操作', key: 'action', width: 220, fixed: 'right', render: (_, r) => (
       <Space size={2}>
-        <Button type="link" size="small" icon={<Activity size={14} />} onClick={() => setDrawer({ id: r.id, envId: r.envId, appId: r.appId })}>详情</Button>
+        <Tooltip title="详情">
+          <Button type="link" size="small" icon={<Activity size={14} />} onClick={() => setDrawer({ id: r.id, envId: r.envId, appId: r.appId })} />
+        </Tooltip>
         {can('devops:deploy:pause') && [2, 3].includes(r.status) && (
-          <Button type="link" size="small" icon={<Pause size={14} />} onClick={() => simple(() => deployApi.pause(r.id), '已暂停')}>暂停</Button>
+          <Tooltip title="暂停">
+            <Button type="link" size="small" icon={<Pause size={14} />} onClick={() => simple(() => deployApi.pause(r.id), '已暂停')} />
+          </Tooltip>
         )}
         {can('devops:deploy:resume') && r.status === 3 && (
-          <Button type="link" size="small" icon={<Play size={14} />} onClick={() => simple(() => deployApi.resume(r.id), '已恢复')}>恢复</Button>
+          <Tooltip title="恢复">
+            <Button type="link" size="small" icon={<Play size={14} />} onClick={() => simple(() => deployApi.resume(r.id), '已恢复')} />
+          </Tooltip>
         )}
       </Space>
     ) },

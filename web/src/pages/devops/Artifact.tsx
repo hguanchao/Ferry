@@ -126,15 +126,23 @@ export default function Artifact() {
     },
     { title: '操作', key: 'action', width: COL.actionWide, fixed: 'right', render: (_, r) => (
       <Space size={0}>
-        <Button type="link" size="small" icon={<Eye size={14} />} onClick={() => setDetailId(r.id)}>详情</Button>
-        <Button type="link" size="small" icon={<History size={14} />} onClick={() => setTraceId(r.id)}>追溯</Button>
+        <Tooltip title="详情">
+          <Button type="link" size="small" icon={<Eye size={14} />} onClick={() => setDetailId(r.id)} />
+        </Tooltip>
+        <Tooltip title="追溯">
+          <Button type="link" size="small" icon={<History size={14} />} onClick={() => setTraceId(r.id)} />
+        </Tooltip>
         {can('devops:artifact:promote') && (
-          <Button type="link" size="small" icon={<ArrowRight size={14} />} onClick={() => openPromote(r)}>晋级</Button>
+          <Tooltip title="晋级">
+            <Button type="link" size="small" icon={<ArrowRight size={14} />} onClick={() => openPromote(r)} />
+          </Tooltip>
         )}
         {can('devops:artifact:restore') && (r as unknown as { deleteSeq?: string }).deleteSeq && Number((r as unknown as { deleteSeq?: string }).deleteSeq) !== 0 && (
-          <Button type="link" size="small" icon={<RotateCw size={14} />}
-            onClick={() => modal.confirm({ title: '恢复该制品？', content: '30 天内且同版本无有效制品时可恢复。',
-              okText: '恢复', cancelText: '取消', onOk: () => restoreMutation.mutateAsync(r.id) })}>恢复</Button>
+          <Tooltip title="恢复">
+            <Button type="link" size="small" icon={<RotateCw size={14} />}
+              onClick={() => modal.confirm({ title: '恢复该制品？', content: '30 天内且同版本无有效制品时可恢复。',
+                okText: '恢复', cancelText: '取消', onOk: () => restoreMutation.mutateAsync(r.id) })} />
+          </Tooltip>
         )}
       </Space>
     ) },

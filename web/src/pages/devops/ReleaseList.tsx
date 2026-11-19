@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { App, Button, Form, Input, Modal, Select, Space, Table, Tag, type TableColumnsType } from 'antd'
+import { App, Button, Form, Input, Modal, Select, Space, Table, Tag, Tooltip, type TableColumnsType } from 'antd'
 import { Eye, Plus, RotateCw, Search, Send, Trash2, Undo2 } from 'lucide-react'
 import PageHeader from '@/components/PageHeader'
 import { RoleTag } from '@/components/StatusTag'
@@ -49,19 +49,27 @@ export default function ReleaseList() {
     { title: '创建时间', dataIndex: 'createTime', width: COL.time, render: (v: string) => <span className="ferry-mono" style={{ fontSize: 12, color: 'var(--text-3)' }}>{v ?? '—'}</span> },
     { title: '操作', key: 'action', width: 200, fixed: 'right', render: (_, r) => (
       <Space size={2}>
-        <Button type="link" size="small" icon={<Eye size={14} />} onClick={() => { location.href = `/release/review/${r.id}` }}>评审</Button>
+        <Tooltip title="评审">
+          <Button type="link" size="small" icon={<Eye size={14} />} onClick={() => { location.href = `/release/review/${r.id}` }} />
+        </Tooltip>
         {r.status === 1 && can('devops:release:submit') && (
-          <Button type="link" size="small" icon={<Send size={14} />} onClick={() => simple(() => releaseApi.submit(r.id), '提交成功')}>提交</Button>
+          <Tooltip title="提交">
+            <Button type="link" size="small" icon={<Send size={14} />} onClick={() => simple(() => releaseApi.submit(r.id), '提交成功')} />
+          </Tooltip>
         )}
         {r.status === 2 && can('devops:release:submit') && (
-          <Button type="link" size="small" icon={<Undo2 size={14} />} onClick={() => modal.confirm({
-            title: '撤回发布单？', content: '将解锁制品并退回草稿。', onOk: () => simple(() => releaseApi.withdraw(r.id), '已撤回'),
-          })}>撤回</Button>
+          <Tooltip title="撤回">
+            <Button type="link" size="small" icon={<Undo2 size={14} />} onClick={() => modal.confirm({
+              title: '撤回发布单？', content: '将解锁制品并退回草稿。', onOk: () => simple(() => releaseApi.withdraw(r.id), '已撤回'),
+            })} />
+          </Tooltip>
         )}
         {r.status === 1 && can('devops:release:save') && (
-          <Button type="link" size="small" danger icon={<Trash2 size={14} />} onClick={() => modal.confirm({
-            title: '删除草稿？', onOk: () => simple(() => releaseApi.deleted([r.id]), '删除成功'),
-          })} />
+          <Tooltip title="删除">
+            <Button type="link" size="small" danger icon={<Trash2 size={14} />} onClick={() => modal.confirm({
+              title: '删除草稿？', onOk: () => simple(() => releaseApi.deleted([r.id]), '删除成功'),
+            })} />
+          </Tooltip>
         )}
       </Space>
     ) },

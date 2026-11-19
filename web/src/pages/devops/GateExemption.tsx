@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { App, Button, Input, Select, Table, Tag, type TableColumnsType } from 'antd'
-import { RotateCw, Search } from 'lucide-react'
+import { App, Button, Input, Select, Table, Tag, Tooltip, type TableColumnsType } from 'antd'
+import { RotateCw, Search, Undo2 } from 'lucide-react'
 import PageHeader from '@/components/PageHeader'
 import { RoleTag } from '@/components/StatusTag'
 import { gateApi } from '@/api/devops'
@@ -47,7 +47,9 @@ export default function GateExemption() {
     { title: '申请时间', dataIndex: 'createTime', width: COL.time },
     { title: '操作', key: 'action', width: COL.action, fixed: 'right', render: (_, r) => (
       can('devops:gateExemption:apply') && r.status === 1 && (
-        <Button type="link" size="small" danger onClick={() => revokeMutation.mutate(r.id)}>撤销</Button>
+        <Tooltip title="撤销">
+          <Button type="link" size="small" danger icon={<Undo2 size={14} />} onClick={() => revokeMutation.mutate(r.id)} />
+        </Tooltip>
       )
     ) },
   ]

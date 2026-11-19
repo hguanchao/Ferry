@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { App, Button, Form, Input, Modal, Select, Table, Tag, type TableColumnsType } from 'antd'
+import { App, Button, Form, Input, Modal, Select, Table, Tag, Tooltip, type TableColumnsType } from 'antd'
 import { Pencil, Plus, RotateCw, Search, Send, Trash2 } from 'lucide-react'
 import PageHeader from '@/components/PageHeader'
 import { RoleTag } from '@/components/StatusTag'
@@ -78,17 +78,23 @@ export default function NotifyChannel() {
     { title: '操作', key: 'action', width: COL.actionWide, fixed: 'right',
       render: (_, record) => (
         <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          <Button type="link" size="small" icon={<Send size={14} />}
-            onClick={() => testMutation.mutate(record.id)}>测试</Button>
+          <Tooltip title="测试">
+            <Button type="link" size="small" icon={<Send size={14} />}
+              onClick={() => testMutation.mutate(record.id)} />
+          </Tooltip>
           {can('system:notify:save') && (
-            <Button type="link" size="small" icon={<Pencil size={14} />} onClick={() => openEditor(record)}>编辑</Button>
+            <Tooltip title="编辑">
+              <Button type="link" size="small" icon={<Pencil size={14} />} onClick={() => openEditor(record)} />
+            </Tooltip>
           )}
           {can('system:notify:deleted') && (
-            <Button type="link" size="small" danger icon={<Trash2 size={14} />}
-              onClick={() => modal.confirm({
-                title: `删除渠道「${record.name}」？`, okText: '删除', okButtonProps: { danger: true }, cancelText: '取消',
-                onOk: () => deleteMutation.mutateAsync([record.id]),
-              })} />
+            <Tooltip title="删除">
+              <Button type="link" size="small" danger icon={<Trash2 size={14} />}
+                onClick={() => modal.confirm({
+                  title: `删除渠道「${record.name}」？`, okText: '删除', okButtonProps: { danger: true }, cancelText: '取消',
+                  onOk: () => deleteMutation.mutateAsync([record.id]),
+                })} />
+            </Tooltip>
           )}
         </div>
       ),

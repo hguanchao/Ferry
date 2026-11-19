@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { App, Button, Form, Input, InputNumber, Modal, Table, Tag, type TableColumnsType } from 'antd'
+import { App, Button, Form, Input, InputNumber, Modal, Table, Tag, Tooltip, type TableColumnsType } from 'antd'
 import { Copy, KeyRound, Plus, RefreshCw, RotateCw, Search, ShieldOff } from 'lucide-react'
 import PageHeader from '@/components/PageHeader'
 import { RoleTag } from '@/components/StatusTag'
@@ -78,20 +78,24 @@ export default function OpenApi() {
       render: (_, record) => (
         <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
           {record.status === 1 && can('system:openApi:rotate') && (
-            <Button type="link" size="small" icon={<RefreshCw size={14} />}
-              onClick={() => modal.confirm({
-                title: '轮换 Token？', content: '旧 Token 立即失效，仅内部在途调用保留 5 分钟宽限期。',
-                okText: '轮换', cancelText: '取消',
-                onOk: () => rotateMutation.mutateAsync(record.id),
-              })}>轮换</Button>
+            <Tooltip title="轮换">
+              <Button type="link" size="small" icon={<RefreshCw size={14} />}
+                onClick={() => modal.confirm({
+                  title: '轮换 Token？', content: '旧 Token 立即失效，仅内部在途调用保留 5 分钟宽限期。',
+                  okText: '轮换', cancelText: '取消',
+                  onOk: () => rotateMutation.mutateAsync(record.id),
+                })} />
+            </Tooltip>
           )}
           {record.status === 1 && can('system:openApi:disable') && (
-            <Button type="link" size="small" danger icon={<ShieldOff size={14} />}
-              onClick={() => modal.confirm({
-                title: '禁用 Token？', content: '禁用后该 Token 立即不可用于开放 API 调用。',
-                okText: '禁用', okButtonProps: { danger: true }, cancelText: '取消',
-                onOk: () => disableMutation.mutateAsync(record.id),
-              })}>禁用</Button>
+            <Tooltip title="禁用">
+              <Button type="link" size="small" danger icon={<ShieldOff size={14} />}
+                onClick={() => modal.confirm({
+                  title: '禁用 Token？', content: '禁用后该 Token 立即不可用于开放 API 调用。',
+                  okText: '禁用', okButtonProps: { danger: true }, cancelText: '取消',
+                  onOk: () => disableMutation.mutateAsync(record.id),
+                })} />
+            </Tooltip>
           )}
         </div>
       ),

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { App, Button, Form, Input, Modal, Select, Space, Table, Tag, Tooltip, type TableColumnsType } from 'antd'
-import { RotateCw, Search, UserRoundCheck } from 'lucide-react'
+import { RotateCw, Search, UserPlus, UserRoundCheck } from 'lucide-react'
 import PageHeader from '@/components/PageHeader'
 import { RoleTag } from '@/components/StatusTag'
 import { gateApi, appApi } from '@/api/devops'
@@ -63,10 +63,14 @@ export default function TechDebt() {
     { title: '操作', key: 'action', width: COL.action, fixed: 'right', render: (_, r) => (
       <Space size={0}>
         {can('devops:techDebt:assign') && (
-          <Button type="link" size="small" icon={<UserRoundCheck size={14} />} onClick={() => { form.resetFields(); setAssignRow(r) }}>指派</Button>
+          <Tooltip title="指派">
+            <Button type="link" size="small" icon={<UserPlus size={14} />} onClick={() => { form.resetFields(); setAssignRow(r) }} />
+          </Tooltip>
         )}
         {can('devops:techDebt:falsePositive') && r.status !== 4 && (
-          <Button type="link" size="small" onClick={() => { form.resetFields(); setFpRow(r) }}>误报</Button>
+          <Tooltip title="误报">
+            <Button type="link" size="small" icon={<UserRoundCheck size={14} />} onClick={() => { form.resetFields(); setFpRow(r) }} />
+          </Tooltip>
         )}
       </Space>
     ) },

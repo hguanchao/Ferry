@@ -10,6 +10,7 @@ import {
   Select,
   Switch,
   Table,
+  Tooltip,
   type TableColumnsType,
 } from 'antd'
 import { Pencil, Plus, RotateCw, Search, Trash2 } from 'lucide-react'
@@ -118,37 +119,39 @@ export default function Post() {
       render: (_, record) => (
         <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
           {can('system:post:save') && (
-            <Button
-              type="link"
-              size="small"
-              icon={<Pencil size={14} />}
-              onClick={() => {
-                setEditing(record)
-                form.resetFields()
-                form.setFieldsValue({ ...record })
-                setOpen(true)
-              }}
-            >
-              编辑
-            </Button>
+            <Tooltip title="编辑">
+              <Button
+                type="link"
+                size="small"
+                icon={<Pencil size={14} />}
+                onClick={() => {
+                  setEditing(record)
+                  form.resetFields()
+                  form.setFieldsValue({ ...record })
+                  setOpen(true)
+                }}
+              />
+            </Tooltip>
           )}
           {can('system:post:deleted') && (
-            <Button
-              type="link"
-              size="small"
-              danger
-              icon={<Trash2 size={14} />}
-              onClick={() =>
-                modal.confirm({
-                  title: `删除岗位「${record.name}」？`,
-                  content: '仍有用户绑定该岗位时不可删除。',
-                  okText: '删除',
-                  okButtonProps: { danger: true },
-                  cancelText: '取消',
-                  onOk: () => deleteMutation.mutateAsync([record.id]),
-                })
-              }
-            />
+            <Tooltip title="删除">
+              <Button
+                type="link"
+                size="small"
+                danger
+                icon={<Trash2 size={14} />}
+                onClick={() =>
+                  modal.confirm({
+                    title: `删除岗位「${record.name}」？`,
+                    content: '仍有用户绑定该岗位时不可删除。',
+                    okText: '删除',
+                    okButtonProps: { danger: true },
+                    cancelText: '取消',
+                    onOk: () => deleteMutation.mutateAsync([record.id]),
+                  })
+                }
+              />
+            </Tooltip>
           )}
         </div>
       ),

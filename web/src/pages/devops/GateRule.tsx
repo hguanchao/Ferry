@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { App, Button, Form, Input, Modal, Select, Space, Switch, Table, Tabs, Tag, type TableColumnsType } from 'antd'
-import { Pencil, Plus, RotateCw, Search, Trash2 } from 'lucide-react'
+import { App, Button, Form, Input, Modal, Select, Space, Switch, Table, Tabs, Tag, Tooltip, type TableColumnsType } from 'antd'
+import { CirclePause, CirclePlay, Pencil, Plus, RotateCw, Search, Trash2 } from 'lucide-react'
 import PageHeader from '@/components/PageHeader'
 import { RoleTag } from '@/components/StatusTag'
 import { gateApi, appApi } from '@/api/devops'
@@ -89,15 +89,23 @@ export default function GateRule() {
     { title: '操作', key: 'action', width: COL.actionWide, fixed: 'right', render: (_, r) => (
       <Space size={0}>
         {can('devops:gateRule:enable') && (
-          <Button type="link" size="small" onClick={() => enableMutation.mutate(r.id)}>{r.isEnabled === 1 ? '停用' : '启用'}</Button>
+          <Tooltip title={r.isEnabled === 1 ? '停用' : '启用'}>
+            <Button type="link" size="small"
+              icon={r.isEnabled === 1 ? <CirclePause size={14} /> : <CirclePlay size={14} />}
+              onClick={() => enableMutation.mutate(r.id)} />
+          </Tooltip>
         )}
         {can('devops:gateRule:save') && (
-          <Button type="link" size="small" icon={<Pencil size={14} />} onClick={() => openEditor(r)}>编辑</Button>
+          <Tooltip title="编辑">
+            <Button type="link" size="small" icon={<Pencil size={14} />} onClick={() => openEditor(r)} />
+          </Tooltip>
         )}
         {can('devops:gateRule:deleted') && (
-          <Button type="link" size="small" danger icon={<Trash2 size={14} />}
-            onClick={() => modal.confirm({ title: '删除规则？', okText: '删除', okButtonProps: { danger: true }, cancelText: '取消',
-              onOk: () => deleteMutation.mutateAsync([r.id]) })} />
+          <Tooltip title="删除">
+            <Button type="link" size="small" danger icon={<Trash2 size={14} />}
+              onClick={() => modal.confirm({ title: '删除规则？', okText: '删除', okButtonProps: { danger: true }, cancelText: '取消',
+                onOk: () => deleteMutation.mutateAsync([r.id]) })} />
+          </Tooltip>
         )}
       </Space>
     ) },

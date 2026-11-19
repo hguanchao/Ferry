@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { App, Button, Form, Input, InputNumber, Modal, Select, Space, Switch, Table, Tag, type TableColumnsType } from 'antd'
+import { App, Button, Form, Input, InputNumber, Modal, Select, Space, Switch, Table, Tag, Tooltip, type TableColumnsType } from 'antd'
 import { Eye, Play, RotateCw, Save } from 'lucide-react'
 import PageHeader from '@/components/PageHeader'
 import { RoleTag } from '@/components/StatusTag'
@@ -76,7 +76,9 @@ export default function ArtifactClean() {
       render: (v: number) => <Tag color={v === 2 ? 'green' : v === 3 ? 'red' : 'orange'}>{TASK_STATUS[v] ?? v}</Tag>,
     },
     { title: '操作', key: 'action', width: COL.action, fixed: 'right', render: (_, r) => (
-      <Button type="link" size="small" icon={<Eye size={14} />} onClick={() => manifestMutation.mutate(r.id)}>清单</Button>
+      <Tooltip title="清单">
+        <Button type="link" size="small" icon={<Eye size={14} />} onClick={() => manifestMutation.mutate(r.id)} />
+      </Tooltip>
     ) },
   ]
 

@@ -122,21 +122,27 @@ export default function AiAction() {
       render: (_, record) => (
         <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
           {record.status === 1 && can('devops:action:execute') && (
-            <Button type="link" size="small" icon={<Play size={14} />}
-              onClick={() => executeMutation.mutate(record.id)}>执行</Button>
+            <Tooltip title="执行">
+              <Button type="link" size="small" icon={<Play size={14} />}
+                onClick={() => executeMutation.mutate(record.id)} />
+            </Tooltip>
           )}
           {record.status === 2 && can('devops:action:execute') && (
-            <Button type="link" size="small" icon={<CheckCircle2 size={14} />}
-              onClick={() => modal.confirm({
-                title: '确认执行该动作？',
-                content: '请确认已核对动作的影响面（服务、环境、实例、流量占比）。',
-                okText: '确认执行', cancelText: '取消',
-                onOk: () => confirmMutation.mutateAsync(record.id),
-              })}>确认</Button>
+            <Tooltip title="确认">
+              <Button type="link" size="small" icon={<CheckCircle2 size={14} />}
+                onClick={() => modal.confirm({
+                  title: '确认执行该动作？',
+                  content: '请确认已核对动作的影响面（服务、环境、实例、流量占比）。',
+                  okText: '确认执行', cancelText: '取消',
+                  onOk: () => confirmMutation.mutateAsync(record.id),
+                })} />
+            </Tooltip>
           )}
           {record.status === 5 && record.undoDeadline && can('devops:action:undo') && (
-            <Button type="link" size="small" icon={<CornerUpLeft size={14} />}
-              onClick={() => undoMutation.mutate(record.id)}>撤销</Button>
+            <Tooltip title="撤销">
+              <Button type="link" size="small" icon={<CornerUpLeft size={14} />}
+                onClick={() => undoMutation.mutate(record.id)} />
+            </Tooltip>
           )}
         </div>
       ),

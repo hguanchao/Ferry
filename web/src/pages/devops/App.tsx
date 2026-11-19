@@ -214,19 +214,25 @@ export default function AppList() {
       render: (_, record) => (
         <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
           {can('devops:app:save') && (
-            <Button type="link" size="small" icon={<Pencil size={14} />} onClick={() => openEditor(record)}>编辑</Button>
+            <Tooltip title="编辑">
+              <Button type="link" size="small" icon={<Pencil size={14} />} onClick={() => openEditor(record)} />
+            </Tooltip>
           )}
           {/* TODO(dev_app-schema): dev_app_repo 已删除，代码源操作移除；仓库信息在应用表单维护。 */}
-          <Button type="link" size="small" icon={<WandSparkles size={14} />}>向导</Button>
+          <Tooltip title="向导">
+            <Button type="link" size="small" icon={<WandSparkles size={14} />} />
+          </Tooltip>
           {can('devops:app:deleted') && (
-            <Button type="link" size="small" danger icon={<Trash2 size={14} />}
-              onClick={() => modal.confirm({
-                title: `删除应用「${record.name}」？`,
-                content: '存在进行中运行、部署或未关闭发布单时不可删除，删除后历史数据仍可查。',
-                okText: '删除', okButtonProps: { danger: true }, cancelText: '取消',
-                onOk: () => deleteMutation.mutateAsync([record.id]),
-              })}
-            />
+            <Tooltip title="删除">
+              <Button type="link" size="small" danger icon={<Trash2 size={14} />}
+                onClick={() => modal.confirm({
+                  title: `删除应用「${record.name}」？`,
+                  content: '存在进行中运行、部署或未关闭发布单时不可删除，删除后历史数据仍可查。',
+                  okText: '删除', okButtonProps: { danger: true }, cancelText: '取消',
+                  onOk: () => deleteMutation.mutateAsync([record.id]),
+                })}
+              />
+            </Tooltip>
           )}
         </div>
       ),

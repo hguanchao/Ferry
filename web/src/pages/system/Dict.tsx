@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { App, Button, Form, Input, InputNumber, Modal, Table, type TableColumnsType } from 'antd'
+import { App, Button, Form, Input, InputNumber, Modal, Table, Tooltip, type TableColumnsType } from 'antd'
 import { Pencil, Plus, RotateCw, Search, Trash2 } from 'lucide-react'
 import PageHeader from '@/components/PageHeader'
 import { RoleTag } from '@/components/StatusTag'
@@ -140,29 +140,31 @@ export default function Dict() {
       render: (_, record) => (
         <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
           {can('system:dict:save') && (
-            <Button type="link" size="small" icon={<Pencil size={14} />} onClick={() => openGroupEditor(record)}>
-              编辑
-            </Button>
+            <Tooltip title="编辑">
+              <Button type="link" size="small" icon={<Pencil size={14} />} onClick={() => openGroupEditor(record)} />
+            </Tooltip>
           )}
           {can('system:dict:deleted') && (
-            <Button
-              type="link"
-              size="small"
-              danger
-              icon={<Trash2 size={14} />}
-              onClick={() =>
-                confirmTreeDelete({
-                  modal,
-                  label: '字典',
-                  name: record.label,
-                  childLabel: '字典项',
-                  // 分组列表不返回子项数量，按「存在字典项」提示，具体以实际为准
-                  childCount: undefined,
-                  note: '被业务引用的取值删除后，新建数据将不再可选。',
-                  onOk: () => deleteMutation.mutateAsync([record.id]),
-                })
-              }
-            />
+            <Tooltip title="删除">
+              <Button
+                type="link"
+                size="small"
+                danger
+                icon={<Trash2 size={14} />}
+                onClick={() =>
+                  confirmTreeDelete({
+                    modal,
+                    label: '字典',
+                    name: record.label,
+                    childLabel: '字典项',
+                    // 分组列表不返回子项数量，按「存在字典项」提示，具体以实际为准
+                    childCount: undefined,
+                    note: '被业务引用的取值删除后，新建数据将不再可选。',
+                    onOk: () => deleteMutation.mutateAsync([record.id]),
+                  })
+                }
+              />
+            </Tooltip>
           )}
         </div>
       ),
@@ -202,27 +204,29 @@ export default function Dict() {
       render: (_, record) => (
         <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
           {can('system:dict:save') && (
-            <Button type="link" size="small" icon={<Pencil size={14} />} onClick={() => openItemEditor(record)}>
-              编辑
-            </Button>
+            <Tooltip title="编辑">
+              <Button type="link" size="small" icon={<Pencil size={14} />} onClick={() => openItemEditor(record)} />
+            </Tooltip>
           )}
           {can('system:dict:deleted') && (
-            <Button
-              type="link"
-              size="small"
-              danger
-              icon={<Trash2 size={14} />}
-              onClick={() =>
-                modal.confirm({
-                  title: `删除字典项「${record.label}」？`,
-                  content: '被业务引用的字典项删除后，历史数据仍保留原值，新建数据将不再可选。',
-                  okText: '删除',
-                  okButtonProps: { danger: true },
-                  cancelText: '取消',
-                  onOk: () => deleteMutation.mutateAsync([record.id]),
-                })
-              }
-            />
+            <Tooltip title="删除">
+              <Button
+                type="link"
+                size="small"
+                danger
+                icon={<Trash2 size={14} />}
+                onClick={() =>
+                  modal.confirm({
+                    title: `删除字典项「${record.label}」？`,
+                    content: '被业务引用的字典项删除后，历史数据仍保留原值，新建数据将不再可选。',
+                    okText: '删除',
+                    okButtonProps: { danger: true },
+                    cancelText: '取消',
+                    onOk: () => deleteMutation.mutateAsync([record.id]),
+                  })
+                }
+              />
+            </Tooltip>
           )}
         </div>
       ),

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { App, Button, Form, Input, Modal, Select, Space, Table, Tag, type TableColumnsType } from 'antd'
-import { Check, Plus, RotateCw, Search, Send, X } from 'lucide-react'
+import { App, Button, Form, Input, Modal, Select, Space, Table, Tag, Tooltip, type TableColumnsType } from 'antd'
+import { Ban, Check, Plus, RotateCw, Search, Send, X } from 'lucide-react'
 import PageHeader from '@/components/PageHeader'
 import { RoleTag } from '@/components/StatusTag'
 import { appApi, changeTicketApi } from '@/api/devops'
@@ -47,22 +47,38 @@ export default function ChangeTicket() {
     { title: '创建时间', dataIndex: 'createTime', width: COL.time, render: (v: string) => <span className="ferry-mono" style={{ fontSize: 12, color: 'var(--text-3)' }}>{v ?? '—'}</span> },
     { title: '操作', key: 'action', width: 220, fixed: 'right', render: (_, r) => (
       <Space size={2}>
-        {r.status === 1 && can('devops:changeTicket:submit') && <Button type="link" size="small" icon={<Send size={14} />} onClick={() => simple(() => changeTicketApi.submit(r.id), '提交成功')}>提交</Button>}
+        {r.status === 1 && can('devops:changeTicket:submit') && (
+          <Tooltip title="提交">
+            <Button type="link" size="small" icon={<Send size={14} />} onClick={() => simple(() => changeTicketApi.submit(r.id), '提交成功')} />
+          </Tooltip>
+        )}
         {r.status === 2 && can('devops:changeTicket:approve') && (
           <>
-            <Button type="link" size="small" icon={<Check size={14} />} onClick={() => modal.confirm({
-              title: '审批通过？', content: '紧急单需技术负责人（由权限约束）。',
-              onOk: (): Promise<unknown> => changeTicketApi.approve({ id: r.id, pass: true, opinion: '同意变更' }),
-            })}>通过</Button>
-            <Button type="link" size="small" danger icon={<X size={14} />} onClick={() => modal.confirm({
-              title: '驳回？', onOk: (): Promise<unknown> => changeTicketApi.approve({ id: r.id, pass: false, opinion: '驳回变更' }),
-            })}>驳回</Button>
+            <Tooltip title="通过">
+              <Button type="link" size="small" icon={<Check size={14} />} onClick={() => modal.confirm({
+                title: '审批通过？', content: '紧急单需技术负责人（由权限约束）。',
+                onOk: (): Promise<unknown> => changeTicketApi.approve({ id: r.id, pass: true, opinion: '同意变更' }),
+              })} />
+            </Tooltip>
+            <Tooltip title="驳回">
+              <Button type="link" size="small" danger icon={<X size={14} />} onClick={() => modal.confirm({
+                title: '驳回？', onOk: (): Promise<unknown> => changeTicketApi.approve({ id: r.id, pass: false, opinion: '驳回变更' }),
+              })} />
+            </Tooltip>
           </>
         )}
-        {r.status === 3 && can('devops:changeTicket:close') && <Button type="link" size="small" onClick={() => simple(() => changeTicketApi.close(r.id), '已关闭')}>关闭</Button>}
-        {can('devops:changeTicket:cancel') && ![5, 6].includes(r.status) && <Button type="link" size="small" onClick={() => modal.confirm({
-          title: '取消变更单？', onOk: (): Promise<unknown> => changeTicketApi.cancel(r.id),
-        })}>取消</Button>}
+        {r.status === 3 && can('devops:changeTicket:close') && (
+          <Tooltip title="关闭">
+            <Button type="link" size="small" icon={<X size={14} />} onClick={() => simple(() => changeTicketApi.close(r.id), '已关闭')} />
+          </Tooltip>
+        )}
+        {can('devops:changeTicket:cancel') && ![5, 6].includes(r.status) && (
+          <Tooltip title="取消">
+            <Button type="link" size="small" icon={<Ban size={14} />} onClick={() => modal.confirm({
+              title: '取消变更单？', onOk: (): Promise<unknown> => changeTicketApi.cancel(r.id),
+            })} />
+          </Tooltip>
+        )}
       </Space>
     ) },
   ]

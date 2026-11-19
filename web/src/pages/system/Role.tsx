@@ -335,15 +335,15 @@ export default function Role() {
     width: COL.actionWide,
     render: (_, record) => (
       <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-        <Button type="link" size="small" icon={<Pencil size={14} />} onClick={() => openEditor(record)}>
-          编辑
-        </Button>
-        <Button type="link" size="small" icon={<ShieldCheck size={14} />} onClick={() => openGrant(record)}>
-          授权
-        </Button>
-        <Button type="link" size="small" icon={<Copy size={14} />} onClick={() => copyRole(record)}>
-          复制
-        </Button>
+        <Tooltip title="编辑">
+          <Button type="link" size="small" icon={<Pencil size={14} />} onClick={() => openEditor(record)} />
+        </Tooltip>
+        <Tooltip title="授权">
+          <Button type="link" size="small" icon={<ShieldCheck size={14} />} onClick={() => openGrant(record)} />
+        </Tooltip>
+        <Tooltip title="复制">
+          <Button type="link" size="small" icon={<Copy size={14} />} onClick={() => copyRole(record)} />
+        </Tooltip>
         <Tooltip
           title={
             record.builtin

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { App, Button, Form, Input, Modal, Select, Table, Tag, type TableColumnsType } from 'antd'
-import { CopyPlus, Pencil, Plus, Search, Trash2 } from 'lucide-react'
+import { App, Button, Form, Input, Modal, Select, Table, Tag, Tooltip, type TableColumnsType } from 'antd'
+import { CirclePause, CirclePlay, CopyPlus, Pencil, Plus, Search, Trash2 } from 'lucide-react'
 import PageHeader from '@/components/PageHeader'
 import { templateApi } from '@/api/devops'
 import { useAuthStore } from '@/stores/auth'
@@ -124,24 +124,34 @@ export default function PipelineTemplate() {
       render: (_: unknown, record) => (
         <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
           {can('devops:template:save') && (
-            <Button type="link" size="small" icon={<CopyPlus />} onClick={() => openDerive(record)}>派生</Button>
+            <Tooltip title="派生">
+              <Button type="link" size="small" icon={<CopyPlus />} onClick={() => openDerive(record)} />
+            </Tooltip>
           )}
           {can('devops:template:save') && (
-            <Button type="link" size="small" icon={<Pencil />} onClick={() => openEditor(record)}>编辑</Button>
+            <Tooltip title="编辑">
+              <Button type="link" size="small" icon={<Pencil />} onClick={() => openEditor(record)} />
+            </Tooltip>
           )}
           {can('devops:template:enable') && record.isEnabled === 0 && (
-            <Button type="link" size="small" onClick={() => enableMutation.mutate(record.id)}>启用</Button>
+            <Tooltip title="启用">
+              <Button type="link" size="small" icon={<CirclePlay />} onClick={() => enableMutation.mutate(record.id)} />
+            </Tooltip>
           )}
           {can('devops:template:disable') && record.isEnabled === 1 && (
-            <Button type="link" size="small" onClick={() => disableMutation.mutate({ templateId: record.id, changeNote: '页面停用' })}>停用</Button>
+            <Tooltip title="停用">
+              <Button type="link" size="small" icon={<CirclePause />} onClick={() => disableMutation.mutate({ templateId: record.id, changeNote: '页面停用' })} />
+            </Tooltip>
           )}
           {can('devops:template:deleted') && (
-            <Button type="link" size="small" danger icon={<Trash2 />}
-              onClick={() => modal.confirm({
-                title: '删除模板', content: '存在派生流水线的模板不可删除，仅可停用。确认删除？',
-                okText: '删除', okButtonProps: { danger: true },
-                onOk: async () => { await deleteMutation.mutateAsync([record.id]) },
-              })}>删除</Button>
+            <Tooltip title="删除">
+              <Button type="link" size="small" danger icon={<Trash2 />}
+                onClick={() => modal.confirm({
+                  title: '删除模板', content: '存在派生流水线的模板不可删除，仅可停用。确认删除？',
+                  okText: '删除', okButtonProps: { danger: true },
+                  onOk: async () => { await deleteMutation.mutateAsync([record.id]) },
+                })} />
+            </Tooltip>
           )}
         </div>
       ),

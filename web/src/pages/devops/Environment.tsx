@@ -9,9 +9,10 @@ import {
   Select,
   Table,
   Tag,
+  Tooltip,
   type TableColumnsType,
 } from 'antd'
-import { Pencil, Plus, RotateCw, Search, Trash2, Shuffle } from 'lucide-react'
+import { Check, Pencil, Plus, RotateCw, Search, Trash2, Shuffle } from 'lucide-react'
 import PageHeader from '@/components/PageHeader'
 import { RoleTag } from '@/components/StatusTag'
 import { appApi, envApi } from '@/api/devops'
@@ -187,33 +188,41 @@ export default function Environment() {
       render: (_, record) => (
         <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
           {can('devops:environment:save') && (
-            <Button type="link" size="small" icon={<Pencil size={14} />} onClick={() => openEditor(record)}>编辑</Button>
+            <Tooltip title="编辑">
+              <Button type="link" size="small" icon={<Pencil size={14} />} onClick={() => openEditor(record)} />
+            </Tooltip>
           )}
           {can('devops:environment:changeType') && (
-            <Button type="link" size="small" icon={<Shuffle size={14} />} onClick={() => openChange(record)}>变更类型</Button>
+            <Tooltip title="变更类型">
+              <Button type="link" size="small" icon={<Shuffle size={14} />} onClick={() => openChange(record)} />
+            </Tooltip>
           )}
           {can('devops:environment:changeTypeApprove') && record.status === 2 && (
-            <Button type="link" size="small"
-              onClick={() => modal.confirm({
-                title: '审批通过部署类型变更？',
-                content: '通过后立即生效并清理历史版本指针。',
-                okText: '通过', cancelText: '取消',
-                onOk: () => approveChangeMutation.mutateAsync({
-                  id: record.id,
-                  deployType: pendingTargets[record.id] ?? record.deployType,
-                  pass: true,
-                }),
-              })}>审批</Button>
+            <Tooltip title="审批">
+              <Button type="link" size="small" icon={<Check size={14} />}
+                onClick={() => modal.confirm({
+                  title: '审批通过部署类型变更？',
+                  content: '通过后立即生效并清理历史版本指针。',
+                  okText: '通过', cancelText: '取消',
+                  onOk: () => approveChangeMutation.mutateAsync({
+                    id: record.id,
+                    deployType: pendingTargets[record.id] ?? record.deployType,
+                    pass: true,
+                  }),
+                })} />
+            </Tooltip>
           )}
           {can('devops:environment:deleted') && (
-            <Button type="link" size="small" danger icon={<Trash2 size={14} />}
-              onClick={() => modal.confirm({
-                title: `删除环境「${record.name}」？`,
-                content: '存在进行中部署或生效制品时不可删除。',
-                okText: '删除', okButtonProps: { danger: true }, cancelText: '取消',
-                onOk: () => deleteMutation.mutateAsync([record.id]),
-              })}
-            />
+            <Tooltip title="删除">
+              <Button type="link" size="small" danger icon={<Trash2 size={14} />}
+                onClick={() => modal.confirm({
+                  title: `删除环境「${record.name}」？`,
+                  content: '存在进行中部署或生效制品时不可删除。',
+                  okText: '删除', okButtonProps: { danger: true }, cancelText: '取消',
+                  onOk: () => deleteMutation.mutateAsync([record.id]),
+                })}
+              />
+            </Tooltip>
           )}
         </div>
       ),

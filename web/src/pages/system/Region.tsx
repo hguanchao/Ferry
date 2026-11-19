@@ -270,27 +270,29 @@ export default function Region() {
               </Tooltip>
             )}
             {can('system:region:save') && (
-              <Button type="link" size="small" icon={<Pencil size={14} />} onClick={() => openEditor(record)}>
-                编辑
-              </Button>
+              <Tooltip title="编辑">
+                <Button type="link" size="small" icon={<Pencil size={14} />} onClick={() => openEditor(record)} />
+              </Tooltip>
             )}
             {can('system:region:deleted') && (
-              <Button
-                type="link"
-                size="small"
-                danger
-                icon={<Trash2 size={14} />}
-                onClick={() =>
-                  modal.confirm({
-                    title: `删除区域「${record.name}」？`,
-                    content: '存在下级区域时不可删除，需先处理下级。区划数据被引用后也不建议删除。',
-                    okText: '删除',
-                    okButtonProps: { danger: true },
-                    cancelText: '取消',
-                    onOk: () => deleteMutation.mutateAsync([record.id]),
-                  })
-                }
-              />
+              <Tooltip title="删除">
+                <Button
+                  type="link"
+                  size="small"
+                  danger
+                  icon={<Trash2 size={14} />}
+                  onClick={() =>
+                    modal.confirm({
+                      title: `删除区域「${record.name}」？`,
+                      content: '存在下级区域时不可删除，需先处理下级。区划数据被引用后也不建议删除。',
+                      okText: '删除',
+                      okButtonProps: { danger: true },
+                      cancelText: '取消',
+                      onOk: () => deleteMutation.mutateAsync([record.id]),
+                    })
+                  }
+                />
+              </Tooltip>
             )}
           </div>
         )

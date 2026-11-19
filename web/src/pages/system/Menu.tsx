@@ -199,9 +199,9 @@ export default function Menu() {
             </Tooltip>
           )}
           {can('system:menu:save') && (
-            <Button type="link" size="small" icon={<Pencil size={14} />} onClick={() => openEditor(record)}>
-              编辑
-            </Button>
+            <Tooltip title="编辑">
+              <Button type="link" size="small" icon={<Pencil size={14} />} onClick={() => openEditor(record)} />
+            </Tooltip>
           )}
           {can('system:menu:deleted') && (
             <Tooltip title="存在下级时不可删除">

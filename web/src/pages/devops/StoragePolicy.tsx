@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { App, Button, Form, Input, InputNumber, Modal, Space, Table, Tag, type TableColumnsType } from 'antd'
+import { App, Button, Form, Input, InputNumber, Modal, Space, Table, Tag, Tooltip, type TableColumnsType } from 'antd'
 import { Pencil, RotateCw, Save } from 'lucide-react'
 import PageHeader from '@/components/PageHeader'
 import { RoleTag } from '@/components/StatusTag'
@@ -62,7 +62,9 @@ export default function StoragePolicy() {
     { title: '操作', key: 'action', width: COL.action, fixed: 'right',
       render: (_, record) => (
         can('system:storage:save') && (
-          <Button type="link" size="small" icon={<Pencil size={14} />} onClick={() => openEditor(record)}>编辑</Button>
+          <Tooltip title="编辑">
+            <Button type="link" size="small" icon={<Pencil size={14} />} onClick={() => openEditor(record)} />
+          </Tooltip>
         )
       ),
     },

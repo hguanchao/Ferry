@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { App, Button, Descriptions, Input, Modal, Space, Table, Tag, Timeline, type TableColumnsType } from 'antd'
+import { App, Button, Descriptions, Input, Modal, Space, Table, Tag, Timeline, Tooltip, type TableColumnsType } from 'antd'
 import { CirclePause, CirclePlay, OctagonX, RotateCcw, Search } from 'lucide-react'
 import PageHeader from '@/components/PageHeader'
 import { runApi } from '@/api/devops'
@@ -141,7 +141,9 @@ export default function RunDetail() {
       render: (v: number, r) => <>{v}{r.isTruncated === 1 && <Tag color="orange" style={{ marginLeft: 4 }}>已截断</Tag>}</> },
     { title: '操作', width: 100,
       render: (_: unknown, r) => can('devops:run:detail') && (
-        <Button type="link" size="small" icon={<Search />} onClick={() => setLogTask(r)}>日志</Button>
+        <Tooltip title="日志">
+          <Button type="link" size="small" icon={<Search />} onClick={() => setLogTask(r)} />
+        </Tooltip>
       ) },
   ]
 

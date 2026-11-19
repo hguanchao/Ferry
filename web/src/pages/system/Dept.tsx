@@ -155,27 +155,29 @@ export default function Dept() {
             </Tooltip>
           )}
           {can('system:dept:save') && (
-            <Button type="link" size="small" icon={<Pencil size={14} />} onClick={() => openEditor(record)}>
-              编辑
-            </Button>
+            <Tooltip title="编辑">
+              <Button type="link" size="small" icon={<Pencil size={14} />} onClick={() => openEditor(record)} />
+            </Tooltip>
           )}
           {can('system:dept:deleted') && (
-            <Button
-              type="link"
-              size="small"
-              danger
-              icon={<Trash2 size={14} />}
-              onClick={() =>
-                modal.confirm({
-                  title: `删除部门「${record.name}」？`,
-                  content: '存在下级部门或仍有用户归属时不可删除，需先调整归属。',
-                  okText: '删除',
-                  okButtonProps: { danger: true },
-                  cancelText: '取消',
-                  onOk: () => deleteMutation.mutateAsync([record.id]),
-                })
-              }
-            />
+            <Tooltip title="删除">
+              <Button
+                type="link"
+                size="small"
+                danger
+                icon={<Trash2 size={14} />}
+                onClick={() =>
+                  modal.confirm({
+                    title: `删除部门「${record.name}」？`,
+                    content: '存在下级部门或仍有用户归属时不可删除，需先调整归属。',
+                    okText: '删除',
+                    okButtonProps: { danger: true },
+                    cancelText: '取消',
+                    onOk: () => deleteMutation.mutateAsync([record.id]),
+                  })
+                }
+              />
+            </Tooltip>
           )}
         </div>
       ),

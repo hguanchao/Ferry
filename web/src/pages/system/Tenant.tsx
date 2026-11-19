@@ -118,19 +118,19 @@ export default function Tenant() {
       render: (_, record) => (
         <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
           {can('system:tenant:save') && (
-            <Button
-              type="link"
-              size="small"
-              icon={<Pencil size={14} />}
-              onClick={() => {
-                setEditing(record)
-                form.resetFields()
-                form.setFieldsValue({ ...record })
-                setOpen(true)
-              }}
-            >
-              编辑
-            </Button>
+            <Tooltip title="编辑">
+              <Button
+                type="link"
+                size="small"
+                icon={<Pencil size={14} />}
+                onClick={() => {
+                  setEditing(record)
+                  form.resetFields()
+                  form.setFieldsValue({ ...record })
+                  setOpen(true)
+                }}
+              />
+            </Tooltip>
           )}
           {can('system:tenant:deleted') && (
             <Tooltip title={record.code === '000000' ? '默认租户不可删除' : '删除'}>
