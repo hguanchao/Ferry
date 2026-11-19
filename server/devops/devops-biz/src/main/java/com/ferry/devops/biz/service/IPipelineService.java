@@ -3,7 +3,6 @@ package com.ferry.devops.biz.service;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.ferry.common.jdbc.base.IService;
 import com.ferry.devops.api.dto.PipelineDTO;
-import com.ferry.devops.api.dto.PipelineTemplateVersionDTO;
 import com.ferry.devops.api.dto.query.PipelineQuery;
 import com.ferry.devops.api.entity.Pipeline;
 import com.ferry.devops.api.vo.DiffVO;

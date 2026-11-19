@@ -6,7 +6,6 @@ import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 import java.util.List;
-import java.util.Map;
 
 /**
  * 流水线建档/编辑表单
@@ -33,15 +32,6 @@ public class PipelineDTO {
 
     @Schema(description = "停用原因")
     private String disabledReason;
-
-    @Schema(description = "从模板派生时的模板id")
-    private Long templateId;
-
-    @Schema(description = "从模板派生时的模板版本id")
-    private Long templateVersionId;
-
-    @Schema(description = "派生变量实际值")
-    private Map<String, String> variableValues;
 
     @Schema(description = "新建时初始定义（可选，结构化 JSON）")
     private String definition;

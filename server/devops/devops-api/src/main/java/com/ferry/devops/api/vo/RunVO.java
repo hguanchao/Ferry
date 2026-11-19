@@ -23,9 +23,6 @@ public class RunVO {
     @Schema(description = "流水线名称")
     private String pipelineName;
 
-    @Schema(description = "流水线版本id")
-    private Long pipelineVersionId;
-
     @Schema(description = "流水线版本号")
     private Integer pipelineVersionNo;
 

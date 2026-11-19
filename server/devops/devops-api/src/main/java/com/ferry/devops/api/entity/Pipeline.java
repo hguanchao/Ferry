@@ -1,5 +1,4 @@
 package com.ferry.devops.api.entity;
-import java.util.Date;
 
 import java.io.Serializable;
 
@@ -17,34 +16,19 @@ import lombok.EqualsAndHashCode;
 @EqualsAndHashCode(callSuper = true)
 public class Pipeline extends BaseEntity implements Serializable {
 
-    /** 数据id */
+    /** 主键id */
     @TableId
     private Long id;
-
-    /** 应用id */
-    private Long appId;
 
     /** 流水线名称 */
     private String name;
 
-    /** 启用 1 是 0 否 */
-    private Integer isEnabled;
+    /** 状态 0停用 1启用 */
+    private Integer status;
 
-    /** 停用原因 */
-    private String disabledReason;
+    /** 应用id */
+    private Long appId;
 
-    /** 当前版本id */
-    private Long currentVersionId;
-
-    /** 负责人 */
-    private Long ownerId;
-
-    /** 最近运行id */
-    private Long lastRunId;
-
-    /** 最近运行状态冗余 */
-    private Integer lastRunStatus;
-
-    /** 最近运行时间 */
-    private java.util.Date lastRunTime;
+    /** 当前版本号 */
+    private Integer version;
 }

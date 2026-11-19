@@ -1,12 +1,9 @@
 package com.ferry.devops.biz.service.impl;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
-import com.baomidou.mybatisplus.core.toolkit.Wrappers;
-import com.ferry.common.core.constant.IntConst;
 import com.ferry.common.core.exception.ServiceException;
 import com.ferry.common.core.utils.BeanUtil;
 import com.ferry.common.core.utils.CollUtil;
-import com.ferry.common.core.utils.CryptoUtil;
 import com.ferry.common.core.utils.JsonUtil;
 import com.ferry.common.core.utils.ObjUtil;
 import com.ferry.common.core.utils.StrUtil;
@@ -18,9 +15,6 @@ import com.ferry.devops.api.dto.PipelineStageDTO;
 import com.ferry.devops.api.dto.PipelineTaskDTO;
 import com.ferry.devops.api.dto.query.PipelineQuery;
 import com.ferry.devops.api.entity.Pipeline;
-import com.ferry.devops.api.entity.PipelineTemplateDerivation;
-import com.ferry.devops.api.entity.PipelineTemplateVersion;
-import com.ferry.devops.api.entity.PipelineVersion;
 import com.ferry.devops.api.entity.RunTrigger;
 import com.ferry.devops.api.vo.DiffVO;
 import com.ferry.devops.api.vo.PipelineDefinitionVO;
@@ -32,9 +26,6 @@ import com.ferry.devops.api.vo.TriggerRecordVO;
 import com.ferry.devops.api.vo.ValidateResultVO;
 import com.ferry.devops.api.vo.VersionVO;
 import com.ferry.devops.biz.mapper.PipelineMapper;
-import com.ferry.devops.biz.mapper.PipelineTemplateDerivationMapper;
-import com.ferry.devops.biz.mapper.PipelineTemplateVersionMapper;
-import com.ferry.devops.biz.mapper.PipelineVersionMapper;
 import com.ferry.devops.biz.mapper.RunTriggerMapper;
 import com.ferry.devops.biz.service.IPipelineService;
 import com.ferry.devops.biz.wrapper.PipelineWrapper;
@@ -43,24 +34,22 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
-import java.util.Collections;
+import java.util.Date;
 import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * 流水线服务实现：不可变版本快照、回退复制、定义校验、diff。
+ * 流水线服务实现：定义落库到阶段/任务表，按版本号管理，提供校验、回退与 diff。
  */
 @Service
 @RequiredArgsConstructor
 public class PipelineServiceImpl extends ServiceImpl<PipelineMapper, Pipeline> implements IPipelineService {
-    private final PipelineVersionMapper versionMapper;
-    private final PipelineTemplateVersionMapper templateVersionMapper;
-    private final PipelineTemplateDerivationMapper derivationMapper;
     private final RunTriggerMapper triggerMapper;
+    private final PipelineDefinitionStore definitionStore;
 
     @Override
     public IPage<PipelineVO> pageList(PipelineQuery body) {
-        PipelineWrapper wrapper = PipelineWrapper.build(baseMapper, versionMapper, derivationMapper);
+        PipelineWrapper wrapper = PipelineWrapper.build(baseMapper);
         IPage<Pipeline> pages = page(Page.create(body), wrapper.lambda(body));
         IPage<PipelineVO> result = wrapper.pageVo(pages);
         result.setRecords(wrapper.voWithExtras(pages.getRecords()));
@@ -71,15 +60,11 @@ public class PipelineServiceImpl extends ServiceImpl<PipelineMapper, Pipeline> i
     public PipelineDetailVO detail(Long id) {
         Pipeline pipeline = requirePipeline(id);
         PipelineDetailVO vo = new PipelineDetailVO();
-        vo.setPipeline(PipelineWrapper.build(baseMapper, versionMapper, derivationMapper).vo(pipeline));
-        if (ObjUtil.isNotEmpty(pipeline.getCurrentVersionId())) {
-            vo.setDefinition(definition(id, pipeline.getCurrentVersionId()));
+        vo.setPipeline(PipelineWrapper.build(baseMapper).vo(pipeline));
+        if (pipeline.getVersion() != null && pipeline.getVersion() > 0) {
+            vo.setDefinition(definition(id, null));
         }
         vo.setVersions(versionPage(id, 1L, 20L).getRecords());
-        PipelineTemplateDerivation derivation = derivationMapper.selectByPipeline(id);
-        if (derivation != null) {
-            vo.setDerivation(BeanUtil.copy(derivation, com.ferry.devops.api.vo.DerivationVO.class));
-        }
         return vo;
     }
 
@@ -90,41 +75,22 @@ public class PipelineServiceImpl extends ServiceImpl<PipelineMapper, Pipeline> i
         boolean isNew = ObjUtil.isEmpty(body.getId());
         if (isNew) {
             pipeline = new Pipeline();
-            pipeline.setIsEnabled(IntConst.ONE);
+            pipeline.setStatus(1);
+            pipeline.setVersion(0);
         } else {
             pipeline = requirePipeline(body.getId());
         }
         pipeline.setAppId(body.getAppId());
         pipeline.setName(body.getName());
-        if (ObjUtil.isNotEmpty(body.getOwnerId())) {
-            pipeline.setOwnerId(body.getOwnerId());
-        }
         if (ObjUtil.isNotEmpty(body.getIsEnabled())) {
-            pipeline.setIsEnabled(body.getIsEnabled());
-        }
-        if (ObjUtil.isNotEmpty(body.getDisabledReason())) {
-            pipeline.setDisabledReason(body.getDisabledReason());
+            pipeline.setStatus(body.getIsEnabled());
         }
         boolean success = saveOrUpdate(pipeline);
-        // 新建时若携带定义或派生模板，生成初版
+        // 新建时若携带定义，生成初版
         if (isNew) {
             String definition = body.getDefinition();
-            if (StrUtil.isBlank(definition) && ObjUtil.isNotEmpty(body.getTemplateVersionId())) {
-                definition = templateVersionMapper.selectById(body.getTemplateVersionId()).getContentJson();
-            }
             if (StrUtil.isNotBlank(definition)) {
-                createVersion(pipeline.getId(), definition, null,
-                        ObjUtil.isNotEmpty(body.getTemplateVersionId()) ? 4 : 1,
-                        body.getChangeNote(), null);
-            }
-            // 从模板派生：写派生关系
-            if (ObjUtil.isNotEmpty(body.getTemplateId()) && ObjUtil.isNotEmpty(body.getTemplateVersionId())) {
-                PipelineTemplateDerivation derivation = new PipelineTemplateDerivation();
-                derivation.setTemplateId(body.getTemplateId());
-                derivation.setTemplateVersionId(body.getTemplateVersionId());
-                derivation.setPipelineId(pipeline.getId());
-                derivation.setIsBehind(IntConst.ZERO);
-                derivationMapper.insert(derivation);
+                createVersion(pipeline.getId(), definition, body.getChangeNote());
             }
         }
         return success;
@@ -137,9 +103,12 @@ public class PipelineServiceImpl extends ServiceImpl<PipelineMapper, Pipeline> i
             throw new ServiceException("请选择要删除的流水线");
         }
         for (Long id : ids) {
-            if (baseMapper.countActiveRun(id) > IntConst.ZERO) {
+            if (baseMapper.countActiveRun(id) > 0) {
                 throw new ServiceException("流水线存在进行中的运行，不可删除");
             }
+        }
+        for (Long id : ids) {
+            definitionStore.deleteByPipeline(id);
         }
         return removeByIds(ids);
     }
@@ -148,8 +117,7 @@ public class PipelineServiceImpl extends ServiceImpl<PipelineMapper, Pipeline> i
     @Transactional(rollbackFor = Exception.class)
     public boolean enable(Long id) {
         Pipeline pipeline = requirePipeline(id);
-        pipeline.setIsEnabled(IntConst.ONE);
-        pipeline.setDisabledReason(null);
+        pipeline.setStatus(1);
         return updateById(pipeline);
     }
 
@@ -157,37 +125,22 @@ public class PipelineServiceImpl extends ServiceImpl<PipelineMapper, Pipeline> i
     @Transactional(rollbackFor = Exception.class)
     public boolean disable(Long id, String reason) {
         Pipeline pipeline = requirePipeline(id);
-        pipeline.setIsEnabled(IntConst.ZERO);
-        pipeline.setDisabledReason(reason);
+        pipeline.setStatus(0);
         return updateById(pipeline);
     }
 
     @Override
     public PipelineDefinitionVO definition(Long id, Long versionId) {
-        PipelineVersion version;
-        if (ObjUtil.isNotEmpty(versionId)) {
-            version = versionMapper.selectById(versionId);
-        } else {
-            Pipeline pipeline = requirePipeline(id);
-            version = versionMapper.selectById(pipeline.getCurrentVersionId());
-        }
-        if (version == null) {
-            throw new ServiceException("流水线版本不存在");
-        }
+        Pipeline pipeline = requirePipeline(id);
+        int version = versionId == null ? (pipeline.getVersion() == null ? 0 : pipeline.getVersion()) : versionId.intValue();
+        String json = definitionStore.loadJson(id, version);
         PipelineDefinitionVO vo = new PipelineDefinitionVO();
-        vo.setVersionId(version.getId());
-        vo.setVersionNo(version.getVersionNo());
-        vo.setJson(version.getContentJson());
-        vo.setYaml(version.getContentYaml());
-        if (StrUtil.isNotBlank(version.getContentJson())) {
-            try {
-                PipelineDefinitionDTO dto = JsonUtil.toBean(version.getContentJson(), PipelineDefinitionDTO.class);
-                if (dto != null && dto.getStages() != null) {
-                    vo.setStages(dto.getStages().stream().map(this::stageVo).collect(Collectors.toList()));
-                }
-            } catch (Exception ignored) {
-                // YAML 降级模式下 content_json 可能不是结构化 JSON，忽略阶段解析
-            }
+        vo.setVersionId((long) version);
+        vo.setVersionNo(version);
+        vo.setJson(json);
+        PipelineDefinitionDTO dto = definitionStore.load(id, version);
+        if (dto.getStages() != null) {
+            vo.setStages(dto.getStages().stream().map(this::stageVo).collect(Collectors.toList()));
         }
         return vo;
     }
@@ -205,53 +158,62 @@ public class PipelineServiceImpl extends ServiceImpl<PipelineMapper, Pipeline> i
         if (!Boolean.TRUE.equals(result.getValid())) {
             throw new ServiceException("流水线定义校验不通过：" + result.getErrors().get(0).getMessage());
         }
-        String contentJson = normalize(definition, mode);
-        String hash = CryptoUtil.sha256Hex(contentJson);
-        PipelineVersion current = versionMapper.selectById(pipeline.getCurrentVersionId());
-        if (current != null && hash.equals(current.getContentHash())) {
-            throw new ServiceException("内容未变更");
-        }
-        PipelineVersion version = createVersion(id, contentJson, mode == null ? Integer.valueOf(1) : mode, changeNote, null);
-        return BeanUtil.copy(version, VersionVO.class);
+        int newVersion = (pipeline.getVersion() == null ? 0 : pipeline.getVersion()) + 1;
+        createVersion(id, definition, changeNote);
+        VersionVO vo = new VersionVO();
+        vo.setPipelineId(id);
+        vo.setVersionNo(newVersion);
+        vo.setChangeNote(changeNote);
+        return vo;
     }
 
     @Override
     public IPage<VersionVO> versionPage(Long pipelineId, Long current, Long size) {
-        IPage<PipelineVersion> pages = versionMapper.selectPage(
-                new com.baomidou.mybatisplus.extension.plugins.pagination.Page<>(
-                        current == null ? 1 : current, size == null ? 20 : size),
-                Wrappers.<PipelineVersion>lambdaQuery()
-                        .eq(PipelineVersion::getPipelineId, pipelineId)
-                        .orderByDesc(PipelineVersion::getVersionNo));
-        IPage<VersionVO> result = new com.baomidou.mybatisplus.extension.plugins.pagination.Page<>(
-                pages.getCurrent(), pages.getSize(), pages.getTotal());
-        result.setRecords(pages.getRecords().stream().map(v -> BeanUtil.copy(v, VersionVO.class)).collect(Collectors.toList()));
+        List<Integer> versions = definitionStore.listVersions(pipelineId);
+        long total = versions.size();
+        long cur = current == null ? 1 : current;
+        long sz = size == null ? 20 : size;
+        int from = (int) Math.min((cur - 1) * sz, total);
+        int to = (int) Math.min(from + sz, total);
+        List<VersionVO> records = versions.subList(from, to).stream().map(v -> {
+            VersionVO vo = new VersionVO();
+            vo.setPipelineId(pipelineId);
+            vo.setVersionNo(v);
+            return vo;
+        }).collect(Collectors.toList());
+        IPage<VersionVO> result = new com.baomidou.mybatisplus.extension.plugins.pagination.Page<>(cur, sz, total);
+        result.setRecords(records);
         return result;
     }
 
     @Override
     public DiffVO versionDiff(Long leftId, Long rightId) {
-        PipelineVersion left = versionMapper.selectById(leftId);
-        PipelineVersion right = versionMapper.selectById(rightId);
-        if (left == null || right == null) {
-            throw new ServiceException("对比版本不存在");
-        }
+        Pipeline pipeline = requirePipeline(leftId);
+        String left = definitionStore.loadJson(pipeline.getId(), leftId.intValue());
+        String right = definitionStore.loadJson(pipeline.getId(), rightId.intValue());
         DiffVO vo = new DiffVO();
-        vo.setLeft(left.getContentJson());
-        vo.setRight(right.getContentJson());
-        vo.setLines(lineDiff(left.getContentJson(), right.getContentJson()));
+        vo.setLeft(left);
+        vo.setRight(right);
+        vo.setLines(lineDiff(left, right));
         return vo;
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public VersionVO rollback(Long id, Long versionId, String changeNote) {
-        PipelineVersion target = versionMapper.selectById(versionId);
-        if (target == null || !ObjUtil.equals(target.getPipelineId(), id)) {
+        Pipeline pipeline = requirePipeline(id);
+        int target = versionId.intValue();
+        if (!definitionStore.listVersions(id).contains(target)) {
             throw new ServiceException("回退版本不存在");
         }
-        PipelineVersion version = createVersion(id, target.getContentJson(), 3, changeNote, target.getId());
-        return BeanUtil.copy(version, VersionVO.class);
+        int newVersion = (pipeline.getVersion() == null ? 0 : pipeline.getVersion()) + 1;
+        String json = definitionStore.loadJson(id, target);
+        createVersion(id, json, changeNote);
+        VersionVO vo = new VersionVO();
+        vo.setPipelineId(id);
+        vo.setVersionNo(newVersion);
+        vo.setChangeNote(changeNote);
+        return vo;
     }
 
     @Override
@@ -264,47 +226,23 @@ public class PipelineServiceImpl extends ServiceImpl<PipelineMapper, Pipeline> i
     }
 
     /**
-     * 创建不可变版本快照，并更新流水线当前版本指针。
-     * source_type 由调用方按入口明确传入：1表单 2YAML 3回退 4模板合并。
+     * 创建新版本：阶段/任务落库并更新流水线当前版本号。
      */
-    private PipelineVersion createVersion(Long pipelineId, String contentJson, Integer sourceType,
-                                          String changeNote, Long sourceVersionId) {
-        return createVersion(pipelineId, contentJson, null, sourceType, changeNote, sourceVersionId);
-    }
-
-    private PipelineVersion createVersion(Long pipelineId, String contentJson, String contentYaml,
-                                          Integer sourceType, String changeNote, Long sourceVersionId) {
-        String hash = CryptoUtil.sha256Hex(contentJson);
-        // 同内容去重：已有相同 hash 不再新增版本，直接复用
-        Long existing = versionMapper.selectIdByHash(pipelineId, hash);
-        if (existing != null) {
-            Pipeline pipeline = getById(pipelineId);
-            pipeline.setCurrentVersionId(existing);
-            updateById(pipeline);
-            return versionMapper.selectById(existing);
+    private void createVersion(Long pipelineId, String definitionJson, String changeNote) {
+        PipelineDefinitionDTO dto;
+        try {
+            dto = JsonUtil.toBean(definitionJson, PipelineDefinitionDTO.class);
+        } catch (Exception e) {
+            throw new ServiceException("流水线定义不是合法的 JSON");
         }
-        int versionNo = versionMapper.selectMaxVersionNo(pipelineId) + 1;
-        PipelineVersion version = new PipelineVersion();
-        version.setPipelineId(pipelineId);
-        version.setVersionNo(versionNo);
-        version.setContentJson(contentJson);
-        version.setContentYaml(contentYaml);
-        version.setContentHash(hash);
-        version.setChangeNote(StrUtil.isBlank(changeNote) ? "" : changeNote);
-        version.setSourceType(sourceType == null ? 1 : sourceType);
-        version.setSourceVersionId(sourceVersionId);
-        versionMapper.insert(version);
+        if (dto == null) {
+            throw new ServiceException("流水线定义格式错误");
+        }
         Pipeline pipeline = getById(pipelineId);
-        pipeline.setCurrentVersionId(version.getId());
+        int version = (pipeline.getVersion() == null ? 0 : pipeline.getVersion()) + 1;
+        definitionStore.save(pipelineId, version, dto);
+        pipeline.setVersion(version);
         updateById(pipeline);
-        return version;
-    }
-
-    /**
-     * YAML 模式降级：原样保存 YAML 文本到 content_json（JSON only，不解析），保持编译通过。
-     */
-    private String normalize(String definition, Integer mode) {
-        return definition;
     }
 
     private PipelineStageVO stageVo(PipelineStageDTO stage) {

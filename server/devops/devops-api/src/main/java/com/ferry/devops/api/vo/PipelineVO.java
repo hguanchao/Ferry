@@ -56,12 +56,6 @@ public class PipelineVO {
     @Schema(description = "最近运行耗时毫秒")
     private Long lastDuration;
 
-    @Schema(description = "模板id")
-    private Long templateId;
-
-    @Schema(description = "是否落后于模板 1 是")
-    private Integer isBehind;
-
     @Schema(description = "创建时间")
     private Date createTime;
 }

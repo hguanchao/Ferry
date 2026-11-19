@@ -18,7 +18,7 @@ public interface PipelineMapper extends BaseMapper<Pipeline> {
     /**
      * 应用是否启用（触发预校验：流水线启用状态由主表读取，此方法保留给应用状态检查）
      */
-    @Select("SELECT COUNT(1) FROM dev_pipeline WHERE is_deleted = 0 AND id = #{pipelineId} AND is_enabled = 1")
+    @Select("SELECT COUNT(1) FROM dev_pipeline WHERE is_deleted = 0 AND id = #{pipelineId} AND status = 1")
     long countEnabled(@Param("pipelineId") Long pipelineId);
 
     /**

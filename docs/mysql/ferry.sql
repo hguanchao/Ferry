@@ -316,121 +316,68 @@ CREATE TABLE `dev_app_core_flag_apply`  (
 -- ----------------------------
 DROP TABLE IF EXISTS `dev_pipeline`;
 CREATE TABLE `dev_pipeline`  (
-  `id` bigint NOT NULL COMMENT '主键',
-  `app_id` bigint NOT NULL COMMENT '应用id',
+  `id` bigint NOT NULL COMMENT '主键id',
   `name` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '流水线名称',
-  `is_enabled` tinyint(1) NOT NULL DEFAULT 1 COMMENT '启用 1 是 0 否',
-  `disabled_reason` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '停用原因',
-  `current_version_id` bigint NULL COMMENT '当前版本id',
-  `owner_id` bigint NULL COMMENT '负责人',
-  `last_run_id` bigint NULL COMMENT '最近运行id',
-  `last_run_status` tinyint NULL COMMENT '最近运行状态冗余',
-  `last_run_time` datetime(3) NULL COMMENT '最近运行时间',
-  `create_user` bigint NULL COMMENT '创建人',
-  `create_time` datetime(3) NULL COMMENT '创建时间',
-  `update_user` bigint NULL COMMENT '更新人',
-  `update_time` datetime(3) NULL COMMENT '更新时间',
-  `is_deleted` tinyint(1) NULL DEFAULT 0 COMMENT '是否删除 0：否 1：是',
+  `status` tinyint(1) NOT NULL DEFAULT 1 COMMENT '状态 0停用 1启用',
+  `app_id` bigint NOT NULL COMMENT '应用id',
+  `version` int NOT NULL DEFAULT 0 COMMENT '当前版本号',
+  `create_user` bigint DEFAULT NULL COMMENT '创建人',
+  `create_time` datetime(3) DEFAULT NULL COMMENT '创建时间',
+  `update_user` bigint DEFAULT NULL COMMENT '更新人',
+  `update_time` datetime(3) DEFAULT NULL COMMENT '更新时间',
+  `is_deleted` tinyint(1) DEFAULT 0 COMMENT '是否删除 0否 1是',
   PRIMARY KEY (`id`) USING BTREE,
   KEY `idx_pipeline_app` (`app_id`) USING BTREE,
   KEY `idx_pipeline_name` (`name`) USING BTREE,
-  KEY `idx_pipeline_last` (`last_run_time`) USING BTREE
 ) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '流水线表' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
--- Table structure for dev_pipeline_version
+-- Table structure for dev_pipeline_stage
 -- ----------------------------
-DROP TABLE IF EXISTS `dev_pipeline_version`;
-CREATE TABLE `dev_pipeline_version`  (
-  `id` bigint NOT NULL COMMENT '主键',
+DROP TABLE IF EXISTS `dev_pipeline_stage`;
+CREATE TABLE `dev_pipeline_stage`  (
+  `id` bigint NOT NULL COMMENT '主键id',
+  `type` tinyint NOT NULL COMMENT '阶段类型 1构建 2单测 3静态扫描 4制品入库 5部署非生产 6集成测试 7准入 8生产发布',
+  `name` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '阶段名称',
+  `version` int NOT NULL COMMENT '版本号',
+  `timeout` int DEFAULT NULL COMMENT '超时秒数',
+  `outputs` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci DEFAULT NULL COMMENT '产出物',
   `pipeline_id` bigint NOT NULL COMMENT '流水线id',
-  `version_no` int NOT NULL COMMENT '自增版本号',
-  `content_json` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '结构化定义',
-  `content_yaml` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT 'YAML 原文',
-  `content_hash` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '内容 sha256',
-  `change_note` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '变更说明',
-  `source_version_id` bigint NULL COMMENT '回退来源版本',
-  `source_type` tinyint NOT NULL DEFAULT 1 COMMENT '1 表单 2 YAML 3 回退 4 模板合并',
-  `create_user` bigint NULL COMMENT '创建人',
-  `create_time` datetime(3) NULL COMMENT '创建时间',
+  `sort` int NOT NULL COMMENT '排序号',
+  `create_user` bigint DEFAULT NULL COMMENT '创建人',
+  `create_time` datetime(3) DEFAULT NULL COMMENT '创建时间',
+  `update_user` bigint DEFAULT NULL COMMENT '更新人',
+  `update_time` datetime(3) DEFAULT NULL COMMENT '更新时间',
+  `is_deleted` tinyint(1) DEFAULT 0 COMMENT '是否删除 0否 1是',
   PRIMARY KEY (`id`) USING BTREE,
-  UNIQUE KEY `uk_pipeline_version` (`pipeline_id`,`version_no`) USING BTREE,
-  KEY `idx_pipeline_version_hash` (`content_hash`) USING BTREE
-) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '流水线版本快照表' ROW_FORMAT = DYNAMIC;
+  UNIQUE KEY `uk_pipeline_stage` (`pipeline_id`,`version`,`sort`) USING BTREE,
+  KEY `idx_pipeline_stage_version` (`pipeline_id`,`version`) USING BTREE
+) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '流水线阶段表' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
--- Table structure for dev_pipeline_template
+-- Table structure for dev_pipeline_stage_task
 -- ----------------------------
-DROP TABLE IF EXISTS `dev_pipeline_template`;
-CREATE TABLE `dev_pipeline_template`  (
-  `id` bigint NOT NULL COMMENT '主键',
-  `scope` tinyint NOT NULL COMMENT '1 组织级 2 团队级',
-  `team_id` bigint NULL COMMENT '团队id，团队级必填',
-  `name` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '模板名称',
-  `scene` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '适用场景',
-  `is_enabled` tinyint(1) NOT NULL DEFAULT 1 COMMENT '启停',
-  `current_version_id` bigint NULL COMMENT '当前版本',
-  `derived_count` int NOT NULL DEFAULT 0 COMMENT '派生数',
-  `create_user` bigint NULL COMMENT '创建人',
-  `create_time` datetime(3) NULL COMMENT '创建时间',
-  `update_user` bigint NULL COMMENT '更新人',
-  `update_time` datetime(3) NULL COMMENT '更新时间',
-  `is_deleted` tinyint(1) NULL DEFAULT 0 COMMENT '是否删除 0：否 1：是',
+DROP TABLE IF EXISTS `dev_pipeline_stage_task`;
+CREATE TABLE `dev_pipeline_stage_task`  (
+  `id` bigint NOT NULL COMMENT '主键id',
+  `name` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '任务名称',
+  `executor` tinyint NOT NULL COMMENT '执行器 1jenkins 2deployer 3gate 4release',
+  `script_ref` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci DEFAULT NULL COMMENT '源码脚本路径',
+  `script_content` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci COMMENT '自定义脚本内容',
+  `script_params` varchar(1000) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci DEFAULT NULL COMMENT '脚本参数',
+  `version` int NOT NULL COMMENT '版本号',
+  `stage_id` bigint NOT NULL COMMENT '阶段id',
+  `sort` int NOT NULL COMMENT '排序号',
+  `create_user` bigint DEFAULT NULL COMMENT '创建人',
+  `create_time` datetime(3) DEFAULT NULL COMMENT '创建时间',
+  `update_user` bigint DEFAULT NULL COMMENT '更新人',
+  `update_time` datetime(3) DEFAULT NULL COMMENT '更新时间',
+  `is_deleted` tinyint(1) DEFAULT 0 COMMENT '是否删除 0否 1是',
   PRIMARY KEY (`id`) USING BTREE,
-  KEY `idx_template_scope` (`scope`,`team_id`) USING BTREE,
-  KEY `idx_template_name` (`name`) USING BTREE
-) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '流水线模板表' ROW_FORMAT = DYNAMIC;
+  UNIQUE KEY `uk_stage_task` (`stage_id`,`sort`) USING BTREE,
+  KEY `idx_stage_task_version` (`stage_id`,`version`) USING BTREE
+) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '流水线阶段任务表' ROW_FORMAT = DYNAMIC;
 
--- ----------------------------
--- Table structure for dev_pipeline_template_version
--- ----------------------------
-DROP TABLE IF EXISTS `dev_pipeline_template_version`;
-CREATE TABLE `dev_pipeline_template_version`  (
-  `id` bigint NOT NULL COMMENT '主键',
-  `template_id` bigint NOT NULL COMMENT '模板id',
-  `version_no` int NOT NULL COMMENT '版本号',
-  `content_json` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '定义',
-  `content_yaml` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT 'YAML',
-  `content_hash` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '摘要',
-  `change_note` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '变更说明',
-  `source_version_id` bigint NULL COMMENT '回退来源',
-  `create_user` bigint NULL COMMENT '创建人',
-  `create_time` datetime(3) NULL COMMENT '创建时间',
-  PRIMARY KEY (`id`) USING BTREE,
-  UNIQUE KEY `uk_template_version` (`template_id`,`version_no`) USING BTREE
-) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '模板版本表' ROW_FORMAT = DYNAMIC;
-
--- ----------------------------
--- Table structure for dev_pipeline_template_var
--- ----------------------------
-DROP TABLE IF EXISTS `dev_pipeline_template_var`;
-CREATE TABLE `dev_pipeline_template_var`  (
-  `id` bigint NOT NULL COMMENT '主键',
-  `template_version_id` bigint NOT NULL COMMENT '模板版本id',
-  `name` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '变量名',
-  `description` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '说明',
-  `default_value` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '默认值',
-  `is_required` tinyint(1) NOT NULL DEFAULT 0 COMMENT '是否必填',
-  PRIMARY KEY (`id`) USING BTREE,
-  UNIQUE KEY `uk_template_var` (`template_version_id`,`name`) USING BTREE
-) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '模板占位变量表' ROW_FORMAT = DYNAMIC;
-
--- ----------------------------
--- Table structure for dev_pipeline_template_derivation
--- ----------------------------
-DROP TABLE IF EXISTS `dev_pipeline_template_derivation`;
-CREATE TABLE `dev_pipeline_template_derivation`  (
-  `id` bigint NOT NULL COMMENT '主键',
-  `template_id` bigint NOT NULL COMMENT '模板id',
-  `template_version_id` bigint NOT NULL COMMENT '派生时版本',
-  `pipeline_id` bigint NOT NULL COMMENT '派生出的流水线',
-  `merged_version_id` bigint NULL COMMENT '最近合并后的流水线版本',
-  `is_behind` tinyint(1) NOT NULL DEFAULT 0 COMMENT '是否落后于模板',
-  `last_merge_time` datetime(3) NULL COMMENT '最近合并时间',
-  PRIMARY KEY (`id`) USING BTREE,
-  UNIQUE KEY `uk_derivation_pipeline` (`pipeline_id`) USING BTREE,
-  KEY `idx_derivation_template` (`template_id`) USING BTREE
-) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '派生关系表' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
 -- Table structure for dev_run
@@ -440,7 +387,7 @@ CREATE TABLE `dev_run`  (
   `id` bigint NOT NULL COMMENT '主键',
   `run_no` varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '运行编号 RUN-yyyyMMdd-序号',
   `pipeline_id` bigint NOT NULL COMMENT '流水线id',
-  `pipeline_version_id` bigint NOT NULL COMMENT '版本id',
+  `pipeline_version` int NOT NULL COMMENT '触发时流水线版本号',
   `app_id` bigint NOT NULL COMMENT '应用id',
   `branch` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '分支',
   `commit_id` varchar(40) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '提交',

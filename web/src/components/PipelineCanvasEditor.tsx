@@ -51,6 +51,9 @@ const TASK_TOP = STAGE_TOP + CARD_H + 56
 const TASK_X_OFFSET = CARD_W / 2 - TASK_W / 2
 const MIN_ZOOM = 0.4
 const MAX_ZOOM = 1.6
+// 空画布唯一的「添加阶段」引导框尺寸，同时用于居中计算与 CSS 变量（单一数据源）
+const EMPTY_ADD_W = 320
+const EMPTY_ADD_H = 160
 
 type Selection = { kind: 'stage'; index: number } | { kind: 'task'; stage: number; task: number } | null
 
@@ -308,7 +311,7 @@ export default function PipelineCanvasEditor({ value, onChange }: PipelineCanvas
       }
     })
 
-    // 最后一个阶段 -> 末尾「添加阶段」虚线框
+    // 最后一个阶段 -> 末尾「添加阶段」虚线框；空画布只有一个居中虚线框，无需连线
     if (layout.perCol.length) {
       const last = layout.perCol[layout.perCol.length - 1]
       const x1 = last.cardX + CARD_W
@@ -316,13 +319,6 @@ export default function PipelineCanvasEditor({ value, onChange }: PipelineCanvas
       list.push(
         <g key="stage-to-add">
           <path d={`M ${x1} ${sy} L ${x2} ${sy}`} className="ferry-canvas__edge-dashed" markerEnd="url(#arrowMuted)" />
-        </g>,
-      )
-    } else {
-      // 空画布：从起点画一段虚线到添加框
-      list.push(
-        <g key="empty-to-add">
-          <path d={`M 40 ${sy} L ${layout.addStageX} ${sy}`} className="ferry-canvas__edge-dashed" markerEnd="url(#arrowMuted)" />
         </g>,
       )
     }
@@ -397,13 +393,6 @@ export default function PipelineCanvasEditor({ value, onChange }: PipelineCanvas
               {edges}
             </svg>
 
-            {stages.length === 0 && (
-              <div className="ferry-canvas__empty">
-                <Layers3 size={28} />
-                <p>暂无阶段，从右上角「添加阶段」开始编排</p>
-              </div>
-            )}
-
             {layout.perCol.map((col) => {
               const stageSelected = selection?.kind === 'stage' && selection.index === col.index
               const isDrop = dropTarget?.index === col.index
@@ -472,15 +461,28 @@ export default function PipelineCanvasEditor({ value, onChange }: PipelineCanvas
               )
             })}
 
-            {/* 末尾虚线框：添加阶段 */}
+            {/* 末尾虚线框：添加阶段（非空画布，跟随 world 平移缩放） */}
+            {stages.length > 0 && (
+              <Popover content={stageMenu} trigger="click" open={tailMenuOpen} onOpenChange={setTailMenuOpen} placement="bottom">
+                <button type="button" className="ferry-canvas__add-stage"
+                  style={{ transform: `translate(${layout.addStageX}px, ${STAGE_TOP}px)` }}>
+                  <Plus size={20} />
+                  <span>添加阶段</span>
+                </button>
+              </Popover>
+            )}
+          </div>
+
+          {/* 空画布：唯一的「添加阶段」引导框，直接在视口层绝对居中，不受 pan/zoom 影响 */}
+          {stages.length === 0 && (
             <Popover content={stageMenu} trigger="click" open={tailMenuOpen} onOpenChange={setTailMenuOpen} placement="bottom">
-              <button type="button" className="ferry-canvas__add-stage"
-                style={{ transform: `translate(${layout.addStageX}px, ${STAGE_TOP}px)` }}>
+              <button type="button" className="ferry-canvas__add-stage is-empty"
+                style={{ '--empty-add-w': `${EMPTY_ADD_W}px`, '--empty-add-h': `${EMPTY_ADD_H}px` } as React.CSSProperties}>
                 <Plus size={20} />
                 <span>添加阶段</span>
               </button>
             </Popover>
-          </div>
+          )}
           <div className="ferry-canvas__nav">
             <Button type="text" size="small" icon={<ChevronLeft size={14} />} onClick={() => setPan((p) => ({ ...p, x: p.x + 120 }))} />
             <ArrowDown size={12} style={{ transform: 'rotate(90deg)', color: 'var(--text-4)' }} />
@@ -540,9 +542,15 @@ export default function PipelineCanvasEditor({ value, onChange }: PipelineCanvas
                   onChange={(v) => patchTask(selection.stage, selection.task, { executor: v })} />
               </label>
               <label className="ferry-canvas__field">
-                <span>脚本引用</span>
-                <Input value={selectedTask.scriptRef ?? ''} placeholder="例如 build / deploy"
+                <span>脚本引用（源码路径 / Job 名）</span>
+                <Input value={selectedTask.scriptRef ?? ''} placeholder="例如 scripts/build.sh / build"
                   onChange={(e) => patchTask(selection.stage, selection.task, { scriptRef: e.target.value })} />
+              </label>
+              <label className="ferry-canvas__field">
+                <span>自定义脚本内容（源码无脚本时使用）</span>
+                <Input.TextArea value={selectedTask.scriptContent ?? ''} rows={4}
+                  placeholder="留空则使用源码脚本"
+                  onChange={(e) => patchTask(selection.stage, selection.task, { scriptContent: e.target.value })} />
               </label>
               <Button danger block icon={<Trash2 size={14} />}
                 onClick={() => removeTask(selection.stage, selection.task)}>删除任务</Button>

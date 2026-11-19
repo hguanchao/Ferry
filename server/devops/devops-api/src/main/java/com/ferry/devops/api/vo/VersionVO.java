@@ -20,9 +20,6 @@ public class VersionVO {
     @Schema(description = "流水线id（兼容前端契约）")
     private Long pipelineId;
 
-    @Schema(description = "模板id")
-    private Long templateId;
-
     @Schema(description = "版本号")
     private Integer versionNo;
 

@@ -20,7 +20,6 @@ import com.ferry.devops.api.dto.RunTriggerDTO;
 import com.ferry.devops.api.dto.query.RunQuery;
 import com.ferry.devops.api.entity.App;
 import com.ferry.devops.api.entity.Pipeline;
-import com.ferry.devops.api.entity.PipelineVersion;
 import com.ferry.devops.api.entity.Run;
 import com.ferry.devops.api.entity.RunIdempotency;
 import com.ferry.devops.api.entity.RunLogSegment;
@@ -43,7 +42,8 @@ import com.ferry.devops.api.vo.TriggerResultVO;
 import com.ferry.devops.biz.integration.jenkins.JenkinsClient;
 import com.ferry.devops.biz.mapper.AppMapper;
 import com.ferry.devops.biz.mapper.PipelineMapper;
-import com.ferry.devops.biz.mapper.PipelineVersionMapper;
+import com.ferry.devops.biz.mapper.PipelineStageMapper;
+import com.ferry.devops.biz.mapper.PipelineStageTaskMapper;
 import com.ferry.devops.biz.mapper.RunIdempotencyMapper;
 import com.ferry.devops.biz.mapper.RunLogSegmentMapper;
 import com.ferry.devops.biz.mapper.RunMapper;
@@ -84,7 +84,9 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
 
     private final RunMapper runMapper;
     private final PipelineMapper pipelineMapper;
-    private final PipelineVersionMapper versionMapper;
+    private final PipelineStageMapper pipelineStageMapper;
+    private final PipelineStageTaskMapper pipelineTaskMapper;
+    private final PipelineDefinitionStore definitionStore;
     private final RunStageMapper stageMapper;
     private final RunTaskMapper taskMapper;
     private final RunLogSegmentMapper logMapper;
@@ -97,7 +99,7 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
 
     @Override
     public IPage<RunVO> pageList(RunQuery body) {
-        RunWrapper wrapper = RunWrapper.build(pipelineMapper, versionMapper);
+        RunWrapper wrapper = RunWrapper.build(pipelineMapper);
         IPage<Run> pages = page(Page.create(body), wrapper.lambda(body));
         IPage<RunVO> result = wrapper.pageVo(pages);
         result.setRecords(wrapper.voWithExtras(pages.getRecords()));
@@ -107,7 +109,7 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
     @Override
     public RunDetailVO detail(Long id) {
         Run run = requireRun(id);
-        RunWrapper wrapper = RunWrapper.build(pipelineMapper, versionMapper);
+        RunWrapper wrapper = RunWrapper.build(pipelineMapper);
         RunDetailVO vo = new RunDetailVO();
         vo.setRun(wrapper.voWithExtras(Collections.singletonList(run)).get(0));
         List<RunStage> stages = stageMapper.selectByRun(id);
@@ -261,12 +263,12 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
         }
         // 幂等键
         Pipeline pipeline = pipelineMapper.selectById(body.getPipelineId());
-        String idemKey = idemKey(body.getAppId(), body.getBranch(), body.getCommitId(), pipeline.getCurrentVersionId());
+        String idemKey = idemKey(body.getAppId(), body.getBranch(), body.getCommitId(), pipeline.getVersion());
         // 事务内创建运行 + 阶段 + 触发记录 + 幂等记录
         Run run = new Run();
         run.setRunNo(generateRunNo());
         run.setPipelineId(body.getPipelineId());
-        run.setPipelineVersionId(pipeline.getCurrentVersionId());
+        run.setPipelineVersion(pipeline.getVersion());
         run.setAppId(body.getAppId());
         run.setBranch(body.getBranch());
         run.setCommitId(body.getCommitId());
@@ -279,7 +281,7 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
         run.setIsPrecheckPass(IntConst.ONE);
         run.setIdempotentKey(idemKey);
         save(run);
-        createStages(run.getId(), pipeline.getCurrentVersionId(), null);
+        createStages(run.getId(), pipeline.getId(), pipeline.getVersion(), null);
         persistPrechecks(run.getId(), precheck.getItems());
         writeTriggerRecord(body, 1, run.getId(), null);
         RunIdempotency idem = new RunIdempotency();
@@ -289,13 +291,8 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
         idem.setState(IntConst.ONE);
         idem.setExpireTime(new Date(System.currentTimeMillis() + IDEMPotent_WINDOW_SECONDS * 1000L));
         idempotencyMapper.insert(idem);
-        // 回写流水线最近运行
-        pipeline.setLastRunId(run.getId());
-        pipeline.setLastRunStatus(run.getStatus());
-        pipeline.setLastRunTime(new Date());
-        pipelineMapper.updateById(pipeline);
         // 事务提交后由 JobDispatchService 异步下发；最小实现记日志
-        dispatchStages(run.getId(), pipeline.getCurrentVersionId());
+        dispatchStages(run.getId(), pipeline.getVersion());
         TriggerResultVO vo = new TriggerResultVO();
         vo.setResult(TriggerResultEnum.CREATED.getCode());
         vo.setRunId(run.getId());
@@ -389,7 +386,7 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
         Run run = new Run();
         run.setRunNo(generateRunNo());
         run.setPipelineId(original.getPipelineId());
-        run.setPipelineVersionId(original.getPipelineVersionId());
+        run.setPipelineVersion(original.getPipelineVersion());
         run.setAppId(original.getAppId());
         run.setBranch(original.getBranch());
         run.setCommitId(original.getCommitId());
@@ -422,7 +419,7 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
             stageMapper.insert(stage);
         }
         writeTriggerRecordFromRun(run, 1);
-        dispatchStages(run.getId(), run.getPipelineVersionId());
+        dispatchStages(run.getId(), run.getPipelineVersion());
         TriggerResultVO vo = new TriggerResultVO();
         vo.setResult(TriggerResultEnum.CREATED.getCode());
         vo.setRunId(run.getId());
@@ -466,14 +463,14 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
 
         // 4 定义匹配：流水线启用 + 存在当前版本 + 定义中无空阶段/空任务
         Pipeline pipeline = pipelineMapper.selectById(pipelineId);
-        boolean defOk = pipeline != null && ObjUtil.equals(pipeline.getIsEnabled(), IntConst.ONE)
-                && ObjUtil.isNotEmpty(pipeline.getCurrentVersionId());
+        boolean defOk = pipeline != null && ObjUtil.equals(pipeline.getStatus(), IntConst.ONE)
+                && ObjUtil.isNotEmpty(pipeline.getVersion());
         String defDetail;
         if (!defOk) {
             defDetail = "流水线未启用或无当前版本";
         } else {
             // 保存阶段允许空任务，运行时才拦截：给出明确提示让用户在画布补齐后再触发
-            defDetail = checkRunnableDefinition(pipeline.getCurrentVersionId());
+            defDetail = checkRunnableDefinition(pipeline.getId(), pipeline.getVersion());
             if (defDetail == null) {
                 defDetail = "流水线已启用且存在当前版本";
             } else {
@@ -483,7 +480,7 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
         items.add(item(4, defOk, defDetail));
         // 5 幂等检查：按 60 秒键查活动/成功运行
         String idemKey = idemKey(appId, branch, commitId,
-                pipeline == null ? null : pipeline.getCurrentVersionId());
+                pipeline == null ? null : pipeline.getVersion());
         Run active = runMapper.selectActiveByIdemKey(idemKey);
         Run success = active != null ? null : runMapper.selectSuccessByIdemKey(idemKey);
         PrecheckItemVO idemItem = new PrecheckItemVO();
@@ -539,19 +536,19 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
                 .map(PrecheckItemVO::getDetail).findFirst().orElse("预校验不通过");
     }
 
-    private String idemKey(Long appId, String branch, String commit, Long versionId) {
-        return CryptoUtil.sha256Hex(appId + ":" + branch + ":" + commit + ":" + versionId);
+    private String idemKey(Long appId, String branch, String commit, Integer version) {
+        return CryptoUtil.sha256Hex(appId + ":" + branch + ":" + commit + ":" + version);
     }
 
     /**
      * 按版本快照创建阶段（全部未开始）
      */
-    private void createStages(Long runId, Long versionId, Integer fromSeq) {
-        PipelineVersion version = versionMapper.selectById(versionId);
-        if (version == null || StrUtil.isBlank(version.getContentJson())) {
+    private void createStages(Long runId, Long pipelineId, Integer version, Integer fromSeq) {
+        PipelineDefinitionDTO definition = definitionStore.load(pipelineId, version);
+        List<PipelineStageDTO> stages = definition.getStages();
+        if (stages == null || stages.isEmpty()) {
             return;
         }
-        List<PipelineStageDTO> stages = parseStages(version.getContentJson());
         int seq = 1;
         for (PipelineStageDTO stage : stages) {
             RunStage entity = new RunStage();
@@ -578,29 +575,18 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
         }
     }
 
-    private List<PipelineStageDTO> parseStages(String contentJson) {
-        try {
-            PipelineDefinitionDTO dto = JsonUtil.toBean(contentJson, PipelineDefinitionDTO.class);
-            return dto == null || dto.getStages() == null ? Collections.emptyList() : dto.getStages();
-        } catch (Exception e) {
-            return Collections.emptyList();
-        }
-    }
-
     /**
      * 运行前检查版本定义的完整性：存在不可执行的空阶段/空任务时返回提示，否则返回 null。
      * 保存阶段放宽为空任务，仅在此处（触发运行）拦截并提示。
      *
-     * @param versionId 流水线当前版本 id
+     * @param pipelineId 流水线 id
+     * @param version    流水线当前版本号
      * @return 不可运行的提示文本；定义可运行则为 null
      */
-    private String checkRunnableDefinition(Long versionId) {
-        PipelineVersion version = versionMapper.selectById(versionId);
-        if (version == null || StrUtil.isBlank(version.getContentJson())) {
-            return "流水线当前版本无定义内容";
-        }
-        List<PipelineStageDTO> stages = parseStages(version.getContentJson());
-        if (stages.isEmpty()) {
+    private String checkRunnableDefinition(Long pipelineId, Integer version) {
+        PipelineDefinitionDTO definition = definitionStore.load(pipelineId, version);
+        List<PipelineStageDTO> stages = definition.getStages();
+        if (stages == null || stages.isEmpty()) {
             return "流水线定义未配置任何阶段";
         }
         int seq = 1;
@@ -616,7 +602,7 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
     /**
      * 事务提交后下发 CI 阶段 Job；真实 HTTP 由 JenkinsClient 完成，失败置「结果待确认」不回滚运行记录。
      */
-    private void dispatchStages(Long runId, Long versionId) {
+    private void dispatchStages(Long runId, Integer version) {
         List<RunStage> stages = stageMapper.selectByRun(runId);
         boolean dispatchFailed = false;
         for (RunStage stage : stages) {
@@ -626,7 +612,7 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
                 stage.setJenkinsJobId(jobId);
                 stageMapper.updateById(stage);
                 try {
-                    jenkinsClient.dispatchStage(runId, stage.getId(), jobId, "snapshot:" + versionId);
+                    jenkinsClient.dispatchStage(runId, stage.getId(), jobId, "snapshot:" + version);
                 } catch (ServiceException e) {
                     // 真实 Jenkins 下发失败：不抛出以免回滚运行记录，记录告警并置结果待确认
                     dispatchFailed = true;

@@ -27,8 +27,8 @@ public class Run extends BaseEntity implements Serializable {
     /** 流水线id */
     private Long pipelineId;
 
-    /** 版本id */
-    private Long pipelineVersionId;
+    /** 触发时流水线版本号 */
+    private Integer pipelineVersion;
 
     /** 应用id */
     private Long appId;

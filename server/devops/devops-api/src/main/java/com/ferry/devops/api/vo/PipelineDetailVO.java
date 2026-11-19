@@ -19,7 +19,4 @@ public class PipelineDetailVO {
 
     @Schema(description = "版本列表")
     private List<VersionVO> versions;
-
-    @Schema(description = "派生来源")
-    private DerivationVO derivation;
 }

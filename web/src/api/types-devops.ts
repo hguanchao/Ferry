@@ -86,21 +86,10 @@ export interface PipelineTaskDef {
   name: string
   executor: string
   scriptRef?: string
+  scriptContent?: string
   params?: Record<string, unknown>
 }
 export interface DiffResult { left: string; right: string; lines: Array<{ type: string; leftNo?: number; rightNo?: number; text: string }> }
-export interface TemplateRow { id: ID; scope: number; teamId?: ID; name: string; scene?: string; isEnabled: number; derivedCount: number; createTime: string }
-/** 模板详情（当前版本）：与后端 PipelineTemplateVersionVO 对应 */
-export interface TemplateDetail {
-  id: ID
-  templateId: ID
-  versionNo: number
-  changeNote?: string
-  contentJson: string
-  contentYaml?: string
-}
-export interface TemplateVariable { name: string; description?: string; defaultValue?: string; isRequired: number }
-export interface DerivationRow { id: ID; pipelineId: ID; templateId: ID; isBehind: number; lastMergeTime?: string }
 export interface PrecheckItem { type: number; conclusion: number; detail?: string }
 export interface PrecheckResult { items: PrecheckItem[]; canTrigger: boolean }
 export interface TriggerResult { result: string; runId?: ID; artifactDigest?: string; message: string }

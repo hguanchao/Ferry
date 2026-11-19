@@ -5,12 +5,12 @@ import type {
   ActionCatalogRow, ActionRecordRow, AiFeedbackRow, AiOutputRow, AppAiLevelRow,
   AppOption, AppOverview, AppDependencyRow, AppRow, ArtifactRow, BaselineRow,
   ChangeTicketRow, CleanPolicyRow, CleanTaskRow, ClosureRow, DeployBatchRow,
-  DeployRecordRow, DerivationRow, DiffResult, EnvironmentRow, EnvConfigRow, GateExemptionRow,
+  DeployRecordRow, DiffResult, EnvironmentRow, EnvConfigRow, GateExemptionRow,
   GateResultRow, GateRuleRow, ImpactResult, MetricRow, NotifyChannelRow, NotifyTemplateRow,
   OpenTokenRow, PipelineDefinition, PipelineRow, PipelineVersionRow, PrecheckResult,
   PrecheckResultVO, ReleaseDetail, ReleaseRecordRow, ReleaseRow, ReleaseStrategyRow,
   RiskResult, RollbackCandidate, RollbackRow, RunDetail, RunRow, StageStatRow, StoragePolicyRow,
-  TemplateDetail, TemplateRow, TemplateVariable, TechDebtRow, TriggerRecordRow, TriggerResult, ValidateResult,
+  TechDebtRow, TriggerRecordRow, TriggerResult, ValidateResult,
   WizardProgress,
 } from './types-devops'
 
@@ -63,20 +63,7 @@ export const pipelineApi = {
   trigger: (body: Record<string, unknown>, requestId: string) => post<TriggerResult>(`${B}/pipeline/trigger`, { ...body, requestId }),
   triggerRecords: (appId: string, current = 1, size = 20) => get<ApiPage<TriggerRecordRow>>(`${B}/pipeline/trigger/records`, { appId, current, size }),
 }
-export const templateApi = {
-  pageList: (body: Record<string, unknown>) => post<ApiPage<TemplateRow>>(`${B}/pipelineTemplate/pageList`, body),
-  detail: (id: string) => get<TemplateDetail>(`${B}/pipelineTemplate/detail`, { id }),
-  save: (body: Record<string, unknown>) => post<string>(`${B}/pipelineTemplate/save`, body),
-  deleted: (ids: string[]) => post<string>(`${B}/pipelineTemplate/deleted`, ids),
-  enable: (id: string) => post<string>(`${B}/pipelineTemplate/enable`, { id }),
-  disable: (body: Record<string, unknown>) => post<string>(`${B}/pipelineTemplate/disable`, body),
-  versionPage: (templateId: string) => get<ApiPage<PipelineVersionRow>>(`${B}/pipelineTemplate/version/pageList`, { templateId }),
-  versionDiff: (leftId: string, rightId: string) => get<DiffResult>(`${B}/pipelineTemplate/version/diff`, { leftId, rightId }),
-  versionRollback: (body: Record<string, unknown>) => post<{ id: string }>(`${B}/pipelineTemplate/version/rollback`, body),
-  derivations: (id: string) => get<DerivationRow[]>(`${B}/pipelineTemplate/derivations`, { id }),
-  merge: (body: Record<string, unknown>) => post<{ id: string }>(`${B}/pipelineTemplate/merge`, body),
-  variables: (versionId: string) => get<TemplateVariable[]>(`${B}/pipelineTemplate/variables`, { versionId }),
-}
+
 
 export const runApi = {
   pageList: (body: Record<string, unknown>) => post<ApiPage<RunRow>>(`${B}/run/pageList`, body),
