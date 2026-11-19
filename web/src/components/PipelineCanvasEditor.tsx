@@ -237,6 +237,10 @@ export default function PipelineCanvasEditor({ value, onChange }: PipelineCanvas
   }
 
   const onPointerDownCanvas = (e: React.PointerEvent) => {
+    // 只处理真正落在视口 DOM 子树内的按下事件。
+    // Popover 菜单虽在 React 树中位于视口内，但其内容被 portal 到 document.body；
+    // React 事件仍会沿 React 树冒泡到这里，若不排除会误捕获指针，导致菜单项 click 被吞掉。
+    if (!viewportRef.current?.contains(e.target as Node)) return
     if ((e.target as HTMLElement).closest(
       '.ferry-canvas__card, .ferry-canvas__task, .ferry-canvas__add-task, .ferry-canvas__add-stage, .ferry-canvas__inspector, .ferry-canvas__nav',
     )) return
@@ -411,11 +415,12 @@ export default function PipelineCanvasEditor({ value, onChange }: PipelineCanvas
               const StageIcon = STAGE_ICONS[col.stage.type] ?? CircleDot
               const accent = STAGE_COLORS[col.stage.type] ?? '#4096ff'
               return (
-                <div key={stageSelected ? `s-${col.index}` : `d-${col.index}`}>
+                // key 必须稳定：若掺入选中状态，切换选中会重建卡片并重放入场动画，导致插入时卡片闪烁/空白
+                <div key={col.index}>
                   <div
                     className={`ferry-canvas__card${stageSelected ? ' is-selected' : ''}${isDrop ? (dropTarget?.before ? ' drop-before' : ' drop-after') : ''}${dragIndex === col.index ? ' is-dragging' : ''}`}
                     style={{ transform: `translate(${col.cardX}px, ${STAGE_TOP}px)`,
-                      '--stage-accent': accent, animationDelay: `${col.index * 90}ms` } as React.CSSProperties}
+                      '--stage-accent': accent, animationDelay: `${Math.min(col.index, 2) * 60}ms` } as React.CSSProperties}
                     draggable
                     onDragStart={() => setDragIndex(col.index)}
                     onDragEnd={() => { setDragIndex(null); setDropTarget(null) }}
