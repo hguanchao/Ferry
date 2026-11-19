@@ -328,7 +328,7 @@ CREATE TABLE `dev_pipeline`  (
   `is_deleted` tinyint(1) DEFAULT 0 COMMENT '是否删除 0否 1是',
   PRIMARY KEY (`id`) USING BTREE,
   KEY `idx_pipeline_app` (`app_id`) USING BTREE,
-  KEY `idx_pipeline_name` (`name`) USING BTREE,
+  KEY `idx_pipeline_name` (`name`) USING BTREE
 ) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '流水线表' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------

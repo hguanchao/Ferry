@@ -233,7 +233,7 @@ export default function Pipeline() {
     <div>
       <PageHeader
         title="流水线管理"
-        description="以应用维度查看流水线定义与运行情况，支持版本管理、模板派生与手动触发"
+        description="以应用维度查看流水线定义与运行情况，支持版本管理与手动触发"
         extra={
           <div style={{ display: 'flex', gap: 8 }}>
             {can('devops:pipeline:trigger') && <Button type="primary" icon={<Play size={14} />} onClick={() => openTrigger(null)}>手动触发</Button>}
