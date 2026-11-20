@@ -80,7 +80,7 @@ public class PipelineController {
     @PreAuthorize("devops:pipeline:disable")
     @Operation(summary = "流水线-停用")
     public R<String> disable(@RequestBody PipelineDTO body) {
-        return service.disable(body.getId(), body.getDisabledReason()) ? R.success("停用成功") : R.fail("停用失败");
+        return service.disable(body.getId()) ? R.success("停用成功") : R.fail("停用失败");
     }
 
     @GetMapping("/definition")

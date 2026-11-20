@@ -8,20 +8,14 @@ import {
 import PageHeader from '@/components/PageHeader'
 import PipelineCanvasEditor from '@/components/PipelineCanvasEditor'
 import { appApi, pipelineApi } from '@/api/devops'
-import type { AppOption, PipelineStageDef, PrecheckResult, TriggerResult } from '@/api/types-devops'
+import type { AppOption, PipelineRow, PipelineStageDef, PrecheckResult, TriggerResult } from '@/api/types-devops'
 import { useAuthStore } from '@/stores/auth'
 import { showError } from '@/lib/notify'
 import { COL } from '@/lib/table'
 
-/** 后端 PipelineVO 比前端共享类型多几个冗余展示字段 */
-interface PipelineRowExt {
-  id: string
-  appId: string
-  name: string
-  isEnabled: number
-  currentVersionNo?: number
+/** 流水线列表行：共享类型 + 后端回填的应用名称 */
+interface PipelineRowExt extends PipelineRow {
   appName?: string
-  createTime: string
 }
 
 const STATUS_LABEL: Record<number, string> = {
@@ -187,7 +181,7 @@ export default function Pipeline() {
     { title: 'ID', dataIndex: 'id', width: COL.code, render: (v: string) => <span className="ferry-mono">{v}</span> },
     { title: '流水线名称', dataIndex: 'name', minWidth: 220, ellipsis: true },
     { title: '应用', dataIndex: 'appName', width: 140 },
-    { title: '当前版本', dataIndex: 'currentVersionNo', width: 100,
+    { title: '当前版本', dataIndex: 'version', width: 100,
       render: (v: number) => v ? `V${v}` : '—' },
     {
       title: '操作', width: 160, fixed: 'right',
@@ -203,16 +197,16 @@ export default function Pipeline() {
               <Button type="link" size="small" icon={<Pencil size={15} />} onClick={() => openEditor(record)} />
             </Tooltip>
           )}
-          {can('devops:pipeline:enable') && record.isEnabled === 0 && (
+          {can('devops:pipeline:enable') && record.status === 0 && (
             <Tooltip title="启用">
               <Button type="link" size="small" icon={<CirclePlay size={15} />}
                 onClick={() => enableMutation.mutate({ id: record.id })} />
             </Tooltip>
           )}
-          {can('devops:pipeline:disable') && record.isEnabled === 1 && (
+          {can('devops:pipeline:disable') && record.status === 1 && (
             <Tooltip title="停用">
               <Button type="link" size="small" icon={<CirclePause size={15} />}
-                onClick={() => disableMutation.mutate({ id: record.id, reason: '页面停用' })} />
+                onClick={() => disableMutation.mutate({ id: record.id })} />
             </Tooltip>
           )}
           {can('devops:pipeline:deleted') && (

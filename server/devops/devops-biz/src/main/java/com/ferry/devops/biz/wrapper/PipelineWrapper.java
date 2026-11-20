@@ -33,15 +33,10 @@ public class PipelineWrapper extends BaseEntityWrapper<Pipeline, PipelineVO> {
 
     @Override
     public PipelineVO vo(Pipeline entity) {
-        PipelineVO vo = BeanUtil.copy(entity, PipelineVO.class);
-        if (vo != null) {
-            vo.setIsEnabled(entity.getStatus());
-            vo.setCurrentVersionNo(entity.getVersion());
-        }
-        return vo;
+        return BeanUtil.copy(entity, PipelineVO.class);
     }
 
-    /** 组装列表 VO：回填应用名称、版本号、派生落后标记 */
+    /** 组装列表 VO：回填应用名称 */
     public List<PipelineVO> voWithExtras(List<Pipeline> list) {
         List<PipelineVO> result = list.stream().map(this::vo).collect(Collectors.toList());
         for (PipelineVO vo : result) {
@@ -55,7 +50,7 @@ public class PipelineWrapper extends BaseEntityWrapper<Pipeline, PipelineVO> {
         return Wrappers.<Pipeline>lambdaQuery()
                 .in(CollUtil.isNotEmpty(query.getAppIds()), Pipeline::getAppId, query.getAppIds())
                 .like(StrUtil.isNotBlank(query.getName()), Pipeline::getName, query.getName())
-                .eq(ObjUtil.isNotEmpty(query.getIsEnabled()), Pipeline::getStatus, query.getIsEnabled())
+                .eq(ObjUtil.isNotEmpty(query.getStatus()), Pipeline::getStatus, query.getStatus())
                 .orderByDesc(Pipeline::getCreateTime);
     }
 }

@@ -4,6 +4,7 @@ import { App, Button, Descriptions, Input, Modal, Space, Table, Tag, Timeline, T
 import { CirclePause, CirclePlay, OctagonX, RotateCcw, Search } from 'lucide-react'
 import PageHeader from '@/components/PageHeader'
 import { runApi } from '@/api/devops'
+import type { RunDetail } from '@/api/types-devops'
 import { useAuthStore } from '@/stores/auth'
 import { showError } from '@/lib/notify'
 
@@ -69,7 +70,7 @@ export default function RunDetail() {
     queryFn: () => runApi.detail(runId!),
     enabled: !!runId,
     refetchInterval: (q) => {
-      const status = (q.state.data as Record<string, unknown> | undefined)?.status
+      const status = (q.state.data as RunDetail | undefined)?.run?.status
       return status === 2 || status === 1 ? 3000 : false
     },
   })
@@ -114,9 +115,10 @@ export default function RunDetail() {
     onSuccess: () => setSearchOpen(true), onError: showError,
   })
 
-  const detail = detailQuery.data as unknown as Record<string, unknown> | undefined
-  const stages = (stagesQuery.data ?? []) as unknown as StageExt[]
-  const tasks = (detail?.tasks ?? []) as TaskExt[]
+  const detail = detailQuery.data
+  const run = detail?.run
+  const stages = ((detail?.stages ?? stagesQuery.data ?? []) as unknown as StageExt[])
+  const tasks = (detail?.tasks ?? []) as unknown as TaskExt[]
 
   const stageColumns: TableColumnsType<StageExt> = [
     { title: '顺序', dataIndex: 'seq', width: 70 },
@@ -147,7 +149,7 @@ export default function RunDetail() {
       ) },
   ]
 
-  const status = Number(detail?.status ?? 0)
+  const status = Number(run?.status ?? 0)
   const canRerun = status === 5 || status === 6
 
   return (
@@ -181,20 +183,20 @@ export default function RunDetail() {
         <>
           <div className="ferry-panel" style={{ marginBottom: 12 }}>
             <Descriptions column={4} size="small" bordered>
-              <Descriptions.Item label="运行ID">{String(detail.runNo ?? '')}</Descriptions.Item>
-              <Descriptions.Item label="应用">{String(detail.appName ?? '')}</Descriptions.Item>
-              <Descriptions.Item label="流水线">{String(detail.pipelineName ?? '')}</Descriptions.Item>
-              <Descriptions.Item label="版本">{detail.pipelineVersionNo ? `V${detail.pipelineVersionNo}` : '—'}</Descriptions.Item>
-              <Descriptions.Item label="分支">{String(detail.branch ?? '')}</Descriptions.Item>
-              <Descriptions.Item label="Commit"><span className="ferry-mono">{String(detail.commitId ?? '')}</span></Descriptions.Item>
+              <Descriptions.Item label="运行ID">{String(run?.runNo ?? '')}</Descriptions.Item>
+              <Descriptions.Item label="应用">{String(run?.appName ?? '')}</Descriptions.Item>
+              <Descriptions.Item label="流水线">{String(run?.pipelineName ?? '')}</Descriptions.Item>
+              <Descriptions.Item label="版本">{run?.pipelineVersionNo ? `V${run.pipelineVersionNo}` : '—'}</Descriptions.Item>
+              <Descriptions.Item label="分支">{String(run?.branch ?? '')}</Descriptions.Item>
+              <Descriptions.Item label="Commit"><span className="ferry-mono">{String(run?.commitId ?? '')}</span></Descriptions.Item>
               <Descriptions.Item label="状态">
                 <Tag color={STATUS_COLOR[status]}>{RUN_STATUS[status] ?? status}</Tag>
               </Descriptions.Item>
-              <Descriptions.Item label="触发人">{String(detail.triggerUser ?? '')}</Descriptions.Item>
-              <Descriptions.Item label="开始时间">{String(detail.startTime ?? '—')}</Descriptions.Item>
-              <Descriptions.Item label="结束时间">{String(detail.endTime ?? '—')}</Descriptions.Item>
-              <Descriptions.Item label="总耗时">{detail.duration != null ? `${(Number(detail.duration) / 1000).toFixed(1)}s` : '—'}</Descriptions.Item>
-              <Descriptions.Item label="制品">{detail.artifactId ? String(detail.artifactId) : '—'}</Descriptions.Item>
+              <Descriptions.Item label="触发人">{String(run?.triggerUser ?? '')}</Descriptions.Item>
+              <Descriptions.Item label="开始时间">{String(run?.startTime ?? '—')}</Descriptions.Item>
+              <Descriptions.Item label="结束时间">{String(run?.endTime ?? '—')}</Descriptions.Item>
+              <Descriptions.Item label="总耗时">{run?.duration != null ? `${(Number(run.duration) / 1000).toFixed(1)}s` : '—'}</Descriptions.Item>
+              <Descriptions.Item label="制品">{run?.artifactId ? String(run.artifactId) : '—'}</Descriptions.Item>
             </Descriptions>
           </div>
 

@@ -20,8 +20,8 @@ public class PipelineQuery extends Query {
     @Schema(description = "流水线名称")
     private String name;
 
-    @Schema(description = "启用 1 是 0 否")
-    private Integer isEnabled;
+    @Schema(description = "状态 0停用 1启用")
+    private Integer status;
 
     @Schema(description = "运行状态")
     private List<Integer> statuses;

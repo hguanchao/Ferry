@@ -62,12 +62,8 @@ export interface PipelineRow {
   id: ID
   appId: ID
   name: string
-  isEnabled: number
-  currentVersionId?: ID
-  ownerId?: ID
-  lastRunId?: ID
-  lastRunStatus?: number
-  lastRunTime?: string
+  status: number
+  version: number
   createTime: string
 }
 export interface PipelineVersionRow { id: ID; pipelineId: ID; versionNo: number; changeNote: string; sourceType: number; createTime: string }
@@ -100,13 +96,16 @@ export interface RunRow {
   id: ID
   runNo: string
   pipelineId: ID
+  pipelineName?: string
+  pipelineVersionNo?: number
   appId: ID
+  appName?: string
   branch: string
   commitId: string
   status: number
   blockReason?: number
   triggerUser: ID
-  start_time?: string
+  artifactId?: ID
   startTime?: string
   endTime?: string
   duration?: number
@@ -115,7 +114,12 @@ export interface RunRow {
 export interface RunStageRow { id: ID; runId: ID; stageType: number; stageName: string; seq: number; status: number; startTime?: string; endTime?: string; duration?: number }
 export interface RunTaskRow { id: ID; stageId: ID; name: string; status: number; exitCode?: number; logLineCount: number; isTruncated: number }
 export interface LogSegmentRow { id: ID; taskId: ID; segmentNo: number; startLine: number; endLine: number; content: string; isTruncated: number }
-export interface RunDetail extends RunRow { stages: RunStageRow[]; tasks: RunTaskRow[] }
+/** 运行详情：与后端 RunDetailVO 的 { run, stages, tasks } 嵌套结构一致 */
+export interface RunDetail {
+  run: RunRow
+  stages: RunStageRow[]
+  tasks: RunTaskRow[]
+}
 
 /* ------------------------------ 制品 ------------------------------ */
 export interface ArtifactRow {

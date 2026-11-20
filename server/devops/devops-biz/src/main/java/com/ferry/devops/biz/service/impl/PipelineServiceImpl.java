@@ -82,8 +82,8 @@ public class PipelineServiceImpl extends ServiceImpl<PipelineMapper, Pipeline> i
         }
         pipeline.setAppId(body.getAppId());
         pipeline.setName(body.getName());
-        if (ObjUtil.isNotEmpty(body.getIsEnabled())) {
-            pipeline.setStatus(body.getIsEnabled());
+        if (ObjUtil.isNotEmpty(body.getStatus())) {
+            pipeline.setStatus(body.getStatus());
         }
         boolean success = saveOrUpdate(pipeline);
         // 新建时若携带定义，生成初版
@@ -123,7 +123,7 @@ public class PipelineServiceImpl extends ServiceImpl<PipelineMapper, Pipeline> i
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public boolean disable(Long id, String reason) {
+    public boolean disable(Long id) {
         Pipeline pipeline = requirePipeline(id);
         pipeline.setStatus(0);
         return updateById(pipeline);

@@ -30,7 +30,7 @@ public interface IPipelineService extends IService<Pipeline> {
 
     boolean enable(Long id);
 
-    boolean disable(Long id, String reason);
+    boolean disable(Long id);
 
     PipelineDefinitionVO definition(Long id, Long versionId);
 

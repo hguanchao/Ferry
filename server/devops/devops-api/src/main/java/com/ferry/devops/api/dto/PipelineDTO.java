@@ -24,14 +24,8 @@ public class PipelineDTO {
     @NotBlank(message = "流水线名称不能为空")
     private String name;
 
-    @Schema(description = "负责人")
-    private Long ownerId;
-
-    @Schema(description = "启用 1 是 0 否")
-    private Integer isEnabled;
-
-    @Schema(description = "停用原因")
-    private String disabledReason;
+    @Schema(description = "状态 0停用 1启用")
+    private Integer status;
 
     @Schema(description = "新建时初始定义（可选，结构化 JSON）")
     private String definition;
