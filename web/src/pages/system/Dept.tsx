@@ -9,11 +9,11 @@ import {
   Modal,
   Select,
   Switch,
-  Table,
   Tooltip,
   TreeSelect,
   type TableColumnsType,
 } from 'antd'
+import FerryTable from '@/components/FerryTable'
 import { Pencil, Plus, RotateCw, Search, Trash2 } from 'lucide-react'
 import PageHeader from '@/components/PageHeader'
 import { useAutoExpandRows } from '@/hooks/useAutoExpandRows'
@@ -101,7 +101,6 @@ export default function Dept() {
     {
       title: '部门名称',
       dataIndex: 'name',
-      width: 250,
 
       render: (value: string, record) => (
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
@@ -113,7 +112,6 @@ export default function Dept() {
     {
       title: '部门编码',
       dataIndex: 'code',
-      width: 250,
 
       render: (value: string) => (
         <span className="ferry-mono" style={{ fontSize: 12 }}>
@@ -124,7 +122,6 @@ export default function Dept() {
     {
       title: '排序',
       dataIndex: 'sort',
-      width: 250,
 
       align: 'right',
       render: (value: number) => <span className="ferry-mono">{value}</span>,
@@ -132,7 +129,6 @@ export default function Dept() {
     {
       title: '状态',
       dataIndex: 'status',
-      width: 250,
 
       render: (value: number) => (
         <span className="ferry-status" data-tone={value === 1 ? 'success' : 'default'}>
@@ -144,9 +140,7 @@ export default function Dept() {
     {
       title: '操作',
       key: 'action',
-      width: 190,
 
-      fixed: 'right',
       render: (_, record) => (
         <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
           {can('system:dept:save') && (
@@ -245,7 +239,7 @@ export default function Dept() {
         </div>
 
         <div className="ferry-table-wrap">
-          <Table<DeptNode>
+          <FerryTable<DeptNode>
             rowKey="id"
             columns={columns}
             dataSource={query.data ?? []}

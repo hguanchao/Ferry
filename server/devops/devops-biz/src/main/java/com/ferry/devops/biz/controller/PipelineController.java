@@ -4,17 +4,21 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.ferry.common.core.http.R;
 import com.ferry.common.security.annotation.PreAuthorize;
 import com.ferry.devops.api.dto.PipelineDTO;
+import com.ferry.devops.api.dto.PipelinePreviewDTO;
 import com.ferry.devops.api.dto.RunTriggerDTO;
 import com.ferry.devops.api.dto.query.PipelineQuery;
 import com.ferry.devops.api.vo.DiffVO;
 import com.ferry.devops.api.vo.PipelineDefinitionVO;
+import com.ferry.devops.api.vo.PipelinePreviewVO;
 import com.ferry.devops.api.vo.PipelineVO;
 import com.ferry.devops.api.vo.PrecheckResultVO;
+import com.ferry.devops.api.vo.RepoCommitVO;
 import com.ferry.devops.api.vo.TriggerRecordVO;
 import com.ferry.devops.api.vo.TriggerResultVO;
 import com.ferry.devops.api.vo.ValidateResultVO;
 import com.ferry.devops.api.vo.VersionVO;
 import com.ferry.devops.biz.service.IPipelineService;
+import com.ferry.devops.biz.service.IRepoQueryService;
 import com.ferry.devops.biz.service.IRunService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -37,6 +41,7 @@ import java.util.List;
 public class PipelineController {
     private final IPipelineService service;
     private final IRunService runService;
+    private final IRepoQueryService repoQueryService;
 
     @PostMapping("/pageList")
     @PreAuthorize("devops:pipeline:pageList")
@@ -99,6 +104,13 @@ public class PipelineController {
         return R.data(service.validateDefinition(definition, mode));
     }
 
+    @PostMapping("/definition/preview")
+    @PreAuthorize("devops:pipeline:save")
+    @Operation(summary = "流水线-脚本预览")
+    public R<PipelinePreviewVO> previewDefinition(@RequestBody @Valid PipelinePreviewDTO body) {
+        return R.data(service.previewDefinition(body.getDefinition(), body.getMode()));
+    }
+
     @PostMapping("/definition/save")
     @PreAuthorize("devops:pipeline:save")
     @Operation(summary = "流水线-定义保存生成新版本")
@@ -134,6 +146,22 @@ public class PipelineController {
         Long versionId = Long.valueOf(body.get("versionId").toString());
         String changeNote = (String) body.get("changeNote");
         return R.data(service.rollback(id, versionId, changeNote));
+    }
+
+    @GetMapping("/trigger/branches")
+    @PreAuthorize("devops:pipeline:trigger")
+    @Operation(summary = "流水线-触发弹窗分支候选")
+    public R<List<String>> triggerBranches(@RequestParam("appId") Long appId) {
+        return R.data(repoQueryService.branches(appId));
+    }
+
+    @GetMapping("/trigger/commits")
+    @PreAuthorize("devops:pipeline:trigger")
+    @Operation(summary = "流水线-触发弹窗提交候选")
+    public R<List<RepoCommitVO>> triggerCommits(@RequestParam("appId") Long appId,
+                                                @RequestParam("branch") String branch,
+                                                @RequestParam(value = "limit", required = false) Integer limit) {
+        return R.data(repoQueryService.commits(appId, branch, limit));
     }
 
     @PostMapping("/trigger/precheck")

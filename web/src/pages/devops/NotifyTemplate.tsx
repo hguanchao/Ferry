@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { App, Button, Form, Input, Modal, Select, Table, Tag, Tooltip, type TableColumnsType } from 'antd'
+import { App, Button, Form, Input, Modal, Select, Tag, Tooltip, type TableColumnsType } from 'antd'
+import FerryTable from '@/components/FerryTable'
 import { Pencil, Plus, RotateCw, Search, Trash2 } from 'lucide-react'
 import PageHeader from '@/components/PageHeader'
 import { RoleTag } from '@/components/StatusTag'
@@ -9,8 +10,6 @@ import { post } from '@/api/client'
 import type { NotifyTemplateRow } from '@/api/types-devops'
 import { useAuthStore } from '@/stores/auth'
 import { showError } from '@/lib/notify'
-import { COL } from '@/lib/table'
-
 const EVENTS = [
   'RUN_FAILED', 'GATE_BLOCKED', 'GATE_FETCH_FAILED', 'EXEMPTION_EXPIRED', 'RC_PENDING_APPROVAL',
   'RELEASE_STARTED', 'RELEASE_CIRCUIT', 'ROLLBACK_DONE', 'ACTION_SUCCEEDED',
@@ -68,17 +67,17 @@ export default function NotifyTemplate() {
   }
 
   const columns: TableColumnsType<TemplateExt> = [
-    { title: '事件', dataIndex: 'event', width: 170,
+    { title: '事件', dataIndex: 'event',
       render: (v: string) => <span className="ferry-mono" style={{ fontSize: 12 }}>{v}</span> },
-    { title: '渠道类型', dataIndex: 'channelType', width: 110,
+    { title: '渠道类型', dataIndex: 'channelType',
       render: (v: number) => <Tag color="blue">{CHANNEL_LABEL[v] ?? v}</Tag> },
     { title: '标题模板', dataIndex: 'titleTemplate',
       render: (v: string) => <Tooltip title={v}><span>{v}</span></Tooltip> },
     { title: '变量清单', dataIndex: 'variables',
       render: (v?: string) => <span style={{ color: 'var(--text-3)' }}>{v || '—'}</span> },
-    { title: '状态', dataIndex: 'isEnabled', width: 90,
+    { title: '状态', dataIndex: 'isEnabled',
       render: (v: number) => <Tag color={v === 1 ? 'green' : 'default'}>{v === 1 ? '启用' : '停用'}</Tag> },
-    { title: '操作', key: 'action', width: COL.action, fixed: 'right',
+    { title: '操作', key: 'action',
       render: (_, record) => (
         <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
           {can('system:notify:templateSave') && (
@@ -123,7 +122,7 @@ export default function NotifyTemplate() {
             onClick={() => { setDraft({}); setFilters({}); setPage((p) => ({ ...p, current: 1 })) }}>重置</Button>
         </div>
         <div className="ferry-table-wrap">
-          <Table<TemplateExt> rowKey="id" columns={columns} dataSource={(query.data?.records ?? []) as TemplateExt[]}
+          <FerryTable<TemplateExt> rowKey="id" columns={columns} dataSource={(query.data?.records ?? []) as TemplateExt[]}
             loading={query.isLoading || query.isFetching} scroll={{ x: 'max-content' }}
             pagination={{
               current: page.current, pageSize: page.size, total: query.data?.total ?? 0,

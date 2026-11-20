@@ -11,6 +11,7 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 /**
  * HTTP 请求工具类
@@ -40,6 +41,12 @@ public final class HttpUtil {
      * 默认连接与请求超时：面向表单交互等短等待场景
      */
     private static final Duration TIMEOUT = Duration.ofMillis(5000);
+
+    /**
+     * 查询参数中的令牌类字段：日志打码用
+     */
+    private static final Pattern SENSITIVE_QUERY_PATTERN = Pattern.compile(
+            "(?i)((?:access_token|private_token|token|client_secret|secret|password|passwd)=)[^&]*");
 
     /**
      * HttpClient 不可变且线程安全，全进程共用一个实例
@@ -106,17 +113,27 @@ public final class HttpUtil {
             long start = System.nanoTime();
             HttpResponse<String> resp = CLIENT.send(builder.build(), HttpResponse.BodyHandlers.ofString());
             long end = System.nanoTime();
-            log.info("HTTP {} {} -> {} ({} ms)", method, url, resp.statusCode(), (end - start) / 1_000_000);
+            log.info("HTTP {} {} -> {} ({} ms)", method, maskUrl(url), resp.statusCode(), (end - start) / 1_000_000);
             return new Response(resp.statusCode(), resp.body());
         } catch (IOException e) {
             // 连接超时、读取超时与域名不可达在此归并，具体话术由调用方按业务决定
-            log.error("HTTP {} {} 失败", method, url, e);
+            log.error("HTTP {} {} 失败", method, maskUrl(url), e);
             throw new UtilException("HTTP 请求失败", e);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            log.error("HTTP {} {} 被中断", method, url, e);
+            log.error("HTTP {} {} 被中断", method, maskUrl(url), e);
             throw new UtilException("HTTP 请求被中断", e);
         }
+    }
+
+    /**
+     * 日志用地址打码：遮盖查询参数里的令牌类字段，避免第三方接口把 access_token 放在 URL 上。
+     *
+     * @param url 原始地址
+     * @return 打码后的地址；入参为空时原样返回
+     */
+    private static String maskUrl(String url) {
+        return url == null ? null : SENSITIVE_QUERY_PATTERN.matcher(url).replaceAll("$1***");
     }
 
     /**

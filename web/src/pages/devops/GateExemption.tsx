@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { App, Button, Input, Select, Table, Tag, Tooltip, type TableColumnsType } from 'antd'
+import { App, Button, Input, Select, Tag, Tooltip, type TableColumnsType } from 'antd'
+import FerryTable from '@/components/FerryTable'
 import { RotateCw, Search, Undo2 } from 'lucide-react'
 import PageHeader from '@/components/PageHeader'
 import { RoleTag } from '@/components/StatusTag'
@@ -9,8 +10,6 @@ import { post } from '@/api/client'
 import type { GateExemptionRow } from '@/api/types-devops'
 import { useAuthStore } from '@/stores/auth'
 import { showError } from '@/lib/notify'
-import { COL } from '@/lib/table'
-
 const STATUS: Record<number, { label: string; color: string }> = {
   1: { label: '生效', color: 'green' }, 2: { label: '已到期', color: 'default' }, 3: { label: '已撤销', color: 'red' },
 }
@@ -35,17 +34,17 @@ export default function GateExemption() {
   })
 
   const columns: TableColumnsType<GateExemptionRow> = [
-    { title: '豁免ID', dataIndex: 'id', width: 130, render: (v: string) => <span className="ferry-mono" style={{ fontSize: 12 }}>{v}</span> },
-    { title: '结果ID', dataIndex: 'gateResultId', width: 130, render: (v: string) => <span className="ferry-mono" style={{ fontSize: 12 }}>{v}</span> },
-    { title: '运行ID', dataIndex: 'runId', width: 130, render: (v: string) => <span className="ferry-mono" style={{ fontSize: 12 }}>{v}</span> },
+    { title: '豁免ID', dataIndex: 'id',  render: (v: string) => <span className="ferry-mono" style={{ fontSize: 12 }}>{v}</span> },
+    { title: '结果ID', dataIndex: 'gateResultId',  render: (v: string) => <span className="ferry-mono" style={{ fontSize: 12 }}>{v}</span> },
+    { title: '运行ID', dataIndex: 'runId',  render: (v: string) => <span className="ferry-mono" style={{ fontSize: 12 }}>{v}</span> },
     { title: '理由', dataIndex: 'reason', render: (v: string) => <span title={v}>{v?.slice(0, 40)}{v?.length > 40 ? '…' : ''}</span> },
-    { title: '到期时间', dataIndex: 'expireAt', width: COL.time },
-    { title: '关联问题单', dataIndex: 'issueNo', width: 130, render: (v: string) => v || '—' },
-    { title: '状态', dataIndex: 'status', width: 90,
+    { title: '到期时间', dataIndex: 'expireAt', },
+    { title: '关联问题单', dataIndex: 'issueNo',  render: (v: string) => v || '—' },
+    { title: '状态', dataIndex: 'status',
       render: (v: number) => <Tag color={STATUS[v]?.color}>{STATUS[v]?.label ?? v}</Tag>,
     },
-    { title: '申请时间', dataIndex: 'createTime', width: COL.time },
-    { title: '操作', key: 'action', width: COL.action, fixed: 'right', render: (_, r) => (
+    { title: '申请时间', dataIndex: 'createTime', },
+    { title: '操作', key: 'action',   render: (_, r) => (
       can('devops:gateExemption:apply') && r.status === 1 && (
         <Tooltip title="撤销">
           <Button type="link" size="small" danger icon={<Undo2 size={14} />} onClick={() => revokeMutation.mutate(r.id)} />
@@ -73,7 +72,7 @@ export default function GateExemption() {
             onClick={() => { setDraft({}); setFilters({}); setPage((p) => ({ ...p, current: 1 })) }}>重置</Button>
         </div>
         <div className="ferry-table-wrap">
-          <Table<GateExemptionRow> rowKey="id" columns={columns} dataSource={query.data?.records ?? []}
+          <FerryTable<GateExemptionRow> rowKey="id" columns={columns} dataSource={query.data?.records ?? []}
             loading={query.isFetching} scroll={{ x: 'max-content' }}
             pagination={{ current: page.current, pageSize: page.size, total: query.data?.total ?? 0,
               showSizeChanger: true, pageSizeOptions: ['30', '100', '200'],

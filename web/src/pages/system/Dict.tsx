@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { App, Button, Form, Input, InputNumber, Modal, Table, Tooltip, type TableColumnsType } from 'antd'
+import { App, Button, Form, Input, InputNumber, Modal, Tooltip, type TableColumnsType } from 'antd'
+import FerryTable from '@/components/FerryTable'
 import { Pencil, Plus, RotateCw, Search, Trash2 } from 'lucide-react'
 import PageHeader from '@/components/PageHeader'
 import { RoleTag } from '@/components/StatusTag'
@@ -8,7 +9,6 @@ import { dictApi } from '@/api/system'
 import type { DictNode } from '@/api/types'
 import { useAuthStore } from '@/stores/auth'
 import { confirmTreeDelete } from '@/lib/confirm'
-import { COL } from '@/lib/table'
 import { showError } from '@/lib/notify'
 
 export default function Dict() {
@@ -107,7 +107,7 @@ export default function Dict() {
     {
       title: '字典编码',
       dataIndex: 'code',
-      width: 240,
+
       render: (value: string, record) => (
         <Button type="link" size="small" style={{ padding: 0, height: 'auto' }} onClick={() => openItems(record)}>
           <span className="ferry-mono" style={{ fontSize: 12 }}>
@@ -119,14 +119,14 @@ export default function Dict() {
     {
       title: '排序',
       dataIndex: 'sort',
-      width: COL.sort,
+
       align: 'right',
       render: (value: number) => <span className="ferry-mono">{value}</span>,
     },
     {
       title: '创建时间',
       dataIndex: 'createTime',
-      width: COL.time,
+
       render: (value: string | null) => (
         <span className="ferry-mono" style={{ fontSize: 12, color: 'var(--text-3)' }}>
           {value ?? '—'}
@@ -136,7 +136,7 @@ export default function Dict() {
     {
       title: '操作',
       key: 'action',
-      width: COL.action,
+
       render: (_, record) => (
         <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
           {can('system:dict:save') && (
@@ -180,7 +180,7 @@ export default function Dict() {
     {
       title: '字典值',
       dataIndex: 'value',
-      width: 200,
+
       render: (value: string | null) =>
         value ? (
           <span className="ferry-mono" style={{ fontSize: 12 }}>
@@ -193,14 +193,14 @@ export default function Dict() {
     {
       title: '排序',
       dataIndex: 'sort',
-      width: COL.sort,
+
       align: 'right',
       render: (value: number) => <span className="ferry-mono">{value}</span>,
     },
     {
       title: '操作',
       key: 'action',
-      width: COL.action,
+
       render: (_, record) => (
         <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
           {can('system:dict:save') && (
@@ -289,7 +289,7 @@ export default function Dict() {
         </div>
 
         <div className="ferry-table-wrap">
-          <Table<DictNode>
+          <FerryTable<DictNode>
             rowKey="id"
             columns={groupColumns}
             dataSource={groupQuery.data?.records ?? []}
@@ -375,7 +375,7 @@ export default function Dict() {
           )}
         </div>
 
-        <Table<DictNode>
+        <FerryTable<DictNode>
           rowKey="id"
           size="small"
           columns={itemColumns}

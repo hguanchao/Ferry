@@ -252,7 +252,7 @@ CREATE TABLE `dev_app`  (
   `core_link` tinyint(1) NOT NULL DEFAULT 0 COMMENT '核心链路 0否 1是',
   `repo_type` tinyint NOT NULL COMMENT '代码平台 1GitLab 2GitHub 3Gitee',
   `repo_branch` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '仓库分支',
-  `repo_commit_id` varchar(40) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '仓库提交id',
+  `repo_commit_id` varchar(40) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '默认提交id（7–40 位十六进制）',
   `repo_url` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '仓库git地址',
   `repo_token` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '仓库访问令牌',
   `status` tinyint NOT NULL DEFAULT 1 COMMENT '应用状态 0停用 1启用 2草稿 3完善',
@@ -339,6 +339,7 @@ CREATE TABLE `dev_pipeline_stage`  (
   `id` bigint NOT NULL COMMENT '主键id',
   `type` tinyint NOT NULL COMMENT '阶段类型 1构建 2单测 3静态扫描 4制品入库 5部署非生产 6集成测试 7准入 8生产发布',
   `name` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '阶段名称',
+  `build_tool` varchar(30) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci DEFAULT NULL COMMENT '构建工具，如 Maven/Node/Gradle',
   `version` int NOT NULL COMMENT '版本号',
   `timeout` int DEFAULT NULL COMMENT '超时秒数',
   `outputs` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci DEFAULT NULL COMMENT '产出物',
@@ -382,6 +383,13 @@ CREATE TABLE `dev_pipeline_stage_task`  (
 -- ----------------------------
 -- Table structure for dev_run
 -- ----------------------------
+-- 存量库升级（流水线阶段构建工具）：
+-- ALTER TABLE `dev_pipeline_stage` ADD COLUMN `build_tool` varchar(30) NULL COMMENT '构建工具，如 Maven/Node/Gradle' AFTER `name`;
+-- 存量库升级（轮询 Jenkins 构建状态需要保存队列项 id）：
+-- ALTER TABLE `dev_run` ADD COLUMN `jenkins_queue_id` bigint NULL COMMENT 'Jenkins 队列项id（构建号未分配时轮询用）' AFTER `jenkins_build_no`;
+-- 存量库升级（Tag/Ref 最长 100 字符，commit_id 需同步扩容）：
+-- ALTER TABLE `dev_run` MODIFY COLUMN `commit_id` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '提交或引用值（未接入仓库解析前存触发时生效值）';
+-- ALTER TABLE `dev_run_trigger` MODIFY COLUMN `commit_id` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '提交或引用值（与运行生效值一致）';
 DROP TABLE IF EXISTS `dev_run`;
 CREATE TABLE `dev_run`  (
   `id` bigint NOT NULL COMMENT '主键',
@@ -390,9 +398,9 @@ CREATE TABLE `dev_run`  (
   `pipeline_version` int NOT NULL COMMENT '触发时流水线版本号',
   `app_id` bigint NOT NULL COMMENT '应用id',
   `branch` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '分支',
-  `commit_id` varchar(40) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '提交',
+  `commit_id` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '提交或引用值（未接入仓库解析前存触发时生效值）',
   `ref_type` tinyint NOT NULL DEFAULT 1 COMMENT '1 Commit 2 Tag/Ref',
-  `ref_value` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '原始引用值',
+  `ref_value` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '生效引用值（触发输入或应用登记默认值）',
   `trigger_type` tinyint NOT NULL DEFAULT 1 COMMENT '1 手动（历史值保留）',
   `trigger_user` bigint NOT NULL COMMENT '触发人',
   `trigger_note` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '触发说明',
@@ -404,6 +412,7 @@ CREATE TABLE `dev_run`  (
   `reused_run_id` bigint NULL COMMENT '复用自',
   `artifact_id` bigint NULL COMMENT '产出制品',
   `jenkins_build_no` bigint NULL COMMENT 'Jenkins 构建号',
+  `jenkins_queue_id` bigint NULL COMMENT 'Jenkins 队列项id（构建号未分配时轮询用）',
   `result_expire_time` datetime(3) NULL COMMENT '结果待确认截止时间',
   `start_time` datetime(3) NULL COMMENT '开始时间',
   `end_time` datetime(3) NULL COMMENT '结束时间',
@@ -514,7 +523,7 @@ CREATE TABLE `dev_run_trigger`  (
   `app_id` bigint NOT NULL COMMENT '应用id',
   `pipeline_id` bigint NOT NULL COMMENT '流水线id',
   `branch` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '分支',
-  `commit_id` varchar(40) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '提交',
+  `commit_id` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '提交或引用值（与运行生效值一致）',
   `trigger_user` bigint NOT NULL COMMENT '触发人',
   `result` tinyint NOT NULL COMMENT '1 已创建 2 已合并 3 已复用 4 已拒绝',
   `run_id` bigint NULL COMMENT '运行id',

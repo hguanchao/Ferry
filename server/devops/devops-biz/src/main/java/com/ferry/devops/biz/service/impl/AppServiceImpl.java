@@ -82,6 +82,10 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements IAppS
             vo.setValue(app.getId());
             vo.setLabel(app.getName());
             vo.setCode(app.getCode());
+            // 触发弹窗据此过滤未配置代码源的应用，并预填默认分支/提交
+            vo.setRepoUrl(app.getRepoUrl());
+            vo.setRepoBranch(app.getRepoBranch());
+            vo.setRepoCommitId(app.getRepoCommitId());
             return vo;
         }).collect(Collectors.toList());
     }

@@ -10,12 +10,12 @@ import {
   Radio,
   Select,
   Switch,
-  Table,
   Tag,
   Tooltip,
   TreeSelect,
   type TableColumnsType,
 } from 'antd'
+import FerryTable from '@/components/FerryTable'
 import { Pencil, Plus, RotateCw, Search, Trash2 } from 'lucide-react'
 import PageHeader from '@/components/PageHeader'
 import { useAutoExpandRows } from '@/hooks/useAutoExpandRows'
@@ -25,8 +25,6 @@ import { menuApi } from '@/api/system'
 import type { MenuNode } from '@/api/types'
 import { useAuthStore } from '@/stores/auth'
 import { showError } from '@/lib/notify'
-import { COL } from '@/lib/table'
-
 const TYPE_LABEL: Record<number, { text: string; color: string }> = {
   0: { text: '目录', color: 'blue' },
   1: { text: '菜单', color: 'green' },
@@ -129,7 +127,6 @@ export default function Menu() {
     {
       title: '类型',
       dataIndex: 'type',
-      width: 90,
 
       render: (value: number) => (
         <Tag color={TYPE_LABEL[value]?.color} style={{ fontSize: 11 }}>
@@ -140,7 +137,6 @@ export default function Menu() {
     {
       title: '路由地址',
       dataIndex: 'path',
-      width: 200,
 
       render: (value: string | null) =>
         value ? (
@@ -154,7 +150,6 @@ export default function Menu() {
     {
       title: '权限标识',
       dataIndex: 'perms',
-      width: 200,
 
       render: (value: string | null) =>
         value ? (
@@ -168,7 +163,6 @@ export default function Menu() {
     {
       title: '排序',
       dataIndex: 'sort',
-      width: COL.sort,
 
       align: 'right',
       render: (value: number) => <span className="ferry-mono">{value}</span>,
@@ -176,7 +170,6 @@ export default function Menu() {
     {
       title: '状态',
       dataIndex: 'status',
-      width: COL.status,
 
       render: (value: number) => (
         <span className="ferry-status" data-tone={value === 1 ? 'success' : 'default'}>
@@ -188,9 +181,7 @@ export default function Menu() {
     {
       title: '操作',
       key: 'action',
-      width: COL.actionWide,
 
-      fixed: 'right',
       render: (_, record) => (
         <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
           {can('system:menu:save') && record.type !== 2 && (
@@ -290,7 +281,7 @@ export default function Menu() {
         </div>
 
         <div className="ferry-table-wrap">
-          <Table<MenuNode>
+          <FerryTable<MenuNode>
             rowKey="id"
             columns={columns}
             dataSource={query.data ?? []}

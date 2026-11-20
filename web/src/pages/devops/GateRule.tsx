@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { App, Button, Form, Input, Modal, Select, Space, Switch, Table, Tabs, Tag, Tooltip, type TableColumnsType } from 'antd'
+import { App, Button, Form, Input, Modal, Select, Space, Switch, Tabs, Tag, Tooltip, type TableColumnsType } from 'antd'
+import FerryTable from '@/components/FerryTable'
 import { CirclePause, CirclePlay, Pencil, Plus, RotateCw, Search, Trash2 } from 'lucide-react'
 import PageHeader from '@/components/PageHeader'
 import { RoleTag } from '@/components/StatusTag'
@@ -9,8 +10,6 @@ import { post } from '@/api/client'
 import type { GateRuleRow } from '@/api/types-devops'
 import { useAuthStore } from '@/stores/auth'
 import { showError } from '@/lib/notify'
-import { COL } from '@/lib/table'
-
 const SCOPE_LABEL: Record<number, string> = { 1: '组织默认', 2: '应用', 3: '分支' }
 const RULE_LABEL: Record<number, string> = {
   1: '单元测试通过率', 2: '行覆盖率', 3: '分支覆盖率', 4: '阻断级漏洞数', 5: '高危依赖漏洞数', 6: '许可证黑名单',
@@ -75,18 +74,18 @@ export default function GateRule() {
   }
 
   const columns: TableColumnsType<GateRuleRow> = [
-    { title: '作用域', dataIndex: 'scopeType', width: 110,
+    { title: '作用域', dataIndex: 'scopeType',
       render: (v: number) => <Tag color={v === 3 ? 'purple' : v === 2 ? 'blue' : 'default'}>{SCOPE_LABEL[v] ?? v}</Tag>,
     },
-    { title: '规则类型', dataIndex: 'ruleType', width: 150, render: (v: number) => RULE_LABEL[v] ?? v },
+    { title: '规则类型', dataIndex: 'ruleType',  render: (v: number) => RULE_LABEL[v] ?? v },
     { title: '规则名', dataIndex: 'ruleName' },
-    { title: '阈值', dataIndex: 'threshold', width: 120, render: (v: string) => <span className="ferry-mono">{v}</span> },
-    { title: '比较方向', dataIndex: 'compareDirection', width: 100, render: (v: number) => DIRECTION_LABEL[v] ?? '—' },
-    { title: '版本', dataIndex: 'version', width: 70 },
-    { title: '状态', dataIndex: 'isEnabled', width: 90,
+    { title: '阈值', dataIndex: 'threshold',  render: (v: string) => <span className="ferry-mono">{v}</span> },
+    { title: '比较方向', dataIndex: 'compareDirection',  render: (v: number) => DIRECTION_LABEL[v] ?? '—' },
+    { title: '版本', dataIndex: 'version', },
+    { title: '状态', dataIndex: 'isEnabled',
       render: (v: number) => <Tag color={v === 1 ? 'green' : 'default'}>{v === 1 ? '启用' : '停用'}</Tag>,
     },
-    { title: '操作', key: 'action', width: COL.actionWide, fixed: 'right', render: (_, r) => (
+    { title: '操作', key: 'action',   render: (_, r) => (
       <Space size={0}>
         {can('devops:gateRule:enable') && (
           <Tooltip title={r.isEnabled === 1 ? '停用' : '启用'}>
@@ -158,7 +157,7 @@ export default function GateRule() {
           <Button icon={<RotateCw size={14} />} onClick={() => void queryClient.invalidateQueries({ queryKey: ['gate-rules'] })}>刷新</Button>
         </div>
         <div className="ferry-table-wrap">
-          <Table<GateRuleRow> rowKey="id" columns={columns} dataSource={query.data?.records ?? []}
+          <FerryTable<GateRuleRow> rowKey="id" columns={columns} dataSource={query.data?.records ?? []}
             loading={query.isFetching} scroll={{ x: 'max-content' }}
             pagination={{ current: page.current, pageSize: page.size, total: query.data?.total ?? 0,
               showSizeChanger: true, pageSizeOptions: ['30', '100', '200'],

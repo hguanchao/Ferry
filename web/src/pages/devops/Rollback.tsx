@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { App, Button, Form, Input, InputNumber, Modal, Select, Space, Table, Tag, type TableColumnsType } from 'antd'
+import { App, Button, Form, Input, InputNumber, Modal, Select, Space, Tag, type TableColumnsType } from 'antd'
+import FerryTable from '@/components/FerryTable'
 import { RotateCcw, Search } from 'lucide-react'
 import PageHeader from '@/components/PageHeader'
 import { RoleTag } from '@/components/StatusTag'
@@ -8,8 +9,6 @@ import { deployApi, envApi } from '@/api/devops'
 import type { RollbackCandidate, RollbackRow } from '@/api/types-devops'
 import { useAuthStore } from '@/stores/auth'
 import { showError } from '@/lib/notify'
-import { COL } from '@/lib/table'
-
 export default function Rollback() {
   const { message, modal } = App.useApp()
   const queryClient = useQueryClient()
@@ -42,13 +41,13 @@ export default function Rollback() {
   }
 
   const columns: TableColumnsType<RollbackRow> = [
-    { title: '环境', dataIndex: 'envId', width: 140, render: (v: string) => envs.data?.find((e) => e.value === v)?.label ?? v },
-    { title: '目标制品', dataIndex: 'artifactId', width: 120 },
-    { title: '版本', dataIndex: 'artifactVersion', width: 140 },
+    { title: '环境', dataIndex: 'envId',  render: (v: string) => envs.data?.find((e) => e.value === v)?.label ?? v },
+    { title: '目标制品', dataIndex: 'artifactId', },
+    { title: '版本', dataIndex: 'artifactVersion', },
     { title: '原因', dataIndex: 'reason' },
-    { title: '结果', dataIndex: 'result', width: 90, render: (v: number) => <Tag color={v === 1 ? 'green' : 'red'}>{v === 1 ? '成功' : '失败'}</Tag> },
-    { title: '操作人', dataIndex: 'operator', width: 100 },
-    { title: '时间', dataIndex: 'createTime', width: COL.time, render: (v: string) => <span className="ferry-mono" style={{ fontSize: 12 }}>{v ?? '—'}</span> },
+    { title: '结果', dataIndex: 'result',  render: (v: number) => <Tag color={v === 1 ? 'green' : 'red'}>{v === 1 ? '成功' : '失败'}</Tag> },
+    { title: '操作人', dataIndex: 'operator', },
+    { title: '时间', dataIndex: 'createTime',  render: (v: string) => <span className="ferry-mono" style={{ fontSize: 12 }}>{v ?? '—'}</span> },
   ]
 
   return (
@@ -65,7 +64,7 @@ export default function Rollback() {
           <Button type="primary" icon={<Search size={15} />} onClick={() => { setFilters(draft); setPage((p) => ({ ...p, current: 1 })) }}>查询</Button>
         </div>
         <div className="ferry-table-wrap">
-          <Table<RollbackRow> rowKey="id" columns={columns} dataSource={list.data?.records ?? []}
+          <FerryTable<RollbackRow> rowKey="id" columns={columns} dataSource={list.data?.records ?? []}
             loading={list.isLoading || list.isFetching} scroll={{ x: 'max-content' }}
             pagination={{ current: page.current, pageSize: page.size, total: list.data?.total ?? 0, showSizeChanger: true,
               pageSizeOptions: ['30', '100', '200'], showTotal: (t) => `共 ${t} 条`, onChange: (c, s) => setPage({ current: c, size: s }) }} />

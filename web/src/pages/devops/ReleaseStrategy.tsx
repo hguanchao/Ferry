@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { App, Button, Form, Input, InputNumber, Modal, Select, Space, Table, Tag, type TableColumnsType } from 'antd'
+import { App, Button, Form, Input, InputNumber, Modal, Select, Space, Tag, type TableColumnsType } from 'antd'
+import FerryTable from '@/components/FerryTable'
 import { Plus, RotateCw, Save, Search } from 'lucide-react'
 import PageHeader from '@/components/PageHeader'
 import { RoleTag } from '@/components/StatusTag'
@@ -8,8 +9,6 @@ import { appApi, releaseApi } from '@/api/devops'
 import type { ClosureRow } from '@/api/types-devops'
 import { useAuthStore } from '@/stores/auth'
 import { showError } from '@/lib/notify'
-import { COL } from '@/lib/table'
-
 const SCOPE: Record<number, string> = { 1: '全局', 2: '应用', 3: '团队' }
 
 export default function ReleaseStrategy() {
@@ -43,12 +42,12 @@ export default function ReleaseStrategy() {
   })
 
   const columns: TableColumnsType<ClosureRow> = [
-    { title: '开始日期', dataIndex: 'startDate', width: 130 },
-    { title: '结束日期', dataIndex: 'endDate', width: 130 },
-    { title: '范围', dataIndex: 'scope', width: 90, render: (v: number) => <Tag color={v === 1 ? 'red' : 'blue'}>{SCOPE[v] ?? '—'}</Tag> },
-    { title: '应用', dataIndex: 'appId', width: 120, render: (v?: string) => apps.data?.find((a) => a.value === v)?.label ?? '—' },
+    { title: '开始日期', dataIndex: 'startDate', },
+    { title: '结束日期', dataIndex: 'endDate', },
+    { title: '范围', dataIndex: 'scope',  render: (v: number) => <Tag color={v === 1 ? 'red' : 'blue'}>{SCOPE[v] ?? '—'}</Tag> },
+    { title: '应用', dataIndex: 'appId',  render: (v?: string) => apps.data?.find((a) => a.value === v)?.label ?? '—' },
     { title: '原因', dataIndex: 'reason' },
-    { title: '创建时间', dataIndex: 'createTime', width: COL.time },
+    { title: '创建时间', dataIndex: 'createTime', },
   ]
 
   return (
@@ -84,7 +83,7 @@ export default function ReleaseStrategy() {
           <Button icon={<RotateCw size={14} />} onClick={() => void queryClient.invalidateQueries({ queryKey: ['closures'] })} />
         </div>
         <div className="ferry-table-wrap">
-          <Table<ClosureRow> rowKey="id" columns={columns} dataSource={closures.data?.records ?? []}
+          <FerryTable<ClosureRow> rowKey="id" columns={columns} dataSource={closures.data?.records ?? []}
             loading={closures.isLoading || closures.isFetching} scroll={{ x: 'max-content' }}
             pagination={{ current: page.current, pageSize: page.size, total: closures.data?.total ?? 0, showSizeChanger: true,
               pageSizeOptions: ['30', '100', '200'], onChange: (c, s) => setPage({ current: c, size: s }) }} />

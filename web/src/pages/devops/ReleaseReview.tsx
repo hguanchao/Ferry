@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { App, Button, Descriptions, Input, List, Select, Space, Table, Tag, Typography } from 'antd'
+import { App, Button, Descriptions, Input, List, Select, Space, Tag, Typography } from 'antd'
+import FerryTable from '@/components/FerryTable'
 import { ArrowLeft, Check, ShieldAlert, X } from 'lucide-react'
 import PageHeader from '@/components/PageHeader'
 import { releaseApi } from '@/api/devops'
@@ -71,12 +72,12 @@ export default function ReleaseReview({ id }: { id?: string }) {
         </section>
         <section className="ferry-panel">
           <h3>六项准入检查</h3>
-          <Table size="small" rowKey="id" pagination={false} dataSource={checkRows as Record<string, unknown>[]}
+          <FerryTable size="small" rowKey="id" pagination={false} dataSource={checkRows as Record<string, unknown>[]}
             columns={[
-              { title: '检查项', dataIndex: 'checkName', width: 110 },
-              { title: '系统', dataIndex: 'systemConclusion', width: 90, render: (v: number) => <Tag color={CONCLUSION[v]?.color}>{CONCLUSION[v]?.text ?? '—'}</Tag> },
-              { title: '人工', dataIndex: 'manualConclusion', width: 90, render: (v?: number) => v ? <Tag color={CONCLUSION[v]?.color}>{CONCLUSION[v]?.text}</Tag> : '—' },
-              { title: '人工结论', key: 'edit', width: 120, render: (_, c) => (
+              { title: '检查项', dataIndex: 'checkName', },
+              { title: '系统', dataIndex: 'systemConclusion',  render: (v: number) => <Tag color={CONCLUSION[v]?.color}>{CONCLUSION[v]?.text ?? '—'}</Tag> },
+              { title: '人工', dataIndex: 'manualConclusion',  render: (v?: number) => v ? <Tag color={CONCLUSION[v]?.color}>{CONCLUSION[v]?.text}</Tag> : '—' },
+              { title: '人工结论', key: 'edit',  render: (_, c) => (
                 <Select size="small" style={{ width: 110 }} placeholder="改结论" value={c.manualConclusion as number}
                   options={[3, 4].map((v) => ({ value: v, label: CONCLUSION[v].text }))}
                   onChange={(v) => checkSave.mutate({ itemId: c.id, conclusion: v, remark: String(c.remark ?? '') })} />

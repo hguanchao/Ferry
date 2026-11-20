@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { App, Button, Form, Input, InputNumber, Modal, Space, Table, Tag, Tooltip, type TableColumnsType } from 'antd'
+import { App, Button, Form, Input, InputNumber, Modal, Space, Tag, Tooltip, type TableColumnsType } from 'antd'
+import FerryTable from '@/components/FerryTable'
 import { Pencil, RotateCw, Save } from 'lucide-react'
 import PageHeader from '@/components/PageHeader'
 import { RoleTag } from '@/components/StatusTag'
@@ -8,8 +9,6 @@ import { systemExtApi } from '@/api/devops'
 import type { StoragePolicyRow } from '@/api/types-devops'
 import { useAuthStore } from '@/stores/auth'
 import { showError } from '@/lib/notify'
-import { COL } from '@/lib/table'
-
 export default function StoragePolicy() {
   const { message } = App.useApp()
   const queryClient = useQueryClient()
@@ -47,19 +46,19 @@ export default function StoragePolicy() {
   }
 
   const columns: TableColumnsType<StoragePolicyRow> = [
-    { title: '策略范围', dataIndex: 'scope', width: 160,
+    { title: '策略范围', dataIndex: 'scope',
       render: (value: string) => <Tag color={value === 'global' ? 'blue' : 'default'}>{value === 'global' ? '全局默认' : value}</Tag>,
     },
-    { title: '保留天数', dataIndex: 'retentionDays', width: 120,
+    { title: '保留天数', dataIndex: 'retentionDays',
       render: (value: number) => `${value ?? 0} 天`,
     },
-    { title: '容量上限', dataIndex: 'maxSizeGb', width: 120,
+    { title: '容量上限', dataIndex: 'maxSizeGb',
       render: (value: number) => `${value ?? 0} GB`,
     },
     { title: '说明', dataIndex: 'description',
       render: (value: string) => value || <span style={{ color: 'var(--text-3)' }}>—</span>,
     },
-    { title: '操作', key: 'action', width: COL.action, fixed: 'right',
+    { title: '操作', key: 'action',
       render: (_, record) => (
         can('system:storage:save') && (
           <Tooltip title="编辑">
@@ -89,7 +88,7 @@ export default function StoragePolicy() {
           </span>
         </div>
         <div className="ferry-table-wrap">
-          <Table<StoragePolicyRow> rowKey="id" columns={columns} dataSource={query.data?.records ?? []}
+          <FerryTable<StoragePolicyRow> rowKey="id" columns={columns} dataSource={query.data?.records ?? []}
             loading={query.isLoading || query.isFetching} scroll={{ x: 'max-content' }}
             pagination={{
               current: page.current, pageSize: page.size, total: query.data?.total ?? 0,

@@ -41,7 +41,7 @@ import java.util.Map;
  *
  * <p>签名：以请求参数按字典序拼成 {@code k=v&...} 作为待签串，HMAC-SHA256(secret, 待签串) 转小写十六进制，
  * 放在请求头 {@code X-Ferry-Signature}。secret 未配置时跳过验签（本地/试点环境）；配置后校验不通过返回 401 语义失败。
- * 状态以本系统为准，回调驱动阶段推进与运行终态；结果待确认不直接置成功。
+ * 状态以本系统为准；状态同步主通道为轮询任务，本回调保留给自定义 Job 作为快速通道；结果待确认不直接置成功。
  */
 @Slf4j
 @RestController
@@ -55,7 +55,7 @@ public class JenkinsWebhookController {
     private final IRunService runService;
     private final IGateResultService gateResultService;
 
-    @Value("${devops.jenkins.callback-secret:}")
+    @Value("${ferry.devops.jenkins.callback-secret:}")
     private String callbackSecret;
 
     /** reportType -> ruleType：1单测通过率 2行覆盖率 3分支覆盖率 4阻断漏洞 5高危依赖 6许可证黑名单 */
@@ -89,36 +89,77 @@ public class JenkinsWebhookController {
         }
         RunStatusEnum runStatus = parseRunStatus(status);
         StageStatusEnum stageStatus = parseStageStatus(status);
-        if (stageStatus != null) {
-            stage.setStatus(stageStatus.getCode());
-            stage.setEndTime(new Date());
-            if (stage.getStartTime() != null) {
-                stage.setDuration(stage.getEndTime().getTime() - stage.getStartTime().getTime());
-            }
-            stageMapper.updateById(stage);
-            // 阶段失败/超时：后续未开始阶段全部跳过
-            if (stageStatus == StageStatusEnum.FAILURE || stageStatus == StageStatusEnum.TIMEOUT
-                    || stageStatus == StageStatusEnum.CANCELLED) {
-                for (RunStage later : stageMapper.selectByRun(runId)) {
-                    if (later.getSeq() != null && stage.getSeq() != null && later.getSeq() > stage.getSeq()
-                            && ObjUtil.equals(later.getStatus(), StageStatusEnum.NOT_STARTED.getCode())) {
-                        later.setStatus(StageStatusEnum.SKIPPED.getCode());
-                        stageMapper.updateById(later);
+        if (stageStatus == null) {
+            // 非阶段级状态：保持原有运行级回传能力
+            if (runStatus != null) {
+                run.setStatus(runStatus.getCode());
+                if (isTerminalRunStatus(runStatus.getCode())) {
+                    run.setEndTime(new Date());
+                    if (run.getStartTime() != null) {
+                        run.setDuration(run.getEndTime().getTime() - run.getStartTime().getTime());
                     }
                 }
+                runMapper.updateById(run);
+            }
+            return R.success("回调已接收");
+        }
+        // 重复回调幂等：阶段已终态时不再处理，避免重复推进下一阶段
+        if (isTerminalStageStatus(stage.getStatus())) {
+            log.info("ignore terminal stage callback: runId={}, stageId={}, previous={}, incoming={}",
+                    runId, stageId, stage.getStatus(), stageStatus);
+            return R.success("回调已接收");
+        }
+        Date now = new Date();
+        stage.setStatus(stageStatus.getCode());
+        if (stageStatus == StageStatusEnum.RUNNING) {
+            if (stage.getStartTime() == null) {
+                stage.setStartTime(now);
+            }
+            stageMapper.updateById(stage);
+            if (run.getStartTime() == null) {
+                run.setStartTime(now);
+            }
+            if (!isTerminalRunStatus(run.getStatus())) {
+                run.setStatus(RunStatusEnum.RUNNING.getCode());
+                runMapper.updateById(run);
+            }
+            return R.success("回调已接收");
+        }
+        stage.setEndTime(now);
+        if (stage.getStartTime() != null) {
+            stage.setDuration(now.getTime() - stage.getStartTime().getTime());
+        }
+        stageMapper.updateById(stage);
+        if (stageStatus == StageStatusEnum.SUCCESS) {
+            // 阶段成功只更新阶段与运行中状态；运行最终结果由轮询任务按整条构建收敛
+            if (run.getStartTime() == null) {
+                run.setStartTime(now);
+            }
+            if (!isTerminalRunStatus(run.getStatus())) {
+                run.setStatus(RunStatusEnum.RUNNING.getCode());
+                runMapper.updateById(run);
+            }
+            return R.success("回调已接收");
+        }
+        // 阶段失败/超时/取消：后续未开始阶段全部跳过，运行进入对应终态
+        for (RunStage later : stageMapper.selectByRun(runId)) {
+            if (later.getSeq() != null && stage.getSeq() != null && later.getSeq() > stage.getSeq()
+                    && ObjUtil.equals(later.getStatus(), StageStatusEnum.NOT_STARTED.getCode())) {
+                later.setStatus(StageStatusEnum.SKIPPED.getCode());
+                stageMapper.updateById(later);
             }
         }
-        if (runStatus != null) {
-            run.setStatus(runStatus.getCode());
-            if (runStatus == RunStatusEnum.SUCCESS || runStatus == RunStatusEnum.FAILURE
-                    || runStatus == RunStatusEnum.TIMEOUT || runStatus == RunStatusEnum.CANCELLED) {
-                run.setEndTime(new Date());
-                if (run.getStartTime() != null) {
-                    run.setDuration(run.getEndTime().getTime() - run.getStartTime().getTime());
-                }
-            }
-            runMapper.updateById(run);
+        RunStatusEnum terminalRunStatus = switch (stageStatus) {
+            case TIMEOUT -> RunStatusEnum.TIMEOUT;
+            case CANCELLED -> RunStatusEnum.CANCELLED;
+            default -> RunStatusEnum.FAILURE;
+        };
+        run.setStatus(terminalRunStatus.getCode());
+        run.setEndTime(now);
+        if (run.getStartTime() != null) {
+            run.setDuration(now.getTime() - run.getStartTime().getTime());
         }
+        runMapper.updateById(run);
         return R.success("回调已接收");
     }
 
@@ -310,6 +351,22 @@ public class JenkinsWebhookController {
             log.warn("Jenkins callback sign error", e);
             return false;
         }
+    }
+
+    private boolean isTerminalStageStatus(Integer status) {
+        return ObjUtil.equals(status, StageStatusEnum.SUCCESS.getCode())
+                || ObjUtil.equals(status, StageStatusEnum.FAILURE.getCode())
+                || ObjUtil.equals(status, StageStatusEnum.SKIPPED.getCode())
+                || ObjUtil.equals(status, StageStatusEnum.TIMEOUT.getCode())
+                || ObjUtil.equals(status, StageStatusEnum.REUSED.getCode())
+                || ObjUtil.equals(status, StageStatusEnum.CANCELLED.getCode());
+    }
+
+    private boolean isTerminalRunStatus(Integer status) {
+        return ObjUtil.equals(status, RunStatusEnum.SUCCESS.getCode())
+                || ObjUtil.equals(status, RunStatusEnum.FAILURE.getCode())
+                || ObjUtil.equals(status, RunStatusEnum.TIMEOUT.getCode())
+                || ObjUtil.equals(status, RunStatusEnum.CANCELLED.getCode());
     }
 
     private RunStatusEnum parseRunStatus(String status) {

@@ -3,6 +3,7 @@ package com.ferry.devops.api.dto;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 import java.util.List;
@@ -20,6 +21,10 @@ public class PipelineStageDTO {
     @Schema(description = "阶段名")
     @NotBlank(message = "阶段名不能为空")
     private String name;
+
+    @Schema(description = "构建工具，如 Maven/Node/Gradle")
+    @Size(max = 30, message = "构建工具长度不能超过 30")
+    private String buildTool;
 
     @Schema(description = "超时秒数 60–86400")
     private Integer timeoutSeconds;

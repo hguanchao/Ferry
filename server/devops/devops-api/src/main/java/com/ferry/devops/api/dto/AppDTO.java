@@ -3,6 +3,7 @@ package com.ferry.devops.api.dto;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import lombok.Data;
 
 /**
@@ -47,7 +48,8 @@ public class AppDTO {
     @Schema(description = "仓库分支")
     private String repoBranch;
 
-    @Schema(description = "仓库提交id")
+    @Schema(description = "仓库提交id，7–40 位十六进制")
+    @Pattern(regexp = "^$|^[0-9a-fA-F]{7,40}$", message = "指定提交需为 7–40 位十六进制")
     private String repoCommitId;
 
     @Schema(description = "应用描述")

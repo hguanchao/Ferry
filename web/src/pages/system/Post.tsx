@@ -9,10 +9,10 @@ import {
   Modal,
   Select,
   Switch,
-  Table,
   Tooltip,
   type TableColumnsType,
 } from 'antd'
+import FerryTable from '@/components/FerryTable'
 import { Pencil, Plus, RotateCw, Search, Trash2 } from 'lucide-react'
 import PageHeader from '@/components/PageHeader'
 import { RoleTag } from '@/components/StatusTag'
@@ -20,8 +20,6 @@ import { postApi } from '@/api/system'
 import type { PostRow } from '@/api/types'
 import { useAuthStore } from '@/stores/auth'
 import { showError } from '@/lib/notify'
-import { COL } from '@/lib/table'
-
 export default function Post() {
   const { message, modal } = App.useApp()
   const queryClient = useQueryClient()
@@ -66,7 +64,6 @@ export default function Post() {
     {
       title: '岗位编码',
       dataIndex: 'code',
-      width: COL.code,
 
       render: (value: string) => (
         <span className="ferry-mono" style={{ fontSize: 12, color: 'var(--text-2)' }}>
@@ -82,7 +79,6 @@ export default function Post() {
     {
       title: '排序',
       dataIndex: 'sort',
-      width: COL.sort,
 
       align: 'right',
       render: (value: number) => <span className="ferry-mono">{value}</span>,
@@ -90,7 +86,6 @@ export default function Post() {
     {
       title: '状态',
       dataIndex: 'status',
-      width: COL.status,
 
       render: (value: number) => (
         <span className="ferry-status" data-tone={value === 1 ? 'success' : 'default'}>
@@ -102,7 +97,6 @@ export default function Post() {
     {
       title: '创建时间',
       dataIndex: 'createTime',
-      width: COL.time,
 
       render: (value: string) => (
         <span className="ferry-mono" style={{ fontSize: 12, color: 'var(--text-3)' }}>
@@ -113,9 +107,7 @@ export default function Post() {
     {
       title: '操作',
       key: 'action',
-      width: COL.action,
 
-      fixed: 'right',
       render: (_, record) => (
         <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
           {can('system:post:save') && (
@@ -234,7 +226,7 @@ export default function Post() {
         </div>
 
         <div className="ferry-table-wrap">
-          <Table<PostRow>
+          <FerryTable<PostRow>
             rowKey="id"
             columns={columns}
             dataSource={query.data?.records ?? []}

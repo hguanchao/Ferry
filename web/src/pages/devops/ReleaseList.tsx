@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { App, Button, Form, Input, Modal, Select, Space, Table, Tag, Tooltip, type TableColumnsType } from 'antd'
+import { App, Button, Form, Input, Modal, Select, Space, Tag, Tooltip, type TableColumnsType } from 'antd'
+import FerryTable from '@/components/FerryTable'
 import { Eye, Plus, RotateCw, Search, Send, Trash2, Undo2 } from 'lucide-react'
 import PageHeader from '@/components/PageHeader'
 import { RoleTag } from '@/components/StatusTag'
@@ -8,8 +9,6 @@ import { changeTicketApi, releaseApi } from '@/api/devops'
 import type { ReleaseRow } from '@/api/types-devops'
 import { useAuthStore } from '@/stores/auth'
 import { showError } from '@/lib/notify'
-import { COL } from '@/lib/table'
-
 const STATUS: Record<number, { text: string; color: string }> = {
   1: { text: '草稿', color: 'default' }, 2: { text: '待审批', color: 'gold' },
   3: { text: '已批准', color: 'blue' }, 4: { text: '发布中', color: 'processing' },
@@ -39,15 +38,15 @@ export default function ReleaseList() {
   const simple = (fn: () => Promise<string>, ok: string) => fn().then((t) => { message.success(t || ok); invalidate() }).catch(showError)
 
   const columns: TableColumnsType<ReleaseRow> = [
-    { title: '发布单号', dataIndex: 'rcNo', width: 170, render: (v: string) => <span className="ferry-mono" style={{ fontSize: 12 }}>{v}</span> },
+    { title: '发布单号', dataIndex: 'rcNo',  render: (v: string) => <span className="ferry-mono" style={{ fontSize: 12 }}>{v}</span> },
     { title: '标题', dataIndex: 'title' },
-    { title: '状态', dataIndex: 'status', width: 100, render: (v: number) => <Tag color={STATUS[v]?.color}>{STATUS[v]?.text ?? '—'}</Tag> },
-    { title: '风险', dataIndex: 'riskLevel', width: 90, render: (v: number) => v ? <Tag color={RISK[v]?.color}>{RISK[v]?.text}</Tag> : '—' },
-    { title: '评分', dataIndex: 'riskScore', width: 80, render: (v?: string) => v ?? '—' },
-    { title: '计划窗口', width: 200, render: (_, r) => <span className="ferry-mono" style={{ fontSize: 12 }}>{r.windowStart} ~ {r.windowEnd}</span> },
-    { title: '创建人', dataIndex: 'creator', width: 100 },
-    { title: '创建时间', dataIndex: 'createTime', width: COL.time, render: (v: string) => <span className="ferry-mono" style={{ fontSize: 12, color: 'var(--text-3)' }}>{v ?? '—'}</span> },
-    { title: '操作', key: 'action', width: 200, fixed: 'right', render: (_, r) => (
+    { title: '状态', dataIndex: 'status',  render: (v: number) => <Tag color={STATUS[v]?.color}>{STATUS[v]?.text ?? '—'}</Tag> },
+    { title: '风险', dataIndex: 'riskLevel',  render: (v: number) => v ? <Tag color={RISK[v]?.color}>{RISK[v]?.text}</Tag> : '—' },
+    { title: '评分', dataIndex: 'riskScore',  render: (v?: string) => v ?? '—' },
+    { title: '计划窗口',  render: (_, r) => <span className="ferry-mono" style={{ fontSize: 12 }}>{r.windowStart} ~ {r.windowEnd}</span> },
+    { title: '创建人', dataIndex: 'creator', },
+    { title: '创建时间', dataIndex: 'createTime',  render: (v: string) => <span className="ferry-mono" style={{ fontSize: 12, color: 'var(--text-3)' }}>{v ?? '—'}</span> },
+    { title: '操作', key: 'action',   render: (_, r) => (
       <Space size={2}>
         <Tooltip title="评审">
           <Button type="link" size="small" icon={<Eye size={14} />} onClick={() => { location.href = `/release/review/${r.id}` }} />
@@ -90,7 +89,7 @@ export default function ReleaseList() {
           <Button icon={<RotateCw size={15} />} onClick={() => { setDraft({}); setFilters({}); setPage((p) => ({ ...p, current: 1 })) }}>重置</Button>
         </div>
         <div className="ferry-table-wrap">
-          <Table<ReleaseRow> rowKey="id" columns={columns} dataSource={list.data?.records ?? []}
+          <FerryTable<ReleaseRow> rowKey="id" columns={columns} dataSource={list.data?.records ?? []}
             loading={list.isLoading || list.isFetching} scroll={{ x: 'max-content' }}
             pagination={{ current: page.current, pageSize: page.size, total: list.data?.total ?? 0, showSizeChanger: true,
               pageSizeOptions: ['30', '100', '200'], showTotal: (t) => `共 ${t} 条`, onChange: (c, s) => setPage({ current: c, size: s }) }} />

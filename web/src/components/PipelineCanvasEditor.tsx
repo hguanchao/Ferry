@@ -36,6 +36,14 @@ export const EXECUTORS = [
   { value: 'release', label: '发布' },
 ] as const
 
+/** 构建工具：仅作为阶段属性展示与后续 Agent/镜像选择依据，实际命令由任务脚本内容决定 */
+export const BUILD_TOOLS = [
+  { value: 'Maven', label: 'Maven' },
+  { value: 'Gradle', label: 'Gradle' },
+  { value: 'Node', label: 'Node.js / npm' },
+  { value: 'Custom', label: '自定义' },
+] as const
+
 const STAGE_LABEL = Object.fromEntries(STAGE_TYPES.map((s) => [s.value, s.label])) as Record<number, string>
 const EXECUTOR_LABEL = Object.fromEntries(EXECUTORS.map((e) => [e.value, e.label])) as Record<string, string>
 
@@ -141,9 +149,10 @@ export default function PipelineCanvasEditor({ value, onChange }: PipelineCanvas
     const stage: PipelineStageDef = {
       type,
       name: STAGE_LABEL[type],
+      buildTool: '',
       timeoutSeconds: 1800,
       tasks: [],
-      outputs: type === 4 ? ['artifact'] : [],
+      outputs: [],
     }
     update([...stages, stage])
     setSelection({ kind: 'stage', index: stages.length })
@@ -514,13 +523,20 @@ export default function PipelineCanvasEditor({ value, onChange }: PipelineCanvas
                   onChange={(e) => patchStage(selection.index, { name: e.target.value })} />
               </label>
               <label className="ferry-canvas__field">
+                <span>构建工具</span>
+                <Select allowClear value={selectedStage.buildTool || undefined} style={{ width: '100%' }}
+                  placeholder="例如 Maven / Node"
+                  options={BUILD_TOOLS.map((tool) => ({ value: tool.value, label: tool.label }))}
+                  onChange={(v) => patchStage(selection.index, { buildTool: v ?? '' })} />
+              </label>
+              <label className="ferry-canvas__field">
                 <span>超时（秒，60–86400）</span>
                 <InputNumber min={60} max={86400} style={{ width: '100%' }} value={selectedStage.timeoutSeconds ?? 1800}
                   onChange={(v) => patchStage(selection.index, { timeoutSeconds: v ?? 1800 })} />
               </label>
               <label className="ferry-canvas__field">
                 <span>产出物（逗号分隔）</span>
-                <Input value={(selectedStage.outputs ?? []).join(',')} placeholder="例如 artifact"
+                <Input value={(selectedStage.outputs ?? []).join(',')} placeholder="例如 target/*.jar, dist/**"
                   onChange={(e) => patchStage(selection.index, {
                     outputs: e.target.value.split(',').map((s) => s.trim()).filter(Boolean),
                   })} />
@@ -542,14 +558,14 @@ export default function PipelineCanvasEditor({ value, onChange }: PipelineCanvas
                   onChange={(v) => patchTask(selection.stage, selection.task, { executor: v })} />
               </label>
               <label className="ferry-canvas__field">
-                <span>脚本引用（源码路径 / Job 名）</span>
-                <Input value={selectedTask.scriptRef ?? ''} placeholder="例如 scripts/build.sh / build"
+                <span>脚本引用（源码路径，可选）</span>
+                <Input value={selectedTask.scriptRef ?? ''} placeholder="例如 scripts/build.sh" maxLength={200}
                   onChange={(e) => patchTask(selection.stage, selection.task, { scriptRef: e.target.value })} />
               </label>
               <label className="ferry-canvas__field">
-                <span>自定义脚本内容（源码无脚本时使用）</span>
+                <span>执行命令 / 脚本内容</span>
                 <Input.TextArea value={selectedTask.scriptContent ?? ''} rows={4}
-                  placeholder="留空则使用源码脚本"
+                  placeholder="例如 mvn -B -DskipTests clean package"
                   onChange={(e) => patchTask(selection.stage, selection.task, { scriptContent: e.target.value })} />
               </label>
               <Button danger block icon={<Trash2 size={14} />}

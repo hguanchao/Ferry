@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { App, Button, Form, Input, Modal, Select, Table, Tag, Tooltip, type TableColumnsType } from 'antd'
+import { App, Button, Form, Input, Modal, Select, Tag, Tooltip, type TableColumnsType } from 'antd'
+import FerryTable from '@/components/FerryTable'
 import { Pencil, Plus, RotateCw, Search, Send, Trash2 } from 'lucide-react'
 import PageHeader from '@/components/PageHeader'
 import { RoleTag } from '@/components/StatusTag'
@@ -9,8 +10,6 @@ import { post } from '@/api/client'
 import type { NotifyChannelRow } from '@/api/types-devops'
 import { useAuthStore } from '@/stores/auth'
 import { showError } from '@/lib/notify'
-import { COL } from '@/lib/table'
-
 const TYPE_LABEL: Record<number, string> = { 1: '企业 IM', 2: '邮件', 3: 'Webhook' }
 const STATUS_LABEL: Record<number, string> = { 1: '正常', 2: '异常' }
 
@@ -66,16 +65,16 @@ export default function NotifyChannel() {
 
   const columns: TableColumnsType<ChannelExt> = [
     { title: '渠道名', dataIndex: 'name' },
-    { title: '类型', dataIndex: 'type', width: 110,
+    { title: '类型', dataIndex: 'type',
       render: (v: number) => <Tag color="blue">{TYPE_LABEL[v] ?? v}</Tag> },
     { title: '配置摘要', dataIndex: 'configJson',
       render: (v?: string) => <span className="ferry-mono" style={{ fontSize: 12, color: 'var(--text-3)' }}>
         {v ? v.replace(/https?:\/\/[^\s",}]+/g, '***').slice(0, 60) : '—'}</span> },
-    { title: '状态', dataIndex: 'status', width: 90,
+    { title: '状态', dataIndex: 'status',
       render: (v: number) => <Tag color={v === 1 ? 'green' : 'red'}>{STATUS_LABEL[v] ?? v}</Tag> },
-    { title: '最近发送', dataIndex: 'lastSendTime', width: COL.time,
+    { title: '最近发送', dataIndex: 'lastSendTime',
       render: (v?: string) => <span className="ferry-mono" style={{ fontSize: 12, color: 'var(--text-3)' }}>{v || '—'}</span> },
-    { title: '操作', key: 'action', width: COL.actionWide, fixed: 'right',
+    { title: '操作', key: 'action',
       render: (_, record) => (
         <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
           <Tooltip title="测试">
@@ -124,7 +123,7 @@ export default function NotifyChannel() {
             onClick={() => { setDraft({}); setFilters({}); setPage((p) => ({ ...p, current: 1 })) }}>重置</Button>
         </div>
         <div className="ferry-table-wrap">
-          <Table<ChannelExt> rowKey="id" columns={columns} dataSource={(query.data?.records ?? []) as ChannelExt[]}
+          <FerryTable<ChannelExt> rowKey="id" columns={columns} dataSource={(query.data?.records ?? []) as ChannelExt[]}
             loading={query.isLoading || query.isFetching} scroll={{ x: 'max-content' }}
             pagination={{
               current: page.current, pageSize: page.size, total: query.data?.total ?? 0,

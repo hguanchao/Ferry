@@ -1,14 +1,13 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Button, DatePicker, Select, Table, Tag, type TableColumnsType } from 'antd'
+import { Button, DatePicker, Select, Tag, type TableColumnsType } from 'antd'
+import FerryTable from '@/components/FerryTable'
 import { CircleCheck, FileQuestion, RotateCw, ShieldAlert, Undo2 } from 'lucide-react'
 import PageHeader from '@/components/PageHeader'
 import { RoleTag } from '@/components/StatusTag'
 import { aiApi, metricApi } from '@/api/devops'
 import { post } from '@/api/client'
 import type { AiFeedbackRow, MetricRow } from '@/api/types-devops'
-import { COL } from '@/lib/table'
-
 interface QualityData {
   totalOutput?: number
   adoptedCount?: number
@@ -69,26 +68,26 @@ export default function AiQuality() {
   ]
 
   const feedbackColumns: TableColumnsType<AiFeedbackRow> = [
-    { title: '输出ID', dataIndex: 'outputId', width: COL.code,
+    { title: '输出ID', dataIndex: 'outputId',
       render: (v: string) => <span className="ferry-mono" style={{ fontSize: 12 }}>{v}</span> },
-    { title: '是否有帮助', dataIndex: 'isHelpful', width: 120,
+    { title: '是否有帮助', dataIndex: 'isHelpful',
       render: (v: number) => <Tag color={v === 1 ? 'green' : 'red'}>{v === 1 ? '有帮助' : '没帮助'}</Tag> },
-    { title: '反馈人', dataIndex: 'userId', width: COL.creator },
+    { title: '反馈人', dataIndex: 'userId', },
     { title: '正确答案', dataIndex: 'correctAnswer',
       render: (v?: string) => <span style={{ color: 'var(--text-3)' }}>{v || '—'}</span> },
-    { title: '反馈时间', dataIndex: 'createTime', width: COL.time,
+    { title: '反馈时间', dataIndex: 'createTime',
       render: (v: string) => <span className="ferry-mono" style={{ fontSize: 12, color: 'var(--text-3)' }}>{v ?? '—'}</span> },
   ]
 
   const dailyColumns: TableColumnsType<MetricRow> = [
-    { title: '统计日', dataIndex: 'statDate', width: COL.time,
+    { title: '统计日', dataIndex: 'statDate',
       render: (v: string) => <span className="ferry-mono" style={{ fontSize: 12 }}>{v}</span> },
-    { title: '应用ID', dataIndex: 'appId', width: COL.code },
-    { title: 'AI采纳率', dataIndex: 'aiAdoptRate', width: 110, render: (v?: string) => pct(v ?? undefined) },
-    { title: '低置信占比', dataIndex: 'aiLowConfidenceRate', width: 120, render: (v?: string) => pct(v ?? undefined) },
-    { title: '拒答率', dataIndex: 'aiRefusalRate', width: 100, render: (v?: string) => pct(v ?? undefined) },
-    { title: '动作撤销率', dataIndex: 'actionUndoRate', width: 120, render: (v?: string) => pct(v ?? undefined) },
-    { title: '数据状态', dataIndex: 'dataStatus', width: 100,
+    { title: '应用ID', dataIndex: 'appId', },
+    { title: 'AI采纳率', dataIndex: 'aiAdoptRate',  render: (v?: string) => pct(v ?? undefined) },
+    { title: '低置信占比', dataIndex: 'aiLowConfidenceRate',  render: (v?: string) => pct(v ?? undefined) },
+    { title: '拒答率', dataIndex: 'aiRefusalRate',  render: (v?: string) => pct(v ?? undefined) },
+    { title: '动作撤销率', dataIndex: 'actionUndoRate',  render: (v?: string) => pct(v ?? undefined) },
+    { title: '数据状态', dataIndex: 'dataStatus',
       render: (v: number) => <Tag color={v === 2 ? 'orange' : 'green'}>{v === 2 ? '数据不足' : '正常'}</Tag> },
   ]
 
@@ -128,7 +127,7 @@ export default function AiQuality() {
             onClick={() => { setFilters(draft); setPage((p) => ({ ...p, current: 1 })) }}>查询</Button>
         </div>
         <div className="ferry-table-wrap">
-          <Table<MetricRow> rowKey="id" columns={dailyColumns} dataSource={dailyQuery.data?.records ?? []}
+          <FerryTable<MetricRow> rowKey="id" columns={dailyColumns} dataSource={dailyQuery.data?.records ?? []}
             loading={dailyQuery.isLoading || dailyQuery.isFetching} scroll={{ x: 'max-content' }}
             pagination={{
               current: page.current, pageSize: page.size, total: dailyQuery.data?.total ?? 0,
@@ -141,7 +140,7 @@ export default function AiQuality() {
       <section className="ferry-panel" style={{ marginTop: 16 }}>
         <div className="ferry-panel__head"><span className="ferry-panel__title">用户反馈明细</span></div>
         <div className="ferry-table-wrap">
-          <Table<AiFeedbackRow> rowKey="id" columns={feedbackColumns} dataSource={feedbackQuery.data?.records ?? []}
+          <FerryTable<AiFeedbackRow> rowKey="id" columns={feedbackColumns} dataSource={feedbackQuery.data?.records ?? []}
             loading={feedbackQuery.isLoading} scroll={{ x: 'max-content' }}
             pagination={{
               current: page.current, pageSize: page.size, total: feedbackQuery.data?.total ?? 0,

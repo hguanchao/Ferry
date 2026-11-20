@@ -11,13 +11,13 @@ import {
   Modal,
   Radio,
   Select,
-  Table,
   Tabs,
   Tag,
   Tooltip,
   Tree,
   type TableColumnsType,
 } from 'antd'
+import FerryTable from '@/components/FerryTable'
 import { Copy, Download, Pencil, Plus, RotateCw, Search, ShieldCheck, Trash2 } from 'lucide-react'
 import PageHeader from '@/components/PageHeader'
 import { BuiltinTag, EnabledTag } from '@/components/StatusTag'
@@ -25,7 +25,6 @@ import { deptApi, menuApi, roleApi } from '@/api/system'
 import type { DeptNode, MenuNode, RoleRow } from '@/api/types'
 import { DATA_SCOPE_OPTIONS, dataScopeText } from '@/lib/dataScope'
 import { exportCsv } from '@/lib/export'
-import { COL } from '@/lib/table'
 import { useAuthStore } from '@/stores/auth'
 import { showError } from '@/lib/notify'
 
@@ -289,7 +288,7 @@ export default function Role() {
     {
       title: '角色编码',
       dataIndex: 'code',
-      width: COL.code,
+
       render: (value: string) => (
         <span className="ferry-mono" style={{ fontSize: 12 }}>
           {value}
@@ -299,20 +298,20 @@ export default function Role() {
     {
       title: '排序',
       dataIndex: 'sort',
-      width: COL.sort,
+
       align: 'right',
       render: (value: number) => <span className="ferry-mono">{value ?? '—'}</span>,
     },
     {
       title: '状态',
       dataIndex: 'status',
-      width: COL.status,
+
       render: (value: number) => <EnabledTag value={value} />,
     },
     {
       title: '数据范围',
       dataIndex: 'dataScope',
-      width: 130,
+
       render: (value?: number) => (
         <span style={{ fontSize: 12.5, color: 'var(--text-2)' }}>{dataScopeText(value)}</span>
       ),
@@ -320,7 +319,7 @@ export default function Role() {
     {
       title: '创建时间',
       dataIndex: 'createTime',
-      width: COL.time,
+
       render: (value: string) => (
         <span className="ferry-mono" style={{ fontSize: 12, color: 'var(--text-3)' }}>
           {value || '—'}
@@ -332,7 +331,7 @@ export default function Role() {
   columns.push({
     title: '操作',
     key: 'action',
-    width: COL.actionWide,
+
     render: (_, record) => (
       <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
         <Tooltip title="编辑">
@@ -460,7 +459,7 @@ export default function Role() {
         </div>
 
         <div className="ferry-table-wrap">
-          <Table<RoleRow>
+          <FerryTable<RoleRow>
             rowKey="id"
             columns={columns}
             dataSource={listQuery.data?.records ?? []}

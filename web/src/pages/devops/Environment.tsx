@@ -7,11 +7,11 @@ import {
   Input,
   Modal,
   Select,
-  Table,
   Tag,
   Tooltip,
   type TableColumnsType,
 } from 'antd'
+import FerryTable from '@/components/FerryTable'
 import { Check, Pencil, Plus, RotateCw, Search, Trash2, Shuffle } from 'lucide-react'
 import PageHeader from '@/components/PageHeader'
 import { RoleTag } from '@/components/StatusTag'
@@ -19,8 +19,6 @@ import { appApi, envApi } from '@/api/devops'
 import type { EnvironmentRow } from '@/api/types-devops'
 import { useAuthStore } from '@/stores/auth'
 import { showError } from '@/lib/notify'
-import { COL } from '@/lib/table'
-
 const CATEGORY_LABEL: Record<number, string> = { 1: '测试', 2: '预发', 3: '生产' }
 const CATEGORY_COLOR: Record<number, string> = { 1: 'blue', 2: 'orange', 3: 'red' }
 const DEPLOY_LABEL: Record<number, string> = { 1: 'SSH', 2: 'Docker', 3: 'Kubernetes' }
@@ -153,16 +151,16 @@ export default function Environment() {
   }
 
   const columns: TableColumnsType<EnvironmentRow> = [
-    { title: '应用', dataIndex: 'appId', width: 140,
+    { title: '应用', dataIndex: 'appId',
       render: (value: string) => appOptions.data?.find((item) => item.value === value)?.label ?? value,
     },
     { title: '环境名', dataIndex: 'name',
       render: (value: string) => <span style={{ fontWeight: 500, color: 'var(--text-1)' }}>{value}</span>,
     },
-    { title: '环境类别', dataIndex: 'category', width: 100,
+    { title: '环境类别', dataIndex: 'category',
       render: (value: number) => <Tag color={CATEGORY_COLOR[value]}>{CATEGORY_LABEL[value] ?? '—'}</Tag>,
     },
-    { title: '部署类型', dataIndex: 'deployType', width: 110,
+    { title: '部署类型', dataIndex: 'deployType',
       render: (value: number, record) => (
         <span>
           {DEPLOY_LABEL[value] ?? '—'}
@@ -172,19 +170,19 @@ export default function Environment() {
         </span>
       ),
     },
-    { title: '配置版本', dataIndex: 'configVersion', width: 90,
+    { title: '配置版本', dataIndex: 'configVersion',
       render: (value: number) => <span className="ferry-mono">v{value ?? 0}</span>,
     },
-    { title: '保护标记', dataIndex: 'isProtected', width: 90,
+    { title: '保护标记', dataIndex: 'isProtected',
       render: (value: number) => (value === 1 ? <Tag color="red">受保护</Tag> : <span style={{ color: 'var(--text-3)' }}>—</span>),
     },
-    { title: '状态', dataIndex: 'status', width: 90,
+    { title: '状态', dataIndex: 'status',
       render: (value: number) => (value === 2 ? <Tag color="orange">待审批</Tag> : <Tag color="green">正常</Tag>),
     },
-    { title: '创建时间', dataIndex: 'createTime', width: COL.time,
+    { title: '创建时间', dataIndex: 'createTime',
       render: (value: string) => <span className="ferry-mono" style={{ fontSize: 12, color: 'var(--text-3)' }}>{value ?? '—'}</span>,
     },
-    { title: '操作', key: 'action', width: COL.actionWide, fixed: 'right',
+    { title: '操作', key: 'action',
       render: (_, record) => (
         <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
           {can('devops:environment:save') && (
@@ -263,7 +261,7 @@ export default function Environment() {
             onClick={() => { setDraft({}); setFilters({}); setPage((p) => ({ ...p, current: 1 })) }}>重置</Button>
         </div>
         <div className="ferry-table-wrap">
-          <Table<EnvironmentRow> rowKey="id" columns={columns} dataSource={query.data?.records ?? []}
+          <FerryTable<EnvironmentRow> rowKey="id" columns={columns} dataSource={query.data?.records ?? []}
             loading={query.isLoading || query.isFetching} scroll={{ x: 'max-content' }}
             pagination={{
               current: page.current, pageSize: page.size, total: query.data?.total ?? 0,

@@ -7,9 +7,9 @@ import type {
   ChangeTicketRow, CleanPolicyRow, CleanTaskRow, ClosureRow, DeployBatchRow,
   DeployRecordRow, DiffResult, EnvironmentRow, EnvConfigRow, GateExemptionRow,
   GateResultRow, GateRuleRow, ImpactResult, MetricRow, NotifyChannelRow, NotifyTemplateRow,
-  OpenTokenRow, PipelineDefinition, PipelineDetail, PipelineRow, PipelineVersionRow, PrecheckResult,
+  OpenTokenRow, PipelineDefinition, PipelineDetail, PipelinePreview, PipelineRow, PipelineVersionRow, PrecheckResult,
   PrecheckResultVO, ReleaseDetail, ReleaseRecordRow, ReleaseRow, ReleaseStrategyRow,
-  RiskResult, RollbackCandidate, RollbackRow, RunDetail, RunRow, StageStatRow, StoragePolicyRow,
+  RepoCommitOption, RiskResult, RollbackCandidate, RollbackRow, RunDetail, RunRow, StageStatRow, StoragePolicyRow,
   TechDebtRow, TriggerRecordRow, TriggerResult, ValidateResult,
   WizardProgress,
 } from './types-devops'
@@ -55,11 +55,15 @@ export const pipelineApi = {
   disable: (body: Record<string, unknown>) => post<string>(`${B}/pipeline/disable`, body),
   definition: (id: string, versionId?: string) => get<PipelineDefinition>(`${B}/pipeline/definition`, { id, versionId }),
   validateDefinition: (body: Record<string, unknown>) => post<ValidateResult>(`${B}/pipeline/definition/validate`, body),
+  previewDefinition: (body: Record<string, unknown>) => post<PipelinePreview>(`${B}/pipeline/definition/preview`, body),
   saveDefinition: (body: Record<string, unknown>) => post<{ id: string; versionNo: number }>(`${B}/pipeline/definition/save`, body),
   versionPage: (pipelineId: string, current = 1, size = 20) => get<ApiPage<PipelineVersionRow>>(`${B}/pipeline/version/pageList`, { pipelineId, current, size }),
   versionDiff: (leftId: string, rightId: string) => get<DiffResult>(`${B}/pipeline/version/diff`, { leftId, rightId }),
   versionRollback: (body: Record<string, unknown>) => post<{ id: string }>(`${B}/pipeline/version/rollback`, body),
   triggerPrecheck: (body: Record<string, unknown>) => post<PrecheckResult>(`${B}/pipeline/trigger/precheck`, body),
+  triggerBranches: (appId: string) => get<string[]>(`${B}/pipeline/trigger/branches`, { appId }, { silent: true }),
+  triggerCommits: (appId: string, branch: string, limit = 10) =>
+    get<RepoCommitOption[]>(`${B}/pipeline/trigger/commits`, { appId, branch, limit }, { silent: true }),
   trigger: (body: Record<string, unknown>, requestId: string) => post<TriggerResult>(`${B}/pipeline/trigger`, { ...body, requestId }),
   triggerRecords: (appId: string, current = 1, size = 20) => get<ApiPage<TriggerRecordRow>>(`${B}/pipeline/trigger/records`, { appId, current, size }),
 }

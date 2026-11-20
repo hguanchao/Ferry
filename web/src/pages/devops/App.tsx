@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { App, Button, Form, Input, Modal, Select, Table, Tag, Tooltip, TreeSelect, type SelectProps, type TableColumnsType } from 'antd'
+import { App, Button, Form, Input, Modal, Select, Tag, Tooltip, TreeSelect, type SelectProps, type TableColumnsType } from 'antd'
+import FerryTable from '@/components/FerryTable'
 import { Pencil, Plus, RotateCw, Search, Trash2, WandSparkles } from 'lucide-react'
 import PageHeader from '@/components/PageHeader'
 import { appApi } from '@/api/devops'
@@ -10,8 +11,6 @@ import type { DeptNode, UserRow } from '@/api/types'
 import type { AppRow } from '@/api/types-devops'
 import { useAuthStore } from '@/stores/auth'
 import { showError } from '@/lib/notify'
-import { COL } from '@/lib/table'
-
 const PLATFORM_LABEL: Record<number, string> = { 1: 'GitLab', 2: 'GitHub', 3: 'Gitee' }
 const STATUS_LABEL: Record<number, string> = { 0: '停用', 1: '启用', 2: '草稿', 3: '完善' }
 
@@ -183,7 +182,7 @@ export default function AppList() {
 
   const columns: TableColumnsType<AppRow> = [
     {
-      title: '应用编码', dataIndex: 'code', width: COL.code,
+      title: '应用编码', dataIndex: 'code',
       render: (value: string) => <span className="ferry-mono" style={{ fontSize: 12 }}>{value}</span>,
     },
     { title: '应用名称', dataIndex: 'name',
@@ -194,23 +193,23 @@ export default function AppList() {
         </div>
       ),
     },
-    { title: '所属团队', dataIndex: 'deptName', width: 120,
+    { title: '所属团队', dataIndex: 'deptName',
       render: (value?: string) => value || '—',
     },
-    { title: '负责人', dataIndex: 'ownerName', width: 120 },
-    { title: '代码平台', dataIndex: 'repoType', width: 100,
+    { title: '负责人', dataIndex: 'ownerName', },
+    { title: '代码平台', dataIndex: 'repoType',
       render: (value: number) => PLATFORM_LABEL[value] ?? '—',
     },
     { title: '仓库地址', dataIndex: 'repoUrl',
       render: (value?: string) => <Tooltip title={value}><span className="ferry-mono" style={{ fontSize: 12 }}>{value || '—'}</span></Tooltip>,
     },
-    { title: '应用状态', dataIndex: 'status', width: 100,
+    { title: '应用状态', dataIndex: 'status',
       render: (value: number) => <Tag color={value === 3 ? 'green' : value === 0 ? 'default' : 'orange'}>{STATUS_LABEL[value] ?? '—'}</Tag>,
     },
-    { title: '创建时间', dataIndex: 'createTime', width: COL.time,
+    { title: '创建时间', dataIndex: 'createTime',
       render: (value: string) => <span className="ferry-mono" style={{ fontSize: 12, color: 'var(--text-3)' }}>{value ?? '—'}</span>,
     },
-    { title: '操作', key: 'action', width: COL.actionWide, fixed: 'right',
+    { title: '操作', key: 'action',
       render: (_, record) => (
         <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
           {can('devops:app:save') && (
@@ -267,7 +266,7 @@ export default function AppList() {
             onClick={() => { setDraft({}); setFilters({}); setPage((p) => ({ ...p, current: 1 })) }}>重置</Button>
         </div>
         <div className="ferry-table-wrap">
-          <Table<AppRow> rowKey="id" columns={columns} dataSource={query.data?.records ?? []}
+          <FerryTable<AppRow> rowKey="id" columns={columns} dataSource={query.data?.records ?? []}
             loading={query.isLoading || query.isFetching} scroll={{ x: 'max-content' }}
             pagination={{
               current: page.current, pageSize: page.size, total: query.data?.total ?? 0,
@@ -344,8 +343,13 @@ export default function AppList() {
             <Form.Item name="coreLink" label="核心链路">
               <Select options={[{ value: 0, label: '否' }, { value: 1, label: '是' }]} />
             </Form.Item>
-            <Form.Item name="repoCommitId" label="指定提交 Id">
-              <Input placeholder="可选，指定构建提交" />
+            <Form.Item
+              name="repoCommitId"
+              label="指定提交 Id"
+              rules={[{ pattern: /^[0-9a-fA-F]{7,40}$/, message: '需为 7–40 位十六进制提交 ID' }]}
+              extra="选填；作为手动触发的默认提交，留空表示由触发时指定"
+            >
+              <Input placeholder="例如 29aaf3f" />
             </Form.Item>
             <Form.Item name="description" label="应用描述" style={{ gridColumn: '1 / -1' }}>
               <Input.TextArea placeholder="应用用途说明" rows={2} maxLength={500} />

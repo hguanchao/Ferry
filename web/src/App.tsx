@@ -12,12 +12,23 @@ import NotFoundPage from '@/pages/error/NotFoundPage'
 import ForbiddenPage from '@/pages/error/ForbiddenPage'
 import RequireAuth from '@/router/RequireAuth'
 import DynamicPage from '@/router/DynamicPage'
+import type { MenuRoute } from '@/router/menu'
 import { useMenuRoutes } from '@/router/useMenuRoutes'
 import { buildTheme } from '@/theme'
 import { UNAUTHORIZED_EVENT } from '@/lib/session'
 import { notifyQueryError } from '@/lib/notify'
 import { useUiStore } from '@/stores/ui'
 import { useAuthStore } from '@/stores/auth'
+
+/** 运行详情深链：菜单只注册 /pipeline/run，带运行 id 时复用同一页面组件 */
+const RUN_DETAIL_ROUTE: MenuRoute = {
+  id: 'run-detail',
+  path: '/pipeline/run',
+  name: '运行详情',
+  component: 'devops/RunDetail',
+  trail: ['流水线管理', '运行详情'],
+  parentIds: [],
+}
 
 const queryClient = new QueryClient({
   /** 查询失败的兜底提示：页面 useQuery 多数只渲染表格，统一补业务错误提示，HTTP 层错误拦截器已弹过 */
@@ -98,6 +109,7 @@ export default function App() {
               >
                 <Route path="/" element={<Navigate to="/workbench" replace />} />
                 <Route path="/workbench" element={<WorkbenchPage />} />
+                <Route path="/pipeline/run/:id" element={<DynamicPage route={RUN_DETAIL_ROUTE} />} />
                 {dynamicRoutes}
                 <Route path="/profile" element={<ProfilePage />} />
                 <Route path="/403" element={<ForbiddenPage />} />

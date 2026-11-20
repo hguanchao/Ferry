@@ -35,7 +35,14 @@ export interface AppDependencyRow {
   versionRange?: string
 }
 
-export interface AppOption { value: ID; label: string; code: string }
+export interface AppOption {
+  value: ID
+  label: string
+  code: string
+  repoUrl?: string
+  repoBranch?: string
+  repoCommitId?: string
+}
 export interface WizardProgress { appId: ID; completedSteps: number[]; skippedSteps: number[]; status: number }
 export interface AppOverview { appId: ID; pipelineCount: number; envCount: number; runningCount: number; prodArtifactDigest?: string; prodDeployType?: string; blockers: Array<Record<string, unknown>> }
 
@@ -71,12 +78,27 @@ export interface PipelineRow {
   updateTime?: string
 }
 export interface PipelineVersionRow { id: ID; pipelineId: ID; versionNo: number; changeNote: string; sourceType: number; createTime: string }
+/** 触发弹窗提交候选：与后端 RepoCommitVO 对应 */
+export interface RepoCommitOption {
+  sha: string
+  shortSha: string
+  message: string
+  authorName?: string
+  committedAt?: string
+}
 export interface PipelineDefinition { json: string; yaml?: string; versionId?: ID }
 export interface ValidateResult { valid: boolean; errors: Array<{ line: number; message: string }> }
+/** 流水线脚本预览 */
+export interface PipelinePreview {
+  script: string
+  stageSpec?: string
+  warnings: string[]
+}
 /** 流水线阶段定义：与后端 PipelineStageDTO 对应 */
 export interface PipelineStageDef {
   type: number
   name: string
+  buildTool?: string
   timeoutSeconds?: number
   tasks: PipelineTaskDef[]
   outputs?: string[]

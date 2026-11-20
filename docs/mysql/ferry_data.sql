@@ -167,10 +167,14 @@ INSERT INTO `sys_role_menu` (role_id,menu_id) VALUES (2000000000000002001,200000
 -- ==================== 应用管理 ====================
 -- ----------------------------
 -- dev_app
+-- 演示仓库均为主流 GitHub 公开仓库，token 留空即可匿名克隆：
+--   order-service   RuoYi（默认分支 master）
+--   payment-service mall（默认分支 master）
+--   web-portal      vue-element-admin（默认分支 master）
 -- ----------------------------
-INSERT INTO `dev_app` (id,dept_id,owner_id,code,name,description,core_link,repo_type,repo_branch,repo_commit_id,repo_url,repo_token,status,create_user,create_time,update_user,update_time,is_deleted) VALUES (2000000000000006001,2000000000000000101,2000000000000005001,'order-service','订单服务','订单核心交易服务',1,1,'main','ce341da0f9a0d4a9953143d790d9190a482335bf','https://gitlab.ferry.local/rdc/order-service.git','demo-token-order',1,2000000000000005001,'2026-11-19 10:00:00',2000000000000005001,'2026-11-19 10:00:00',0);
-INSERT INTO `dev_app` (id,dept_id,owner_id,code,name,description,core_link,repo_type,repo_branch,repo_commit_id,repo_url,repo_token,status,create_user,create_time,update_user,update_time,is_deleted) VALUES (2000000000000006002,2000000000000000101,2000000000000005002,'payment-service','支付服务','支付与对账服务',1,2,'main','7067d16f010e800038a2a5d5d3dc136a6e3b7aea','https://github.com/rdc/payment-service.git','demo-token-payment',1,2000000000000005002,'2026-11-19 10:00:00',2000000000000005002,'2026-11-19 10:00:00',0);
-INSERT INTO `dev_app` (id,dept_id,owner_id,code,name,description,core_link,repo_type,repo_branch,repo_commit_id,repo_url,repo_token,status,create_user,create_time,update_user,update_time,is_deleted) VALUES (2000000000000006003,2000000000000000102,2000000000000005003,'web-portal','Web 门户','面向用户的 Web 门户',0,3,'master','c61ec68264d72f2ae8b783a14287bcccab1f7b13','https://gitee.com/rdc/web-portal.git','demo-token-web',1,2000000000000005003,'2026-11-19 10:00:00',2000000000000005003,'2026-11-19 10:00:00',0);
+INSERT INTO `dev_app` (id,dept_id,owner_id,code,name,description,core_link,repo_type,repo_branch,repo_commit_id,repo_url,repo_token,status,create_user,create_time,update_user,update_time,is_deleted) VALUES (2000000000000006001,2000000000000000101,2000000000000005001,'order-service','订单服务','订单核心交易服务（演示仓库：RuoYi）',1,2,'master','47843e3d99c0f9cfd9311b8cfdf598a69e895306','https://github.com/yangzongzhuan/RuoYi.git',NULL,1,2000000000000005001,'2026-11-19 10:00:00',2000000000000005001,'2026-11-19 10:00:00',0);
+INSERT INTO `dev_app` (id,dept_id,owner_id,code,name,description,core_link,repo_type,repo_branch,repo_commit_id,repo_url,repo_token,status,create_user,create_time,update_user,update_time,is_deleted) VALUES (2000000000000006002,2000000000000000101,2000000000000005002,'payment-service','支付服务','支付与对账服务（演示仓库：mall）',1,2,'master','dcaa93b3150352e5044708d7211b5bed0af4509f','https://github.com/macrozheng/mall.git',NULL,1,2000000000000005002,'2026-11-19 10:00:00',2000000000000005002,'2026-11-19 10:00:00',0);
+INSERT INTO `dev_app` (id,dept_id,owner_id,code,name,description,core_link,repo_type,repo_branch,repo_commit_id,repo_url,repo_token,status,create_user,create_time,update_user,update_time,is_deleted) VALUES (2000000000000006003,2000000000000000102,2000000000000005003,'web-portal','Web 门户','面向用户的 Web 门户（演示仓库：vue-element-admin）',0,2,'master','6858a9ad67483025f6a9432a926beb9327037be3','https://github.com/PanJiaChen/vue-element-admin.git',NULL,1,2000000000000005003,'2026-11-19 10:00:00',2000000000000005003,'2026-11-19 10:00:00',0);
 
 -- ----------------------------
 -- dev_app_dependency
@@ -238,5 +242,21 @@ INSERT INTO `dev_pipeline_stage` (id,type,name,version,timeout,outputs,pipeline_
 INSERT INTO `dev_pipeline_stage_task` (id,name,executor,script_ref,script_content,script_params,version,stage_id,sort,create_user,create_time,update_user,update_time,is_deleted) VALUES (2000000000000008123,'准入-task',3,'gate',NULL,NULL,1,2000000000000008023,1,1604755687527075842,'2026-11-19 10:00:00',1604755687527075842,'2026-11-19 10:00:00',0);
 INSERT INTO `dev_pipeline_stage` (id,type,name,version,timeout,outputs,pipeline_id,sort,create_user,create_time,update_user,update_time,is_deleted) VALUES (2000000000000008024,8,'生产发布',1,1800,NULL,2000000000000007003,8,1604755687527075842,'2026-11-19 10:00:00',1604755687527075842,'2026-11-19 10:00:00',0);
 INSERT INTO `dev_pipeline_stage_task` (id,name,executor,script_ref,script_content,script_params,version,stage_id,sort,create_user,create_time,update_user,update_time,is_deleted) VALUES (2000000000000008124,'生产发布-task',4,'release',NULL,NULL,1,2000000000000008024,1,1604755687527075842,'2026-11-19 10:00:00',1604755687527075842,'2026-11-19 10:00:00',0);
+
+-- 演示流水线构建工具与任务脚本
+-- 构建工具仅作阶段属性；实际执行命令写在任务 script_content 中，可在流水线画布的任务属性里调整。
+UPDATE `dev_pipeline_stage` SET `build_tool` = 'Maven' WHERE `id` IN (2000000000000008001,2000000000000008002,2000000000000008003,2000000000000008004,2000000000000008009,2000000000000008010,2000000000000008011,2000000000000008012);
+UPDATE `dev_pipeline_stage` SET `build_tool` = 'Node' WHERE `id` IN (2000000000000008017,2000000000000008018,2000000000000008019,2000000000000008020);
+UPDATE `dev_pipeline_stage` SET `outputs` = NULL WHERE `id` IN (2000000000000008001,2000000000000008009,2000000000000008017);
+UPDATE `dev_pipeline_stage` SET `outputs` = 'target/*.jar' WHERE `id` IN (2000000000000008004,2000000000000008012);
+UPDATE `dev_pipeline_stage` SET `outputs` = 'dist/**' WHERE `id` = 2000000000000008020;
+UPDATE `dev_pipeline_stage_task` SET `script_content` = 'mvn -B -DskipTests clean package' WHERE `id` IN (2000000000000008101,2000000000000008109);
+UPDATE `dev_pipeline_stage_task` SET `script_content` = 'mvn -B test' WHERE `id` IN (2000000000000008102,2000000000000008110);
+UPDATE `dev_pipeline_stage_task` SET `script_content` = 'mvn -B -DskipTests verify' WHERE `id` IN (2000000000000008103,2000000000000008111);
+UPDATE `dev_pipeline_stage_task` SET `script_content` = 'echo "制品已生成"' WHERE `id` IN (2000000000000008104,2000000000000008112);
+UPDATE `dev_pipeline_stage_task` SET `script_content` = 'npm install && npm run build:prod' WHERE `id` = 2000000000000008117;
+UPDATE `dev_pipeline_stage_task` SET `script_content` = 'npm run test:unit' WHERE `id` = 2000000000000008118;
+UPDATE `dev_pipeline_stage_task` SET `script_content` = 'npm run lint' WHERE `id` = 2000000000000008119;
+UPDATE `dev_pipeline_stage_task` SET `script_content` = 'echo "前端产物已生成"' WHERE `id` = 2000000000000008120;
 
 SET FOREIGN_KEY_CHECKS = 1;

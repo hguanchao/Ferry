@@ -1,21 +1,37 @@
 import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { App, Button, Drawer, Form, Input, Modal, Select, Table, Tag, Tooltip, type TableColumnsType } from 'antd'
+import { useNavigate } from 'react-router-dom'
+import { App, Alert, AutoComplete, Button, Drawer, Form, Input, Modal, Select, Tag, Tooltip, type TableColumnsType } from 'antd'
+import FerryTable from '@/components/FerryTable'
 import {
-  CircleCheck, CirclePause, CirclePlay, OctagonAlert, Pencil, Play, Plus, RotateCw,
+  CircleCheck, CirclePause, CirclePlay, Code2, OctagonAlert, Pencil, Play, Plus, RotateCw,
   Search, Trash2, XCircle,
 } from 'lucide-react'
 import PageHeader from '@/components/PageHeader'
 import PipelineCanvasEditor from '@/components/PipelineCanvasEditor'
 import { appApi, pipelineApi } from '@/api/devops'
-import type { AppOption, PipelineRow, PipelineStageDef, PrecheckResult, TriggerResult } from '@/api/types-devops'
+import type { AppOption, PipelinePreview, PipelineRow, PipelineStageDef, PrecheckResult, TriggerResult } from '@/api/types-devops'
 import { useAuthStore } from '@/stores/auth'
 import { showError } from '@/lib/notify'
+import { useDebouncedValue } from '@/lib/debounce'
 
 const RUN_STATUS_LABEL: Record<number, string> = {
   1: '排队中', 2: '运行中', 3: '阻塞', 4: '成功', 5: '失败', 6: '超时', 7: '已取消', 8: '结果待确认',
 }
 const CONCLUSION_LABEL: Record<number, string> = { 1: '通过', 2: '不通过', 3: '合并', 4: '复用' }
+
+interface TriggerValues {
+  appId: string
+  pipelineId: string
+  branch: string
+  commitId: string
+  refType: number
+  note?: string
+}
+
+interface TriggerPrecheck extends PrecheckResult {
+  values: TriggerValues
+}
 
 /** stages -> definition JSON，与后端 PipelineDefinitionDTO 结构一致 */
 function buildDefinition(stages: PipelineStageDef[]): string {
@@ -45,20 +61,31 @@ function newRequestId() {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`
 }
 
+/** 提交时间展示：无法解析时保留平台原值 */
+function formatCommitTime(value?: string) {
+  if (!value) return ''
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleString('zh-CN', { hour12: false })
+}
+
 export default function Pipeline() {
   const { message, modal } = App.useApp()
+  const navigate = useNavigate()
   const queryClient = useQueryClient()
   const can = useAuthStore((state) => state.can)
   const [form] = Form.useForm()
   const [triggerForm] = Form.useForm()
+  const triggerAppId = Form.useWatch('appId', triggerForm)
   const [open, setOpen] = useState(false)
   const [triggerOpen, setTriggerOpen] = useState(false)
   const [editing, setEditing] = useState<PipelineRow | null>(null)
   const [triggerRow, setTriggerRow] = useState<PipelineRow | null>(null)
-  const [precheck, setPrecheck] = useState<PrecheckResult | null>(null)
+  const [precheck, setPrecheck] = useState<TriggerPrecheck | null>(null)
   const [filters, setFilters] = useState<Record<string, unknown>>({})
   const [page, setPage] = useState({ current: 1, size: 30 })
   const [stages, setStages] = useState<PipelineStageDef[]>([])
+  const [previewOpen, setPreviewOpen] = useState(false)
+  const [preview, setPreview] = useState<PipelinePreview | null>(null)
   const originalDefinitionRef = useRef<string>('')
 
   const query = useQuery({
@@ -69,6 +96,28 @@ export default function Pipeline() {
     queryKey: ['app-options'],
     queryFn: () => appApi.options(),
   })
+  const triggerPipelinesQuery = useQuery({
+    queryKey: ['trigger-pipeline-options', triggerAppId],
+    queryFn: () => pipelineApi.pageList({ appIds: triggerAppId ? [triggerAppId] : [], status: 1, current: 1, size: 1000 }),
+    enabled: triggerOpen && !triggerRow && !!triggerAppId,
+  })
+  const triggerBranch = Form.useWatch('branch', triggerForm)
+  const triggerRefType = Form.useWatch('refType', triggerForm)
+  const debouncedBranch = useDebouncedValue(triggerBranch ?? '', 500)
+  const triggerBranchesQuery = useQuery({
+    queryKey: ['trigger-branches', triggerAppId],
+    queryFn: () => pipelineApi.triggerBranches(String(triggerAppId)),
+    enabled: triggerOpen && !!triggerAppId,
+    staleTime: 60_000,
+    retry: false,
+  })
+  const triggerCommitsQuery = useQuery({
+    queryKey: ['trigger-commits', triggerAppId, debouncedBranch],
+    queryFn: () => pipelineApi.triggerCommits(String(triggerAppId), debouncedBranch),
+    enabled: triggerOpen && !!triggerAppId && !!debouncedBranch && triggerRefType !== 2,
+    staleTime: 60_000,
+    retry: false,
+  })
 
   const definitionQuery = useQuery({
     queryKey: ['pipeline-definition', editing?.id],
@@ -78,6 +127,39 @@ export default function Pipeline() {
   })
 
   const rows = query.data?.records ?? []
+  const appOptions = appOptionsQuery.data ?? []
+  // 触发只列已配置代码源的应用：未登记仓库地址/默认分支时无法确定构建来源
+  const triggerAppOptions = appOptions.filter((app) => app.repoUrl && app.repoBranch)
+  const triggerApp = appOptions.find((app) => app.value === triggerAppId)
+  const branchOptions = (triggerBranchesQuery.data ?? []).map((branch) => ({ value: branch }))
+  const commitOptions = triggerRefType === 2
+    ? []
+    : (triggerCommitsQuery.data ?? []).map((commit) => ({
+      value: commit.sha,
+      label: (
+        <div style={{ display: 'flex', gap: 8, alignItems: 'baseline' }}>
+          <span className="ferry-mono" style={{ fontSize: 12 }}>{commit.shortSha}</span>
+          <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{commit.message}</span>
+          <span style={{ color: 'var(--text-3)', fontSize: 12, whiteSpace: 'nowrap' }}>
+            {commit.authorName || '—'} {formatCommitTime(commit.committedAt)}
+          </span>
+        </div>
+      ),
+    }))
+  const branchExtra = triggerBranchesQuery.isError
+    ? `${triggerBranchesQuery.error?.message || '分支列表获取失败'}，可手动输入`
+    : triggerBranchesQuery.isFetching
+      ? '正在获取分支列表…'
+      : triggerApp?.repoBranch ? `默认取应用登记分支：${triggerApp.repoBranch}` : undefined
+  const commitExtra = triggerRefType === 2
+    ? 'Tag/Ref 模式：可直接输入标签或引用名'
+    : triggerCommitsQuery.isError
+      ? `${triggerCommitsQuery.error?.message || '提交候选获取失败'}，可手动输入`
+      : triggerCommitsQuery.isFetching
+        ? '正在获取最近提交…'
+        : triggerApp?.repoCommitId
+          ? `默认取应用登记提交：${triggerApp.repoCommitId}`
+          : '应用未登记默认提交，请选择或手动填写'
 
   const invalidate = () => void queryClient.invalidateQueries({ queryKey: ['pipelines'] })
 
@@ -103,6 +185,23 @@ export default function Pipeline() {
     },
     onError: showError,
   })
+  const previewMutation = useMutation({
+    mutationFn: () => pipelineApi.previewDefinition({ definition: buildDefinition(stages), mode: 1 }),
+    onSuccess: (result) => {
+      setPreview(result)
+      setPreviewOpen(true)
+    },
+    onError: showError,
+  })
+  const copyPreviewScript = async () => {
+    if (!preview?.script) return
+    try {
+      await navigator.clipboard.writeText(preview.script)
+      message.success('脚本已复制')
+    } catch {
+      message.error('复制失败，请手动选择文本')
+    }
+  }
   const deleteMutation = useMutation({
     mutationFn: (ids: string[]) => pipelineApi.deleted(ids),
     onSuccess: (text) => { message.success(text || '删除成功'); invalidate() },
@@ -119,20 +218,40 @@ export default function Pipeline() {
     onError: showError,
   })
   const precheckMutation = useMutation({
-    mutationFn: (body: Record<string, unknown>) => pipelineApi.triggerPrecheck(body),
-    onSuccess: (result) => { setPrecheck(result); if (!result.canTrigger) message.warning('预校验未全部通过') },
+    mutationFn: (body: TriggerValues) => pipelineApi.triggerPrecheck(body as unknown as Record<string, unknown>),
+    onSuccess: (result, values) => {
+      setPrecheck({ ...result, values })
+      if (!result.canTrigger) message.warning('预校验未全部通过')
+    },
     onError: showError,
   })
   const triggerMutation = useMutation({
     mutationFn: (body: Record<string, unknown>) => pipelineApi.trigger(body, newRequestId()),
     onSuccess: (result: TriggerResult) => {
-      message.success(`触发成功：${result.result}`)
       setTriggerOpen(false)
       setPrecheck(null)
       invalidate()
+      if (result.runId) {
+        modal.success({
+          title: '触发完成',
+          content: `${result.message || result.result}，运行 ID：${result.runId}`,
+          okText: '查看运行详情',
+          onOk: () => navigate(`/pipeline/run/${result.runId}`),
+        })
+      } else {
+        message.success(`触发成功：${result.result}`)
+      }
     },
     onError: showError,
   })
+
+  const currentTriggerValues = triggerForm.getFieldsValue() as Partial<TriggerValues>
+  const hasCurrentPrecheck = precheck?.canTrigger === true
+    && precheck.values.appId === currentTriggerValues.appId
+    && precheck.values.pipelineId === currentTriggerValues.pipelineId
+    && precheck.values.branch === currentTriggerValues.branch
+    && precheck.values.commitId === currentTriggerValues.commitId
+    && precheck.values.refType === currentTriggerValues.refType
 
   const openEditor = (record: PipelineRow | null) => {
     setEditing(record)
@@ -160,33 +279,54 @@ export default function Pipeline() {
     setPrecheck(null)
     triggerForm.resetFields()
     if (record) {
-      triggerForm.setFieldsValue({ appId: record.appId, pipelineId: record.id })
+      const appOption = appOptions.find((app) => app.value === record.appId)
+      triggerForm.setFieldsValue({
+        appId: record.appId,
+        pipelineId: record.id,
+        branch: record.repoBranch ?? appOption?.repoBranch,
+        commitId: appOption?.repoCommitId,
+      })
     }
     setTriggerOpen(true)
   }
 
-  const submitTrigger = () => {
-    const values = triggerForm.getFieldsValue()
-    const body = { ...values, appId: values.appId ?? triggerRow?.appId, pipelineId: values.pipelineId ?? triggerRow?.id }
-    triggerMutation.mutate(body)
+  const runPrecheck = async () => {
+    try {
+      const values = await triggerForm.validateFields()
+      precheckMutation.mutate(values)
+    } catch {
+      // Form renders validation messages next to invalid fields.
+    }
+  }
+
+  const submitTrigger = async () => {
+    if (!precheck?.canTrigger) return
+    try {
+      const values = await triggerForm.validateFields()
+      triggerMutation.mutate({
+        ...values,
+        appId: values.appId ?? triggerRow?.appId,
+        pipelineId: values.pipelineId ?? triggerRow?.id,
+      })
+    } catch {
+      // Form renders validation messages next to invalid fields.
+    }
   }
 
   const columns: TableColumnsType<PipelineRow> = [
-    { title: '流水线名称', dataIndex: 'name', minWidth: 220, ellipsis: true },
-    { title: '应用名称', dataIndex: 'appName', width: 160, render: (v?: string) => v || '—' },
+    { title: '流水线名称', dataIndex: 'name' },
+    { title: '应用名称', dataIndex: 'appName', render: (v?: string) => v || '—' },
     {
-      title: '当前分支', dataIndex: 'repoBranch', width: 120,
+      // 流水线不持有独立分支，这里展示应用管理登记的默认分支
+      title: <Tooltip title="取自应用管理登记的仓库分支"><span>默认分支</span></Tooltip>,
+      dataIndex: 'repoBranch',
       render: (v?: string) => v ? <span className="ferry-mono" style={{ fontSize: 12 }}>{v}</span> : '—',
     },
-    { title: '当前版本', dataIndex: 'version', width: 100,
-      render: (v: number) => v ? `V${v}` : '—' },
+    { title: '当前版本', dataIndex: 'version', render: (v: number) => v ? `V${v}` : '—' },
+    { title: '阶段数', dataIndex: 'stageCount', render: (v?: number) => v == null ? '—' : v },
+    { title: '更新时间', dataIndex: 'updateTime', render: (v?: string) => v || '—' },
     {
-      title: '阶段数', dataIndex: 'stageCount', width: 90,
-      render: (v?: number) => v == null ? '—' : v,
-    },
-    { title: '更新时间', dataIndex: 'updateTime', width: 170, render: (v?: string) => v || '—' },
-    {
-      title: '操作', width: 160, fixed: 'right',
+      title: '操作',
       render: (_: unknown, record) => (
         <div style={{ display: 'flex', gap: 2, flexWrap: 'nowrap', whiteSpace: 'nowrap' }}>
           {can('devops:pipeline:trigger') && (
@@ -281,9 +421,8 @@ export default function Pipeline() {
             onClick={() => setFilters({})}>重置</Button>
         </div>
         <div className="ferry-table-wrap">
-          <Table
+          <FerryTable
             rowKey="id" columns={columns} dataSource={rows} loading={query.isFetching}
-            scroll={{ x: 'max-content' }}
             pagination={{
               current: page.current, pageSize: page.size, total: query.data?.total ?? 0,
               showSizeChanger: true, pageSizeOptions: ['30', '100', '200', '500', '1000'],
@@ -298,6 +437,9 @@ export default function Pipeline() {
         destroyOnHidden styles={{ body: { padding: 0, display: 'flex', flexDirection: 'column' } }}
         extra={
           <div style={{ display: 'flex', gap: 8 }}>
+            <Button icon={<Code2 size={14} />} loading={previewMutation.isPending}
+              disabled={!!editing && definitionQuery.isFetching}
+              onClick={() => previewMutation.mutate()}>预览脚本</Button>
             <Button onClick={() => setOpen(false)}>取消</Button>
             <Button type="primary" loading={saveMutation.isPending} onClick={() => form.submit()}>保存</Button>
           </div>
@@ -326,26 +468,153 @@ export default function Pipeline() {
         </div>
       </Drawer>
 
-      <Modal open={triggerOpen} title="手动触发" onCancel={() => setTriggerOpen(false)}
-        onOk={submitTrigger} okText="校验并运行" confirmLoading={triggerMutation.isPending || precheckMutation.isPending}
-        width={620} destroyOnHidden>
+      <Modal open={previewOpen} title="脚本预览（基于当前定义）" width={900} destroyOnHidden
+        onCancel={() => setPreviewOpen(false)}
+        footer={[
+          <Button key="copy" onClick={copyPreviewScript}>复制脚本</Button>,
+          <Button key="close" type="primary" onClick={() => setPreviewOpen(false)}>关闭</Button>,
+        ]}>
+        {preview?.warnings?.length ? (
+          <Alert type="warning" showIcon style={{ marginBottom: 12 }} message="预览告警"
+            description={
+              <ul style={{ margin: 0, paddingLeft: 18 }}>
+                {preview.warnings.map((warning, index) => <li key={index}>{warning}</li>)}
+              </ul>
+            } />
+        ) : null}
+        <pre className="ferry-mono" style={{
+          background: 'var(--bg-subtle)', padding: 16, borderRadius: 8, margin: 0,
+          maxHeight: 560, overflow: 'auto', whiteSpace: 'pre-wrap', fontSize: 12,
+        }}>
+          {preview?.script ?? ''}
+        </pre>
+      </Modal>
+
+      <Modal
+        open={triggerOpen}
+        title="手动触发"
+        onCancel={() => setTriggerOpen(false)}
+        footer={[
+          <Button key="cancel" onClick={() => setTriggerOpen(false)}>取消</Button>,
+          <Button key="precheck" loading={precheckMutation.isPending} onClick={runPrecheck}>预校验</Button>,
+          <Button key="run" type="primary" disabled={!hasCurrentPrecheck}
+            loading={triggerMutation.isPending} onClick={submitTrigger}>开始运行</Button>,
+        ]}
+        width={620}
+        destroyOnHidden
+      >
         <Form form={triggerForm} layout="vertical">
           <Form.Item name="appId" label="目标应用" rules={[{ required: true, message: '请选择应用' }]}>
-            <Input placeholder="应用id（由列表带入）" disabled={!!triggerRow} />
+            {triggerRow ? (
+              <Select
+                disabled
+                options={[{
+                  value: triggerRow.appId,
+                  label: (() => {
+                    const appOption = appOptionsQuery.data?.find((app) => app.value === triggerRow.appId)
+                    const appName = triggerRow.appName ?? appOption?.label ?? '未知应用'
+                    return appOption?.code ? `${appName}（${appOption.code}）` : appName
+                  })(),
+                }]}
+              />
+            ) : (
+              <Select
+                showSearch
+                optionFilterProp="label"
+                loading={appOptionsQuery.isLoading}
+                placeholder="请选择应用"
+                options={triggerAppOptions.map((app) => ({
+                  value: app.value,
+                  label: `${app.label}（${app.code}）`,
+                }))}
+                onChange={(appId) => {
+                  const selected = appOptions.find((app) => app.value === appId)
+                  setPrecheck(null)
+                  triggerForm.setFieldsValue({
+                    pipelineId: undefined,
+                    branch: selected?.repoBranch,
+                    commitId: selected?.repoCommitId,
+                  })
+                }}
+              />
+            )}
           </Form.Item>
-          <Form.Item name="pipelineId" label="流水线" hidden><Input /></Form.Item>
-          <Form.Item name="branch" label="分支" rules={[{ required: true, message: '请输入分支' }]}>
-            <Input placeholder="如 main" />
+          <Form.Item label="仓库地址">
+            <Input value={triggerApp?.repoUrl} disabled placeholder="选择应用后自动带出" />
           </Form.Item>
-          <Form.Item name="commitId" label="提交 ID / Tag / Ref" rules={[{ required: true, message: '请输入提交' }]}>
-            <Input placeholder="7–40 位十六进制，或 Git ref" />
+          <Form.Item name="pipelineId" label="流水线" rules={[{ required: true, message: '请选择流水线' }]}>
+            {triggerRow ? (
+              <Select disabled options={[{ value: triggerRow.id, label: triggerRow.name }]} />
+            ) : (
+              <Select
+                showSearch
+                optionFilterProp="label"
+                disabled={!triggerAppId}
+                loading={triggerPipelinesQuery.isLoading}
+                placeholder={triggerAppId ? '请选择流水线' : '请先选择应用'}
+                options={(triggerPipelinesQuery.data?.records ?? []).map((row) => ({
+                  value: row.id,
+                  label: row.name,
+                }))}
+                onChange={(pipelineId) => {
+                  const selected = triggerPipelinesQuery.data?.records.find((row) => row.id === pipelineId)
+                  const currentCommit = triggerForm.getFieldValue('commitId') as string | undefined
+                  setPrecheck(null)
+                  triggerForm.setFieldsValue({
+                    branch: selected?.repoBranch ?? triggerApp?.repoBranch,
+                    // 选流水线只补默认提交，不覆盖用户已输入的提交
+                    commitId: currentCommit || triggerApp?.repoCommitId,
+                  })
+                }}
+              />
+            )}
+          </Form.Item>
+          <Form.Item
+            name="branch"
+            label="分支"
+            rules={[{ required: true, message: '请输入分支' }, { max: 100, message: '分支长度不能超过 100' }]}
+            extra={branchExtra}
+          >
+            <AutoComplete
+              allowClear
+              disabled={!triggerAppId}
+              options={branchOptions}
+              placeholder={triggerRow?.repoBranch ? `默认分支：${triggerRow.repoBranch}` : '选择或输入已登记仓库中的分支'}
+              filterOption={(input, option) =>
+                String(option?.value ?? '').toLowerCase().includes(input.toLowerCase())}
+              notFoundContent={triggerBranchesQuery.isFetching ? '加载中…' : '无匹配分支，可直接输入'}
+              onSelect={() => {
+                triggerForm.setFieldsValue({ commitId: undefined })
+                setPrecheck(null)
+              }}
+              onChange={() => setPrecheck(null)}
+            />
+          </Form.Item>
+          <Form.Item
+            name="commitId"
+            label="提交 ID / Tag / Ref"
+            rules={[{ required: true, message: '请输入提交' }, { max: 100, message: '提交或引用值长度不能超过 100' }]}
+            extra={commitExtra}
+          >
+            <AutoComplete
+              allowClear
+              disabled={!triggerAppId}
+              options={commitOptions}
+              filterOption={false}
+              placeholder="Commit：7–40 位十六进制；Tag/Ref：合法 Git ref"
+              notFoundContent={triggerRefType === 2
+                ? 'Tag/Ref 模式可直接输入'
+                : triggerCommitsQuery.isFetching ? '加载中…' : '无匹配提交，可直接输入'}
+              onChange={() => setPrecheck(null)}
+            />
           </Form.Item>
           <Form.Item name="refType" label="引用类型" initialValue={1}>
-            <Select options={[{ value: 1, label: 'Commit' }, { value: 2, label: 'Tag/Ref' }]} />
+            <Select
+              options={[{ value: 1, label: 'Commit' }, { value: 2, label: 'Tag/Ref' }]}
+              onChange={() => setPrecheck(null)}
+            />
           </Form.Item>
           <Form.Item name="note" label="触发说明"><Input.TextArea rows={2} placeholder="选填" /></Form.Item>
-          <Button block icon={<Search size={14} />} loading={precheckMutation.isPending}
-            onClick={() => precheckMutation.mutate(triggerForm.getFieldsValue())}>预校验</Button>
           {precheck && (
             <div style={{ marginTop: 12 }}>
               {precheck.items?.map((item) => (
@@ -357,7 +626,7 @@ export default function Pipeline() {
                 </div>
               ))}
               <div style={{ marginTop: 8, fontWeight: 500 }}>
-                {precheck.canTrigger ? '校验通过，可触发运行' : '预校验未通过，不可触发'}
+                {precheck.canTrigger ? '预校验通过，请确认后开始运行' : '预校验未通过，请根据结果修正'}
               </div>
             </div>
           )}

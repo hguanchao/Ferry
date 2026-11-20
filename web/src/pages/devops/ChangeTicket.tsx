@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { App, Button, Form, Input, Modal, Select, Space, Table, Tag, Tooltip, type TableColumnsType } from 'antd'
+import { App, Button, Form, Input, Modal, Select, Space, Tag, Tooltip, type TableColumnsType } from 'antd'
+import FerryTable from '@/components/FerryTable'
 import { Ban, Check, Plus, RotateCw, Search, Send, X } from 'lucide-react'
 import PageHeader from '@/components/PageHeader'
 import { RoleTag } from '@/components/StatusTag'
@@ -8,8 +9,6 @@ import { appApi, changeTicketApi } from '@/api/devops'
 import type { ChangeTicketRow } from '@/api/types-devops'
 import { useAuthStore } from '@/stores/auth'
 import { showError } from '@/lib/notify'
-import { COL } from '@/lib/table'
-
 const STATUS: Record<number, { text: string; color: string }> = {
   1: { text: '草稿', color: 'default' }, 2: { text: '待审批', color: 'gold' },
   3: { text: '已批准', color: 'green' }, 4: { text: '已实施', color: 'blue' },
@@ -38,14 +37,14 @@ export default function ChangeTicket() {
   const simple = (fn: () => Promise<string>, ok: string) => fn().then((t) => { message.success(t || ok); invalidate() }).catch(showError)
 
   const columns: TableColumnsType<ChangeTicketRow> = [
-    { title: '单号', dataIndex: 'ticketNo', width: 160, render: (v: string) => <span className="ferry-mono" style={{ fontSize: 12 }}>{v}</span> },
+    { title: '单号', dataIndex: 'ticketNo',  render: (v: string) => <span className="ferry-mono" style={{ fontSize: 12 }}>{v}</span> },
     { title: '标题', dataIndex: 'title' },
-    { title: '类型', dataIndex: 'type', width: 90, render: (v: number) => <Tag color={v === 2 ? 'red' : 'blue'}>{TYPE[v] ?? '—'}</Tag> },
-    { title: '状态', dataIndex: 'status', width: 100, render: (v: number) => <Tag color={STATUS[v]?.color}>{STATUS[v]?.text ?? '—'}</Tag> },
-    { title: '申请人', dataIndex: 'applicant', width: 100 },
-    { title: '审批人', dataIndex: 'approver', width: 100, render: (v?: string) => v ?? '—' },
-    { title: '创建时间', dataIndex: 'createTime', width: COL.time, render: (v: string) => <span className="ferry-mono" style={{ fontSize: 12, color: 'var(--text-3)' }}>{v ?? '—'}</span> },
-    { title: '操作', key: 'action', width: 220, fixed: 'right', render: (_, r) => (
+    { title: '类型', dataIndex: 'type',  render: (v: number) => <Tag color={v === 2 ? 'red' : 'blue'}>{TYPE[v] ?? '—'}</Tag> },
+    { title: '状态', dataIndex: 'status',  render: (v: number) => <Tag color={STATUS[v]?.color}>{STATUS[v]?.text ?? '—'}</Tag> },
+    { title: '申请人', dataIndex: 'applicant', },
+    { title: '审批人', dataIndex: 'approver',  render: (v?: string) => v ?? '—' },
+    { title: '创建时间', dataIndex: 'createTime',  render: (v: string) => <span className="ferry-mono" style={{ fontSize: 12, color: 'var(--text-3)' }}>{v ?? '—'}</span> },
+    { title: '操作', key: 'action',   render: (_, r) => (
       <Space size={2}>
         {r.status === 1 && can('devops:changeTicket:submit') && (
           <Tooltip title="提交">
@@ -100,7 +99,7 @@ export default function ChangeTicket() {
           <Button icon={<RotateCw size={15} />} onClick={() => { setDraft({}); setFilters({}); setPage((p) => ({ ...p, current: 1 })) }}>重置</Button>
         </div>
         <div className="ferry-table-wrap">
-          <Table<ChangeTicketRow> rowKey="id" columns={columns} dataSource={list.data?.records ?? []}
+          <FerryTable<ChangeTicketRow> rowKey="id" columns={columns} dataSource={list.data?.records ?? []}
             loading={list.isLoading || list.isFetching} scroll={{ x: 'max-content' }}
             pagination={{ current: page.current, pageSize: page.size, total: list.data?.total ?? 0, showSizeChanger: true,
               pageSizeOptions: ['30', '100', '200'], showTotal: (t) => `共 ${t} 条`, onChange: (c, s) => setPage({ current: c, size: s }) }} />

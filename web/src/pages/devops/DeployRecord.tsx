@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { App, Button, Descriptions, Drawer, Form, Input, Select, Space, Table, Tag, Tooltip, type TableColumnsType } from 'antd'
+import { App, Button, Descriptions, Drawer, Form, Input, Select, Space, Tag, Tooltip, type TableColumnsType } from 'antd'
+import FerryTable from '@/components/FerryTable'
 import { Activity, CircleCheck, CircleX, Pause, Play, RotateCw, Search, ShieldAlert } from 'lucide-react'
 import PageHeader from '@/components/PageHeader'
 import { RoleTag } from '@/components/StatusTag'
@@ -8,8 +9,6 @@ import { deployApi, envApi, appApi } from '@/api/devops'
 import type { DeployRecordRow } from '@/api/types-devops'
 import { useAuthStore } from '@/stores/auth'
 import { showError } from '@/lib/notify'
-import { COL } from '@/lib/table'
-
 const STATUS: Record<number, { text: string; color: string }> = {
   1: { text: '未开始', color: 'default' }, 2: { text: '执行中', color: 'blue' },
   3: { text: '观察中', color: 'gold' }, 4: { text: '成功', color: 'green' },
@@ -58,14 +57,14 @@ export default function DeployRecord() {
   }
 
   const columns: TableColumnsType<DeployRecordRow> = [
-    { title: '部署编号', dataIndex: 'deployNo', width: 170, render: (v: string) => <span className="ferry-mono" style={{ fontSize: 12 }}>{v}</span> },
-    { title: '应用', dataIndex: 'appId', width: 130, render: (v: string) => apps.data?.find((a) => a.value === v)?.label ?? v },
-    { title: '环境', dataIndex: 'envId', width: 130, render: (v: string) => envs.data?.find((e) => e.value === v)?.label ?? v },
-    { title: '形态', dataIndex: 'deployType', width: 110, render: (v: number) => TYPE[v] ?? '—' },
-    { title: '状态', dataIndex: 'status', width: 100, render: (v: number) => <Tag color={STATUS[v]?.color}>{STATUS[v]?.text ?? '—'}</Tag> },
-    { title: '操作人', dataIndex: 'operator', width: 100 },
-    { title: '开始时间', dataIndex: 'startTime', width: COL.time, render: (v?: string) => <span className="ferry-mono" style={{ fontSize: 12, color: 'var(--text-3)' }}>{v ?? '—'}</span> },
-    { title: '操作', key: 'action', width: 220, fixed: 'right', render: (_, r) => (
+    { title: '部署编号', dataIndex: 'deployNo',  render: (v: string) => <span className="ferry-mono" style={{ fontSize: 12 }}>{v}</span> },
+    { title: '应用', dataIndex: 'appId',  render: (v: string) => apps.data?.find((a) => a.value === v)?.label ?? v },
+    { title: '环境', dataIndex: 'envId',  render: (v: string) => envs.data?.find((e) => e.value === v)?.label ?? v },
+    { title: '形态', dataIndex: 'deployType',  render: (v: number) => TYPE[v] ?? '—' },
+    { title: '状态', dataIndex: 'status',  render: (v: number) => <Tag color={STATUS[v]?.color}>{STATUS[v]?.text ?? '—'}</Tag> },
+    { title: '操作人', dataIndex: 'operator', },
+    { title: '开始时间', dataIndex: 'startTime',  render: (v?: string) => <span className="ferry-mono" style={{ fontSize: 12, color: 'var(--text-3)' }}>{v ?? '—'}</span> },
+    { title: '操作', key: 'action',   render: (_, r) => (
       <Space size={2}>
         <Tooltip title="详情">
           <Button type="link" size="small" icon={<Activity size={14} />} onClick={() => setDrawer({ id: r.id, envId: r.envId, appId: r.appId })} />
@@ -104,7 +103,7 @@ export default function DeployRecord() {
           <Button icon={<RotateCw size={15} />} onClick={() => { setDraft({}); setFilters({}); setPage((p) => ({ ...p, current: 1 })) }}>重置</Button>
         </div>
         <div className="ferry-table-wrap">
-          <Table<DeployRecordRow> rowKey="id" columns={columns} dataSource={list.data?.records ?? []}
+          <FerryTable<DeployRecordRow> rowKey="id" columns={columns} dataSource={list.data?.records ?? []}
             loading={list.isLoading || list.isFetching} scroll={{ x: 'max-content' }}
             pagination={{ current: page.current, pageSize: page.size, total: list.data?.total ?? 0, showSizeChanger: true,
               pageSizeOptions: ['30', '100', '200'], showTotal: (t) => `共 ${t} 条`, onChange: (c, s) => setPage({ current: c, size: s }) }} />
@@ -121,19 +120,19 @@ export default function DeployRecord() {
           <Descriptions.Item label="确认人">{String(d.confirmer ?? '—')}</Descriptions.Item>
         </Descriptions>
         <h4 style={{ marginTop: 20 }}>灰度批次</h4>
-        <Table size="small" rowKey="id" pagination={false} dataSource={batchRows as unknown as Record<string, unknown>[]}
+        <FerryTable size="small" rowKey="id" pagination={false} dataSource={batchRows as unknown as Record<string, unknown>[]}
           columns={[
-            { title: '批次', dataIndex: 'batchNo', width: 70 },
-            { title: '实例数', dataIndex: 'targetCount', width: 90 },
+            { title: '批次', dataIndex: 'batchNo', },
+            { title: '实例数', dataIndex: 'targetCount', },
             { title: '状态', dataIndex: 'status', render: (v: number) => <Tag color={STATUS[v]?.color}>{STATUS[v]?.text}</Tag> },
             { title: '健康', dataIndex: 'healthResult', render: (v: number) => v === 2 ? <Tag color="red" icon={<CircleX size={12} />}>不通过</Tag> : v === 1 ? <Tag color="green" icon={<CircleCheck size={12} />}>通过</Tag> : '—' },
           ]} />
         <h4 style={{ marginTop: 20 }}>健康检查采样</h4>
-        <Table size="small" rowKey="id" pagination={false} dataSource={healthRows as Record<string, unknown>[]}
+        <FerryTable size="small" rowKey="id" pagination={false} dataSource={healthRows as Record<string, unknown>[]}
           columns={[
-            { title: '检查项', dataIndex: 'checkType', width: 90 },
-            { title: '采样值', dataIndex: 'value', width: 120 },
-            { title: '阈值', dataIndex: 'threshold', width: 120 },
+            { title: '检查项', dataIndex: 'checkType', },
+            { title: '采样值', dataIndex: 'value', },
+            { title: '阈值', dataIndex: 'threshold', },
             { title: '结论', dataIndex: 'conclusion', render: (v: number) => v === 2 ? <Tag color="red">不通过</Tag> : v === 1 ? <Tag color="green">通过</Tag> : '—' },
           ]} />
         {can('devops:deploy:circuitContinue') && [5, 6].includes(d.status as number) && (

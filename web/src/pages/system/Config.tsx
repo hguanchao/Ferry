@@ -7,11 +7,11 @@ import {
   Input,
   Modal,
   Select,
-  Table,
   Tag,
   Tooltip,
   type TableColumnsType,
 } from 'antd'
+import FerryTable from '@/components/FerryTable'
 import { Pencil, Plus, RotateCw, Search, Trash2 } from 'lucide-react'
 import PageHeader from '@/components/PageHeader'
 import { RoleTag } from '@/components/StatusTag'
@@ -19,8 +19,6 @@ import { configApi } from '@/api/system'
 import type { ConfigRow } from '@/api/types'
 import { useAuthStore } from '@/stores/auth'
 import { showError } from '@/lib/notify'
-import { COL } from '@/lib/table'
-
 export default function Config() {
   const { message, modal } = App.useApp()
   const queryClient = useQueryClient()
@@ -80,7 +78,6 @@ export default function Config() {
     {
       title: '参数键名',
       dataIndex: 'code',
-      width: 240,
 
       render: (value: string) => (
         <span className="ferry-mono" style={{ fontSize: 12, color: 'var(--text-2)' }}>
@@ -102,7 +99,6 @@ export default function Config() {
     {
       title: '更新时间',
       dataIndex: 'updateTime',
-      width: COL.time,
 
       render: (value: string | null) => (
         <span className="ferry-mono" style={{ fontSize: 12, color: 'var(--text-3)' }}>
@@ -113,9 +109,7 @@ export default function Config() {
     {
       title: '操作',
       key: 'action',
-      width: COL.action,
 
-      fixed: 'right',
       render: (_, record) => (
         <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
           {can('system:config:save') && (
@@ -234,7 +228,7 @@ export default function Config() {
         </div>
 
         <div className="ferry-table-wrap">
-          <Table<ConfigRow>
+          <FerryTable<ConfigRow>
             rowKey="id"
             columns={columns}
             dataSource={query.data?.records ?? []}

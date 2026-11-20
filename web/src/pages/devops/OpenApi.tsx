@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { App, Button, Form, Input, InputNumber, Modal, Table, Tag, Tooltip, type TableColumnsType } from 'antd'
+import { App, Button, Form, Input, InputNumber, Modal, Tag, Tooltip, type TableColumnsType } from 'antd'
+import FerryTable from '@/components/FerryTable'
 import { Copy, KeyRound, Plus, RefreshCw, RotateCw, Search, ShieldOff } from 'lucide-react'
 import PageHeader from '@/components/PageHeader'
 import { RoleTag } from '@/components/StatusTag'
@@ -8,8 +9,6 @@ import { systemExtApi } from '@/api/devops'
 import type { OpenTokenRow } from '@/api/types-devops'
 import { useAuthStore } from '@/stores/auth'
 import { showError } from '@/lib/notify'
-import { COL } from '@/lib/table'
-
 const STATUS_LABEL: Record<number, string> = { 1: '正常', 2: '禁用' }
 
 /** 8 个开放接口目录（V1.2.0 已移除"触发运行"） */
@@ -63,18 +62,18 @@ export default function OpenApi() {
   })
 
   const columns: TableColumnsType<OpenTokenRow> = [
-    { title: '应用ID', dataIndex: 'appId', width: COL.code,
+    { title: '应用ID', dataIndex: 'appId',
       render: (v: string) => <span className="ferry-mono" style={{ fontSize: 12 }}>{v}</span> },
     { title: '名称', dataIndex: 'name' },
-    { title: 'Token 掩码', dataIndex: 'tokenMask', width: 180,
+    { title: 'Token 掩码', dataIndex: 'tokenMask',
       render: (v?: string) => <span className="ferry-mono" style={{ fontSize: 12 }}>{v || '—'}</span> },
-    { title: '状态', dataIndex: 'status', width: 90,
+    { title: '状态', dataIndex: 'status',
       render: (v: number) => <Tag color={v === 1 ? 'green' : 'red'}>{STATUS_LABEL[v] ?? v}</Tag> },
-    { title: '最近轮换', dataIndex: 'lastRotateTime', width: COL.time,
+    { title: '最近轮换', dataIndex: 'lastRotateTime',
       render: (v?: string) => <span className="ferry-mono" style={{ fontSize: 12, color: 'var(--text-3)' }}>{v || '—'}</span> },
-    { title: '创建时间', dataIndex: 'createTime', width: COL.time,
+    { title: '创建时间', dataIndex: 'createTime',
       render: (v: string) => <span className="ferry-mono" style={{ fontSize: 12, color: 'var(--text-3)' }}>{v ?? '—'}</span> },
-    { title: '操作', key: 'action', width: COL.actionWide, fixed: 'right',
+    { title: '操作', key: 'action',
       render: (_, record) => (
         <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
           {record.status === 1 && can('system:openApi:rotate') && (
@@ -103,10 +102,10 @@ export default function OpenApi() {
   ]
 
   const apiColumns: TableColumnsType<(typeof API_LIST)[number]> = [
-    { title: '#', dataIndex: 'no', width: 50 },
-    { title: '方法', dataIndex: 'method', width: 90,
+    { title: '#', dataIndex: 'no', },
+    { title: '方法', dataIndex: 'method',
       render: (v: string) => <Tag color={v === 'GET' ? 'green' : 'orange'}>{v}</Tag> },
-    { title: '路径', dataIndex: 'path', width: 320,
+    { title: '路径', dataIndex: 'path',
       render: (v: string) => <span className="ferry-mono" style={{ fontSize: 12 }}>{v}</span> },
     { title: '用途', dataIndex: 'usage' },
   ]
@@ -132,7 +131,7 @@ export default function OpenApi() {
             onClick={() => { setDraft({}); setFilters({}); setPage((p) => ({ ...p, current: 1 })) }}>重置</Button>
         </div>
         <div className="ferry-table-wrap">
-          <Table<OpenTokenRow> rowKey="id" columns={columns} dataSource={query.data?.records ?? []}
+          <FerryTable<OpenTokenRow> rowKey="id" columns={columns} dataSource={query.data?.records ?? []}
             loading={query.isLoading || query.isFetching} scroll={{ x: 'max-content' }}
             pagination={{
               current: page.current, pageSize: page.size, total: query.data?.total ?? 0,
@@ -148,7 +147,7 @@ export default function OpenApi() {
           <span className="ferry-panel__extra"><span className="ferry-caption">鉴权与限流由网关负责</span></span>
         </div>
         <div className="ferry-table-wrap">
-          <Table rowKey="no" columns={apiColumns} dataSource={API_LIST} pagination={false} size="small" />
+          <FerryTable rowKey="no" columns={apiColumns} dataSource={API_LIST} pagination={false} size="small" />
         </div>
       </section>
 

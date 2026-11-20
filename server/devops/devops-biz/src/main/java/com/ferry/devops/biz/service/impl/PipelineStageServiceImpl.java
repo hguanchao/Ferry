@@ -43,6 +43,7 @@ public class PipelineStageServiceImpl extends ServiceImpl<PipelineStageMapper, P
             entity.setVersion(version);
             entity.setType(stage.getType());
             entity.setName(stage.getName());
+            entity.setBuildTool(stage.getBuildTool());
             entity.setTimeout(stage.getTimeoutSeconds());
             entity.setOutputs(stage.getOutputs() == null ? null : String.join(",", stage.getOutputs()));
             entity.setSort(sort++);
@@ -64,6 +65,7 @@ public class PipelineStageServiceImpl extends ServiceImpl<PipelineStageMapper, P
                 PipelineStageDTO stageDto = new PipelineStageDTO();
                 stageDto.setType(stage.getType());
                 stageDto.setName(stage.getName());
+                stageDto.setBuildTool(stage.getBuildTool());
                 stageDto.setTimeoutSeconds(stage.getTimeout());
                 if (stage.getOutputs() != null && !stage.getOutputs().isBlank()) {
                     stageDto.setOutputs(List.of(stage.getOutputs().split(",")));

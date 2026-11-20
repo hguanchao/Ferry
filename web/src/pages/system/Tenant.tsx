@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Alert, App, Button, Form, Input, Modal, Switch, Table, Tag, Tooltip, type TableColumnsType } from 'antd'
+import { Alert, App, Button, Form, Input, Modal, Switch, Tag, Tooltip, type TableColumnsType } from 'antd'
+import FerryTable from '@/components/FerryTable'
 import { Pencil, Plus, RotateCw, Search, Trash2 } from 'lucide-react'
 import PageHeader from '@/components/PageHeader'
 import { RoleTag } from '@/components/StatusTag'
@@ -8,8 +9,6 @@ import { tenantApi } from '@/api/system'
 import type { TenantRow } from '@/api/types'
 import { useAuthStore } from '@/stores/auth'
 import { showError } from '@/lib/notify'
-import { COL } from '@/lib/table'
-
 export default function Tenant() {
   const { message, modal } = App.useApp()
   const queryClient = useQueryClient()
@@ -59,7 +58,6 @@ export default function Tenant() {
     {
       title: '租户编码',
       dataIndex: 'code',
-      width: COL.code,
 
       render: (value: string) => (
         <span className="ferry-mono" style={{ fontSize: 12 }}>
@@ -70,7 +68,6 @@ export default function Tenant() {
     {
       title: '类型',
       dataIndex: 'code',
-      width: 172,
 
       render: (value: string) =>
         value === '000000' ? (
@@ -82,7 +79,6 @@ export default function Tenant() {
     {
       title: '状态',
       dataIndex: 'status',
-      width: 172,
 
       render: (value: number) => (
         <span className="ferry-status" data-tone={value === 1 ? 'success' : 'default'}>
@@ -94,14 +90,12 @@ export default function Tenant() {
     {
       title: '创建人',
       dataIndex: 'createUser',
-      width: COL.creator,
 
       render: (value: string) => value || '—',
     },
     {
       title: '创建时间',
       dataIndex: 'createTime',
-      width: COL.time,
 
       render: (value: string) => (
         <span className="ferry-mono" style={{ fontSize: 12, color: 'var(--text-3)' }}>
@@ -112,9 +106,7 @@ export default function Tenant() {
     {
       title: '操作',
       key: 'action',
-      width: 160,
 
-      fixed: 'right',
       render: (_, record) => (
         <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
           {can('system:tenant:save') && (
@@ -231,7 +223,7 @@ export default function Tenant() {
         </div>
 
         <div className="ferry-table-wrap">
-          <Table<TenantRow>
+          <FerryTable<TenantRow>
             rowKey="id"
             columns={columns}
             dataSource={query.data?.records ?? []}

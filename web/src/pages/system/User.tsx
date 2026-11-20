@@ -10,12 +10,12 @@ import {
   Modal,
   Radio,
   Select,
-  Table,
   Tooltip,
   Tree,
   type MenuProps,
   type TableColumnsType,
 } from 'antd'
+import FerryTable from '@/components/FerryTable'
 import {
   Download,
   KeyRound,
@@ -34,7 +34,6 @@ import { deptApi, roleApi, userApi } from '@/api/system'
 import type { DeptNode, RoleRow, UserRow } from '@/api/types'
 import { exportCsv } from '@/lib/export'
 import { dataScopeText } from '@/lib/dataScope'
-import { COL } from '@/lib/table'
 import { flattenTree } from '@/lib/tree'
 import { useAuthStore } from '@/stores/auth'
 import { showError } from '@/lib/notify'
@@ -277,7 +276,6 @@ export default function User() {
     {
       title: '部门',
       dataIndex: 'deptId',
-      width: 180,
 
       ellipsis: true,
       render: (value: string | null) => (value ? deptName.get(value) ?? value : <span className="ferry-muted">未分配</span>),
@@ -285,7 +283,6 @@ export default function User() {
     {
       title: '角色 / 数据权限',
       dataIndex: 'roleId',
-      width: 200,
 
       render: (value: string | null, record) => {
         const scope = scopeOf(record)
@@ -302,7 +299,6 @@ export default function User() {
     {
       title: '状态',
       dataIndex: 'status',
-      width: COL.status,
 
       render: (value: number) => <EnabledTag value={value} />,
     },
@@ -312,7 +308,6 @@ export default function User() {
     columns.push({
       title: '操作',
       key: 'action',
-      width: COL.actionWide,
 
       render: (_, record) => {
         const moreItems: MenuProps['items'] = [
@@ -486,7 +481,7 @@ export default function User() {
           </div>
 
           <div className="ferry-table-wrap">
-            <Table<UserRow>
+            <FerryTable<UserRow>
               rowKey="id"
               columns={columns}
               dataSource={listQuery.data?.records ?? []}

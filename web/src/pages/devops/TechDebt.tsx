@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { App, Button, Form, Input, Modal, Select, Space, Table, Tag, Tooltip, type TableColumnsType } from 'antd'
+import { App, Button, Form, Input, Modal, Select, Space, Tag, Tooltip, type TableColumnsType } from 'antd'
+import FerryTable from '@/components/FerryTable'
 import { RotateCw, Search, UserPlus, UserRoundCheck } from 'lucide-react'
 import PageHeader from '@/components/PageHeader'
 import { RoleTag } from '@/components/StatusTag'
@@ -9,8 +10,6 @@ import { post } from '@/api/client'
 import type { TechDebtRow } from '@/api/types-devops'
 import { useAuthStore } from '@/stores/auth'
 import { showError } from '@/lib/notify'
-import { COL } from '@/lib/table'
-
 const SEVERITY: Record<number, { label: string; color: string }> = {
   1: { label: '阻断', color: 'red' }, 2: { label: '高危', color: 'orange' },
   3: { label: '中危', color: 'gold' }, 4: { label: '低危', color: 'blue' },
@@ -49,18 +48,18 @@ export default function TechDebt() {
   })
 
   const columns: TableColumnsType<TechDebtRow> = [
-    { title: '问题ID', dataIndex: 'id', width: 130, render: (v: string) => <span className="ferry-mono" style={{ fontSize: 12 }}>{v}</span> },
-    { title: '指纹', dataIndex: 'fingerprint', width: 160, render: (v: string) => <Tooltip title={v}><span className="ferry-mono" style={{ fontSize: 11 }}>{v?.slice(0, 16)}…</span></Tooltip> },
-    { title: '级别', dataIndex: 'severity', width: 90,
+    { title: '问题ID', dataIndex: 'id',  render: (v: string) => <span className="ferry-mono" style={{ fontSize: 12 }}>{v}</span> },
+    { title: '指纹', dataIndex: 'fingerprint',  render: (v: string) => <Tooltip title={v}><span className="ferry-mono" style={{ fontSize: 11 }}>{v?.slice(0, 16)}…</span></Tooltip> },
+    { title: '级别', dataIndex: 'severity',
       render: (v: number) => <Tag color={SEVERITY[v]?.color}>{SEVERITY[v]?.label ?? v}</Tag>,
     },
-    { title: '状态', dataIndex: 'status', width: 90,
+    { title: '状态', dataIndex: 'status',
       render: (v: number) => <Tag color={STATUS[v]?.color}>{STATUS[v]?.label ?? v}</Tag>,
     },
     { title: '文件路径', dataIndex: 'filePath', render: (v: string | undefined, r) => <Tooltip title={v ?? r.file_path}><span className="ferry-mono" style={{ fontSize: 11 }}>{(v ?? r.file_path)?.slice(-40) || '—'}</span></Tooltip> },
-    { title: '责任人', dataIndex: 'assignee', width: 110, render: (v: string) => v || <span style={{ color: 'var(--text-3)' }}>未指派</span> },
-    { title: '首次出现', dataIndex: 'firstSeen', width: COL.time },
-    { title: '操作', key: 'action', width: COL.action, fixed: 'right', render: (_, r) => (
+    { title: '责任人', dataIndex: 'assignee',  render: (v: string) => v || <span style={{ color: 'var(--text-3)' }}>未指派</span> },
+    { title: '首次出现', dataIndex: 'firstSeen', },
+    { title: '操作', key: 'action',   render: (_, r) => (
       <Space size={0}>
         {can('devops:techDebt:assign') && (
           <Tooltip title="指派">
@@ -108,7 +107,7 @@ export default function TechDebt() {
             }}>导出</Button>
         </div>
         <div className="ferry-table-wrap">
-          <Table<TechDebtRow> rowKey="id" columns={columns} dataSource={query.data?.records ?? []}
+          <FerryTable<TechDebtRow> rowKey="id" columns={columns} dataSource={query.data?.records ?? []}
             loading={query.isFetching} scroll={{ x: 'max-content' }}
             pagination={{ current: page.current, pageSize: page.size, total: query.data?.total ?? 0,
               showSizeChanger: true, pageSizeOptions: ['30', '100', '200'],

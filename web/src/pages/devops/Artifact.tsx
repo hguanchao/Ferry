@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { App, Button, Form, Input, Modal, Select, Space, Table, Tag, Tooltip, type TableColumnsType } from 'antd'
+import { App, Button, Form, Input, Modal, Select, Space, Tag, Tooltip, type TableColumnsType } from 'antd'
+import FerryTable from '@/components/FerryTable'
 import { ArrowRight, Eye, History, Link2, RotateCw, Search, ShieldAlert } from 'lucide-react'
 import PageHeader from '@/components/PageHeader'
 import { RoleTag } from '@/components/StatusTag'
@@ -8,8 +9,6 @@ import { artifactApi, appApi, envApi } from '@/api/devops'
 import type { ArtifactRow, PrecheckResult } from '@/api/types-devops'
 import { useAuthStore } from '@/stores/auth'
 import { showError } from '@/lib/notify'
-import { COL } from '@/lib/table'
-
 const FORM_LABEL: Record<number, string> = { 1: '包制品', 2: '镜像制品' }
 const ENV_LABEL: Record<number, string> = { 1: '测试', 2: '预发', 3: '生产' }
 const PROD_LABEL: Record<number, string> = { 1: '当前生效', 2: '历史版本', 3: '从未使用' }
@@ -95,16 +94,16 @@ export default function Artifact() {
   }
 
   const columns: TableColumnsType<ArtifactRow> = [
-    { title: '制品ID', dataIndex: 'id', width: 140, render: (v: string) => <span className="ferry-mono" style={{ fontSize: 12 }}>{v}</span> },
-    { title: '版本号', dataIndex: 'version', width: 140, render: (v: string) => <span className="ferry-mono">{v}</span> },
-    { title: '形态', dataIndex: 'form', width: 90, render: (v: number) => FORM_LABEL[v] ?? '—' },
-    { title: '摘要', dataIndex: 'digest', width: 160,
+    { title: '制品ID', dataIndex: 'id',  render: (v: string) => <span className="ferry-mono" style={{ fontSize: 12 }}>{v}</span> },
+    { title: '版本号', dataIndex: 'version',  render: (v: string) => <span className="ferry-mono">{v}</span> },
+    { title: '形态', dataIndex: 'form',  render: (v: number) => FORM_LABEL[v] ?? '—' },
+    { title: '摘要', dataIndex: 'digest',
       render: (v: string) => <Tooltip title={v}><span className="ferry-mono" style={{ fontSize: 11 }}>{v ? v.slice(0, 18) + '…' : '—'}</span></Tooltip>,
     },
-    { title: '分支/Commit', width: 160, render: (_, r) => (
+    { title: '分支/Commit',  render: (_, r) => (
       <div><div style={{ fontSize: 12 }}>{r.branch || '—'}</div><div className="ferry-mono" style={{ fontSize: 11, color: 'var(--text-3)' }}>{r.commitId?.slice(0, 8) || '—'}</div></div>
     ) },
-    { title: '所处环境', dataIndex: 'envTags', width: 180, render: (tags: number[] | undefined) => (
+    { title: '所处环境', dataIndex: 'envTags',  render: (tags: number[] | undefined) => (
       <Space size={4} wrap>
         {(tags ?? []).map((t) => t === 3
           ? <Tag key={t} color="red" icon={<ShieldAlert size={11} />}>生产</Tag>
@@ -112,19 +111,19 @@ export default function Artifact() {
         {!tags?.length && <span style={{ color: 'var(--text-3)' }}>—</span>}
       </Space>
     ) },
-    { title: '生产使用', dataIndex: 'prodUseStatus', width: 110,
+    { title: '生产使用', dataIndex: 'prodUseStatus',
       render: (v: number) => <Tag color={v === 1 ? 'red' : v === 2 ? 'default' : 'blue'}>{PROD_LABEL[v] ?? '—'}</Tag>,
     },
-    { title: '门禁结论', dataIndex: 'gateConclusion', width: 100,
+    { title: '门禁结论', dataIndex: 'gateConclusion',
       render: (v: number | undefined) => {
         const color = v === 2 || v === 5 ? 'red' : v === 4 ? 'gold' : v === 1 ? 'green' : 'default'
         return v == null ? '—' : <Tag color={color}>{CONCLUSION_LABEL[v] ?? v}</Tag>
       },
     },
-    { title: '构建时间', dataIndex: 'createTime', width: COL.time,
+    { title: '构建时间', dataIndex: 'createTime',
       render: (v: string) => <span className="ferry-mono" style={{ fontSize: 12, color: 'var(--text-3)' }}>{v ?? '—'}</span>,
     },
-    { title: '操作', key: 'action', width: COL.actionWide, fixed: 'right', render: (_, r) => (
+    { title: '操作', key: 'action',   render: (_, r) => (
       <Space size={0}>
         <Tooltip title="详情">
           <Button type="link" size="small" icon={<Eye size={14} />} onClick={() => setDetailId(r.id)} />
@@ -179,7 +178,7 @@ export default function Artifact() {
             onClick={() => { setDraft({}); setFilters({}); setPage((p) => ({ ...p, current: 1 })) }}>重置</Button>
         </div>
         <div className="ferry-table-wrap">
-          <Table<ArtifactRow> rowKey="id" columns={columns}
+          <FerryTable<ArtifactRow> rowKey="id" columns={columns}
             dataSource={keyword && searchQuery.data?.length ? searchQuery.data : query.data?.records ?? []}
             loading={query.isLoading || query.isFetching || searchQuery.isFetching} scroll={{ x: 'max-content' }}
             pagination={{ current: page.current, pageSize: page.size, total: query.data?.total ?? 0,

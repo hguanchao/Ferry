@@ -30,6 +30,10 @@ public class DevopsIntegrationProperties {
         private String baseUrl = "";
         /** 触发 Job 的 API 路径模板，{job} 占位；默认 Jenkins 标准 buildWithParameters */
         private String buildPath = "/job/{job}/buildWithParameters";
+        /** Job 不存在时是否按模板自动创建；关闭后缺失 Job 直接判失败 */
+        private boolean autoCreateJob = true;
+        /** 签出代码使用的 Jenkins 凭据 ID；为空时按公开仓库访问 */
+        private String gitCredentialsId = "";
         /** API 用户名 */
         private String user = "";
         /** API Token */

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { App, Button, Form, Input, Modal, Select, Table, Tag, Tooltip, type TableColumnsType } from 'antd'
+import { App, Button, Form, Input, Modal, Select, Tag, Tooltip, type TableColumnsType } from 'antd'
+import FerryTable from '@/components/FerryTable'
 import { CheckCircle2, CornerUpLeft, Play, Plus, RotateCw, Search } from 'lucide-react'
 import PageHeader from '@/components/PageHeader'
 import { RoleTag } from '@/components/StatusTag'
@@ -8,8 +9,6 @@ import { aiApi } from '@/api/devops'
 import type { ActionCatalogRow, ActionRecordRow } from '@/api/types-devops'
 import { useAuthStore } from '@/stores/auth'
 import { showError } from '@/lib/notify'
-import { COL } from '@/lib/table'
-
 const LEVEL_LABEL: Record<number, string> = { 0: 'L0', 1: 'L1 · 自动', 2: 'L2 · 待确认', 3: 'L3 · 禁止' }
 const LEVEL_COLOR: Record<number, string> = { 0: 'default', 1: 'blue', 2: 'orange', 3: 'red' }
 const STATUS_LABEL: Record<number, string> = {
@@ -95,30 +94,30 @@ export default function AiAction() {
   })
 
   const catalogColumns: TableColumnsType<ActionCatalogRow> = [
-    { title: '动作ID', dataIndex: 'actionId', width: COL.code,
+    { title: '动作ID', dataIndex: 'actionId',
       render: (v: string) => <span className="ferry-mono" style={{ fontSize: 12 }}>{v}</span> },
     { title: '名称', dataIndex: 'name' },
-    { title: '级别', dataIndex: 'level', width: 120,
+    { title: '级别', dataIndex: 'level',
       render: (v: number) => <Tag color={LEVEL_COLOR[v]}>{LEVEL_LABEL[v] ?? v}</Tag> },
-    { title: '可撤销', dataIndex: 'isUndoable', width: 90,
+    { title: '可撤销', dataIndex: 'isUndoable',
       render: (v: number) => <Tag color={v === 1 ? 'green' : 'default'}>{v === 1 ? '是' : '否'}</Tag> },
     { title: '前置条件', dataIndex: 'precondition',
       render: (v?: string) => <Tooltip title={v}><span>{v || '—'}</span></Tooltip> },
   ]
 
   const recordColumns: TableColumnsType<ActionRecordExt> = [
-    { title: '动作ID', dataIndex: 'actionId', width: 180,
+    { title: '动作ID', dataIndex: 'actionId',
       render: (v: string) => <span className="ferry-mono" style={{ fontSize: 12 }}>{v}</span> },
-    { title: '级别', dataIndex: 'level', width: 110,
+    { title: '级别', dataIndex: 'level',
       render: (v: number) => <Tag color={LEVEL_COLOR[v]}>{LEVEL_LABEL[v] ?? v}</Tag> },
-    { title: '来源', dataIndex: 'source', width: 80,
+    { title: '来源', dataIndex: 'source',
       render: (v: number) => SOURCE_LABEL[v] ?? v },
-    { title: '状态', dataIndex: 'status', width: 110,
+    { title: '状态', dataIndex: 'status',
       render: (v: number) => <Tag color={STATUS_COLOR[v]}>{STATUS_LABEL[v] ?? v}</Tag> },
     { title: '理由', dataIndex: 'reason', render: (v?: string) => <Tooltip title={v}><span>{v || '—'}</span></Tooltip> },
-    { title: '执行时间', dataIndex: 'executeTime', width: COL.time,
+    { title: '执行时间', dataIndex: 'executeTime',
       render: (v?: string) => <span className="ferry-mono" style={{ fontSize: 12, color: 'var(--text-3)' }}>{v || '—'}</span> },
-    { title: '操作', key: 'action', width: COL.actionWide, fixed: 'right',
+    { title: '操作', key: 'action',
       render: (_, record) => (
         <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
           {record.status === 1 && can('devops:action:execute') && (
@@ -168,7 +167,7 @@ export default function AiAction() {
       <section className="ferry-panel">
         <div className="ferry-panel__head"><span className="ferry-panel__title">动作目录</span></div>
         <div className="ferry-table-wrap">
-          <Table<ActionCatalogRow> rowKey="id" columns={catalogColumns} dataSource={catalogQuery.data ?? []}
+          <FerryTable<ActionCatalogRow> rowKey="id" columns={catalogColumns} dataSource={catalogQuery.data ?? []}
             loading={catalogQuery.isLoading} scroll={{ x: 'max-content' }} pagination={false} size="small" />
         </div>
       </section>
@@ -188,7 +187,7 @@ export default function AiAction() {
             onClick={() => { setDraft({}); setFilters({}); setPage((p) => ({ ...p, current: 1 })) }}>重置</Button>
         </div>
         <div className="ferry-table-wrap">
-          <Table<ActionRecordExt> rowKey="id" columns={recordColumns} dataSource={(recordsQuery.data?.records ?? []) as ActionRecordExt[]}
+          <FerryTable<ActionRecordExt> rowKey="id" columns={recordColumns} dataSource={(recordsQuery.data?.records ?? []) as ActionRecordExt[]}
             loading={recordsQuery.isLoading || recordsQuery.isFetching} scroll={{ x: 'max-content' }}
             pagination={{
               current: page.current, pageSize: page.size, total: recordsQuery.data?.total ?? 0,

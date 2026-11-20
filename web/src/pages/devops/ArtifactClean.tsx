@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { App, Button, Form, Input, InputNumber, Modal, Select, Space, Switch, Table, Tag, Tooltip, type TableColumnsType } from 'antd'
+import { App, Button, Form, Input, InputNumber, Modal, Select, Space, Switch, Tag, Tooltip, type TableColumnsType } from 'antd'
+import FerryTable from '@/components/FerryTable'
 import { Eye, Play, RotateCw, Save } from 'lucide-react'
 import PageHeader from '@/components/PageHeader'
 import { RoleTag } from '@/components/StatusTag'
@@ -9,8 +10,6 @@ import { get, post } from '@/api/client'
 import type { CleanTaskRow } from '@/api/types-devops'
 import { useAuthStore } from '@/stores/auth'
 import { showError } from '@/lib/notify'
-import { COL } from '@/lib/table'
-
 const TASK_STATUS: Record<number, string> = { 1: '待确认', 2: '已执行', 3: '失败' }
 
 export default function ArtifactClean() {
@@ -68,14 +67,14 @@ export default function ArtifactClean() {
   }
 
   const columns: TableColumnsType<CleanTaskRow> = [
-    { title: '任务ID', dataIndex: 'id', width: 140, render: (v: string) => <span className="ferry-mono" style={{ fontSize: 12 }}>{v}</span> },
-    { title: '任务时间', dataIndex: 'taskTime', width: COL.time },
-    { title: '待清理数', dataIndex: 'pendingCount', width: 100 },
-    { title: '实际清理数', dataIndex: 'deletedCount', width: 110 },
-    { title: '状态', dataIndex: 'status', width: 100,
+    { title: '任务ID', dataIndex: 'id',  render: (v: string) => <span className="ferry-mono" style={{ fontSize: 12 }}>{v}</span> },
+    { title: '任务时间', dataIndex: 'taskTime', },
+    { title: '待清理数', dataIndex: 'pendingCount', },
+    { title: '实际清理数', dataIndex: 'deletedCount', },
+    { title: '状态', dataIndex: 'status',
       render: (v: number) => <Tag color={v === 2 ? 'green' : v === 3 ? 'red' : 'orange'}>{TASK_STATUS[v] ?? v}</Tag>,
     },
-    { title: '操作', key: 'action', width: COL.action, fixed: 'right', render: (_, r) => (
+    { title: '操作', key: 'action',   render: (_, r) => (
       <Tooltip title="清单">
         <Button type="link" size="small" icon={<Eye size={14} />} onClick={() => manifestMutation.mutate(r.id)} />
       </Tooltip>
@@ -116,7 +115,7 @@ export default function ArtifactClean() {
         )}
 
         <div className="ferry-table-wrap">
-          <Table<CleanTaskRow> rowKey="id" columns={columns} dataSource={runsQuery.data ?? []}
+          <FerryTable<CleanTaskRow> rowKey="id" columns={columns} dataSource={runsQuery.data ?? []}
             loading={runsQuery.isFetching} scroll={{ x: 'max-content' }} pagination={false} />
         </div>
       </section>

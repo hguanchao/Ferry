@@ -19,6 +19,7 @@ import com.ferry.devops.api.entity.Pipeline;
 import com.ferry.devops.api.entity.RunTrigger;
 import com.ferry.devops.api.vo.DiffVO;
 import com.ferry.devops.api.vo.PipelineDefinitionVO;
+import com.ferry.devops.api.vo.PipelinePreviewVO;
 import com.ferry.devops.api.vo.PipelineStageVO;
 import com.ferry.devops.api.vo.PipelineTaskVO;
 import com.ferry.devops.api.vo.PipelineVO;
@@ -156,6 +157,14 @@ public class PipelineServiceImpl extends ServiceImpl<PipelineMapper, Pipeline> i
     @Override
     public ValidateResultVO validateDefinition(String definition, Integer mode) {
         return PipelineDefinitionCodec.validate(definition, mode);
+    }
+
+    @Override
+    public PipelinePreviewVO previewDefinition(String definition, Integer mode) {
+        if (Integer.valueOf(2).equals(mode)) {
+            throw new ServiceException("YAML 模式暂不支持脚本预览，请切换到表单模式");
+        }
+        return PipelineScriptRenderer.preview(PipelineDefinitionCodec.decode(definition));
     }
 
     @Override

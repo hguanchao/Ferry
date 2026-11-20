@@ -2,6 +2,7 @@ package com.ferry.devops.api.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 import java.util.Map;
@@ -20,6 +21,7 @@ public class PipelineTaskDTO {
     private String executor;
 
     @Schema(description = "脚本引用")
+    @Size(max = 200, message = "脚本引用长度不能超过 200")
     private String scriptRef;
 
     @Schema(description = "自定义脚本内容")

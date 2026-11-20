@@ -10,10 +10,10 @@ import {
   Modal,
   Select,
   Switch,
-  Table,
   Tooltip,
   type TableColumnsType,
 } from 'antd'
+import FerryTable from '@/components/FerryTable'
 import { Pencil, Plus, RotateCw, Search, Trash2 } from 'lucide-react'
 import PageHeader from '@/components/PageHeader'
 import { RoleTag } from '@/components/StatusTag'
@@ -22,8 +22,6 @@ import { regionApi } from '@/api/system'
 import type { RegionNode } from '@/api/types'
 import { useAuthStore } from '@/stores/auth'
 import { showError } from '@/lib/notify'
-import { COL } from '@/lib/table'
-
 /** 展开后子级尚未返回时插入的占位行，仅用于给出可见的加载反馈 */
 const LOADING_ID_SUFFIX = '::loading'
 
@@ -60,7 +58,7 @@ const columnsBase: TableColumnsType<RegionRow> = [
   {
     title: '区域编码',
     dataIndex: 'code',
-    width: 170,
+
     render: (value: string, record) =>
       record._loading ? null : (
         <span className="ferry-mono" style={{ fontSize: 12 }}>
@@ -71,7 +69,7 @@ const columnsBase: TableColumnsType<RegionRow> = [
   {
     title: '上级编码',
     dataIndex: 'parentId',
-    width: 150,
+
     render: (value: string, record) =>
       record._loading ? null : value === '0' ? (
         <span className="ferry-muted">顶级</span>
@@ -84,14 +82,14 @@ const columnsBase: TableColumnsType<RegionRow> = [
   {
     title: '排序',
     dataIndex: 'sort',
-    width: COL.sort,
+
     align: 'right',
     render: (value: number, record) => (record._loading ? null : <span className="ferry-mono">{value}</span>),
   },
   {
     title: '状态',
     dataIndex: 'status',
-    width: COL.status,
+
     render: (value: number, record) =>
       record._loading ? null : (
         <span className="ferry-status" data-tone={value === 1 ? 'success' : 'default'}>
@@ -259,7 +257,7 @@ export default function Region() {
     {
       title: '操作',
       key: 'action',
-      width: COL.actionWide,
+
       render: (_, record) => {
         if (record._loading) return null
         return (
@@ -367,7 +365,7 @@ export default function Region() {
         </div>
 
         <div className="ferry-table-wrap">
-          <Table<RegionRow>
+          <FerryTable<RegionRow>
             rowKey="id"
             columns={columns}
             dataSource={rows}

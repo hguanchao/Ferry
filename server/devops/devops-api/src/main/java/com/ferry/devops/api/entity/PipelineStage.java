@@ -26,6 +26,9 @@ public class PipelineStage extends BaseEntity implements Serializable {
     /** 阶段名称 */
     private String name;
 
+    /** 构建工具，如 Maven/Node/Gradle */
+    private String buildTool;
+
     /** 版本号 */
     private Integer version;
 

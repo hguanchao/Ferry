@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { App, Button, Descriptions, InputNumber, Space, Table, Tag, Typography } from 'antd'
+import { App, Button, Descriptions, InputNumber, Space, Tag, Typography } from 'antd'
+import FerryTable from '@/components/FerryTable'
 import { ArrowLeft, Ban, CircleCheck, Play, ShieldAlert } from 'lucide-react'
 import PageHeader from '@/components/PageHeader'
 import { releaseApi, deployApi } from '@/api/devops'
@@ -88,12 +89,12 @@ export default function ReleaseExecute({ id }: { id?: string }) {
 
       <section className="ferry-panel" style={{ marginTop: 12 }}>
         <h3>应用 × 批次矩阵</h3>
-        <Table size="small" rowKey="id" pagination={false} dataSource={artifacts}
+        <FerryTable size="small" rowKey="id" pagination={false} dataSource={artifacts}
           columns={[
-            { title: '应用', dataIndex: 'appName', width: 160 },
-            { title: '制品版本', dataIndex: 'version', width: 160 },
-            { title: '门禁', dataIndex: 'gateConclusion', width: 90, render: (v: number) => <Tag color={v === 1 ? 'green' : 'gold'}>{v === 1 ? '通过' : '豁免'}</Tag> },
-            { title: '锁定', dataIndex: 'isLocked', width: 70, render: (v: number) => v === 1 ? '已锁定' : '未锁' },
+            { title: '应用', dataIndex: 'appName', },
+            { title: '制品版本', dataIndex: 'version', },
+            { title: '门禁', dataIndex: 'gateConclusion',  render: (v: number) => <Tag color={v === 1 ? 'green' : 'gold'}>{v === 1 ? '通过' : '豁免'}</Tag> },
+            { title: '锁定', dataIndex: 'isLocked',  render: (v: number) => v === 1 ? '已锁定' : '未锁' },
             { title: '发布批次', key: 'batches', render: () => (
               <Space size={4}>
                 {[1, 2, 3].map((n) => <Tag key={n} color={BATCH_STATUS[n + 1]?.color}>批次{n}</Tag>)}

@@ -1,13 +1,12 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { App, Button, DatePicker, Select, Table, Tag, Tooltip, type TableColumnsType } from 'antd'
+import { App, Button, DatePicker, Select, Tag, Tooltip, type TableColumnsType } from 'antd'
+import FerryTable from '@/components/FerryTable'
 import { Activity, Clock3, Gauge, RotateCw, Timer, TrendingUp } from 'lucide-react'
 import PageHeader from '@/components/PageHeader'
 import { RoleTag } from '@/components/StatusTag'
 import { metricApi } from '@/api/devops'
 import type { MetricRow, StageStatRow } from '@/api/types-devops'
-import { COL } from '@/lib/table'
-
 const STAGE_LABEL: Record<number, string> = { 1: '构建', 2: '单元测试', 3: '代码扫描', 4: '部署', 5: '门禁', 6: '审批' }
 
 /** 前端 CSV 下载 */
@@ -57,28 +56,28 @@ export default function DeliveryMetric() {
   ]
 
   const metricColumns: TableColumnsType<MetricRow> = [
-    { title: '统计日', dataIndex: 'statDate', width: COL.time,
+    { title: '统计日', dataIndex: 'statDate',
       render: (v: string) => <span className="ferry-mono" style={{ fontSize: 12 }}>{v}</span> },
-    { title: '应用ID', dataIndex: 'appId', width: COL.code },
-    { title: '部署频率', dataIndex: 'deployFreq', width: 110 },
-    { title: '变更前置时间(s)', dataIndex: 'leadTimeP50', width: 150 },
-    { title: '变更失败率', dataIndex: 'changeFailRate', width: 120 },
-    { title: 'MTTR(s)', dataIndex: 'mttrP50', width: 110 },
-    { title: '门禁豁免率', dataIndex: 'gateExemptRate', width: 120 },
-    { title: '数据状态', dataIndex: 'dataStatus', width: 100,
+    { title: '应用ID', dataIndex: 'appId', },
+    { title: '部署频率', dataIndex: 'deployFreq', },
+    { title: '变更前置时间(s)', dataIndex: 'leadTimeP50', },
+    { title: '变更失败率', dataIndex: 'changeFailRate', },
+    { title: 'MTTR(s)', dataIndex: 'mttrP50', },
+    { title: '门禁豁免率', dataIndex: 'gateExemptRate', },
+    { title: '数据状态', dataIndex: 'dataStatus',
       render: (v: number) => <Tag color={v === 2 ? 'orange' : 'green'}>{v === 2 ? '数据不足' : '正常'}</Tag> },
   ]
 
   const stageColumns: TableColumnsType<StageStatRow> = [
-    { title: '统计日', dataIndex: 'statDate', width: COL.time },
-    { title: '应用ID', dataIndex: 'appId', width: COL.code },
-    { title: '阶段', dataIndex: 'stageType', width: 110,
+    { title: '统计日', dataIndex: 'statDate', },
+    { title: '应用ID', dataIndex: 'appId', },
+    { title: '阶段', dataIndex: 'stageType',
       render: (v: number) => STAGE_LABEL[v] ?? `阶段${v}` },
-    { title: 'P50(s)', dataIndex: 'p50', width: 110,
+    { title: 'P50(s)', dataIndex: 'p50',
       render: (v?: number) => v === undefined ? '—' : `${(v / 1000).toFixed(1)}` },
-    { title: 'P90(s)', dataIndex: 'p90', width: 110,
+    { title: 'P90(s)', dataIndex: 'p90',
       render: (v?: number) => v === undefined ? '—' : `${(v / 1000).toFixed(1)}` },
-    { title: '失败数', dataIndex: 'failCount', width: 90 },
+    { title: '失败数', dataIndex: 'failCount', },
   ]
 
   return (
@@ -128,7 +127,7 @@ export default function DeliveryMetric() {
             onClick={() => { setDraft({}); setFilters({}); setPage((p) => ({ ...p, current: 1 })) }}>重置</Button>
         </div>
         <div className="ferry-table-wrap">
-          <Table<MetricRow> rowKey="id" columns={metricColumns} dataSource={doraRows}
+          <FerryTable<MetricRow> rowKey="id" columns={metricColumns} dataSource={doraRows}
             loading={doraQuery.isLoading || doraQuery.isFetching} scroll={{ x: 'max-content' }} />
         </div>
       </section>
@@ -141,7 +140,7 @@ export default function DeliveryMetric() {
           </span>
         </div>
         <div className="ferry-table-wrap">
-          <Table<StageStatRow> rowKey="id" columns={stageColumns} dataSource={stageQuery.data?.records ?? []}
+          <FerryTable<StageStatRow> rowKey="id" columns={stageColumns} dataSource={stageQuery.data?.records ?? []}
             loading={stageQuery.isLoading || stageQuery.isFetching} scroll={{ x: 'max-content' }}
             pagination={{
               current: page.current, pageSize: page.size, total: stageQuery.data?.total ?? 0,
