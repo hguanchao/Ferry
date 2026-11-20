@@ -64,7 +64,11 @@ export interface PipelineRow {
   name: string
   status: number
   version: number
+  appName?: string
+  repoBranch?: string
+  stageCount?: number
   createTime: string
+  updateTime?: string
 }
 export interface PipelineVersionRow { id: ID; pipelineId: ID; versionNo: number; changeNote: string; sourceType: number; createTime: string }
 export interface PipelineDefinition { json: string; yaml?: string; versionId?: ID }
@@ -84,6 +88,10 @@ export interface PipelineTaskDef {
   scriptRef?: string
   scriptContent?: string
   params?: Record<string, unknown>
+}
+/** 流水线详情：复用列表字段，附带当前版本阶段/任务定义 */
+export interface PipelineDetail extends PipelineRow {
+  stages?: PipelineStageDef[]
 }
 export interface DiffResult { left: string; right: string; lines: Array<{ type: string; leftNo?: number; rightNo?: number; text: string }> }
 export interface PrecheckItem { type: number; conclusion: number; detail?: string }

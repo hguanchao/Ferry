@@ -7,7 +7,7 @@ import type {
   ChangeTicketRow, CleanPolicyRow, CleanTaskRow, ClosureRow, DeployBatchRow,
   DeployRecordRow, DiffResult, EnvironmentRow, EnvConfigRow, GateExemptionRow,
   GateResultRow, GateRuleRow, ImpactResult, MetricRow, NotifyChannelRow, NotifyTemplateRow,
-  OpenTokenRow, PipelineDefinition, PipelineRow, PipelineVersionRow, PrecheckResult,
+  OpenTokenRow, PipelineDefinition, PipelineDetail, PipelineRow, PipelineVersionRow, PrecheckResult,
   PrecheckResultVO, ReleaseDetail, ReleaseRecordRow, ReleaseRow, ReleaseStrategyRow,
   RiskResult, RollbackCandidate, RollbackRow, RunDetail, RunRow, StageStatRow, StoragePolicyRow,
   TechDebtRow, TriggerRecordRow, TriggerResult, ValidateResult,
@@ -48,7 +48,7 @@ export const envConfigApi = {
 }
 export const pipelineApi = {
   pageList: (body: Record<string, unknown>) => post<ApiPage<PipelineRow>>(`${B}/pipeline/pageList`, body),
-  detail: (id: string) => get<Record<string, unknown>>(`${B}/pipeline/detail`, { id }),
+  detail: (id: string) => get<PipelineDetail>(`${B}/pipeline/detail`, { id }),
   save: (body: Record<string, unknown>) => post<string>(`${B}/pipeline/save`, body),
   deleted: (ids: string[]) => post<string>(`${B}/pipeline/deleted`, ids),
   enable: (body: Record<string, unknown>) => post<string>(`${B}/pipeline/enable`, body),

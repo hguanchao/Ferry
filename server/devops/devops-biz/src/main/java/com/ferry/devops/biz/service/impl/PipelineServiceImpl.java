@@ -14,21 +14,22 @@ import com.ferry.devops.api.dto.PipelineDefinitionDTO;
 import com.ferry.devops.api.dto.PipelineStageDTO;
 import com.ferry.devops.api.dto.PipelineTaskDTO;
 import com.ferry.devops.api.dto.query.PipelineQuery;
+import com.ferry.devops.api.entity.App;
 import com.ferry.devops.api.entity.Pipeline;
 import com.ferry.devops.api.entity.RunTrigger;
 import com.ferry.devops.api.vo.DiffVO;
 import com.ferry.devops.api.vo.PipelineDefinitionVO;
-import com.ferry.devops.api.vo.PipelineDetailVO;
 import com.ferry.devops.api.vo.PipelineStageVO;
 import com.ferry.devops.api.vo.PipelineTaskVO;
 import com.ferry.devops.api.vo.PipelineVO;
 import com.ferry.devops.api.vo.TriggerRecordVO;
 import com.ferry.devops.api.vo.ValidateResultVO;
 import com.ferry.devops.api.vo.VersionVO;
+import com.ferry.devops.biz.mapper.AppMapper;
 import com.ferry.devops.biz.mapper.PipelineMapper;
 import com.ferry.devops.biz.mapper.RunTriggerMapper;
 import com.ferry.devops.biz.service.IPipelineService;
-import com.ferry.devops.biz.wrapper.PipelineWrapper;
+import com.ferry.devops.biz.service.IPipelineStageService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -45,26 +46,33 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class PipelineServiceImpl extends ServiceImpl<PipelineMapper, Pipeline> implements IPipelineService {
     private final RunTriggerMapper triggerMapper;
-    private final PipelineDefinitionStore definitionStore;
+    private final IPipelineStageService pipelineStageService;
+    private final AppMapper appMapper;
 
     @Override
     public IPage<PipelineVO> pageList(PipelineQuery body) {
-        PipelineWrapper wrapper = PipelineWrapper.build(baseMapper);
-        IPage<Pipeline> pages = page(Page.create(body), wrapper.lambda(body));
-        IPage<PipelineVO> result = wrapper.pageVo(pages);
-        result.setRecords(wrapper.voWithExtras(pages.getRecords()));
-        return result;
+        return baseMapper.selectPageList(Page.create(body), body);
     }
 
     @Override
-    public PipelineDetailVO detail(Long id) {
-        Pipeline pipeline = requirePipeline(id);
-        PipelineDetailVO vo = new PipelineDetailVO();
-        vo.setPipeline(PipelineWrapper.build(baseMapper).vo(pipeline));
-        if (pipeline.getVersion() != null && pipeline.getVersion() > 0) {
-            vo.setDefinition(definition(id, null));
+    public PipelineVO detail(Long id) {
+        Pipeline pipeline = getById(id);
+        if (pipeline == null) {
+            throw new ServiceException("流水线不存在");
         }
-        vo.setVersions(versionPage(id, 1L, 20L).getRecords());
+        PipelineVO vo = BeanUtil.copy(pipeline, PipelineVO.class);
+        App app = appMapper.selectById(pipeline.getAppId());
+        if (app != null) {
+            vo.setAppName(app.getName());
+            vo.setRepoBranch(app.getRepoBranch());
+        }
+        if (pipeline.getVersion() != null && pipeline.getVersion() > 0) {
+            PipelineDefinitionDTO definition = pipelineStageService.loadDefinition(id, pipeline.getVersion());
+            if (definition.getStages() != null) {
+                vo.setStages(definition.getStages().stream().map(this::stageVo).collect(Collectors.toList()));
+                vo.setStageCount(definition.getStages().size());
+            }
+        }
         return vo;
     }
 
@@ -108,7 +116,7 @@ public class PipelineServiceImpl extends ServiceImpl<PipelineMapper, Pipeline> i
             }
         }
         for (Long id : ids) {
-            definitionStore.deleteByPipeline(id);
+            pipelineStageService.deleteByPipeline(id);
         }
         return removeByIds(ids);
     }
@@ -133,12 +141,12 @@ public class PipelineServiceImpl extends ServiceImpl<PipelineMapper, Pipeline> i
     public PipelineDefinitionVO definition(Long id, Long versionId) {
         Pipeline pipeline = requirePipeline(id);
         int version = versionId == null ? (pipeline.getVersion() == null ? 0 : pipeline.getVersion()) : versionId.intValue();
-        String json = definitionStore.loadJson(id, version);
+        String json = pipelineStageService.loadDefinitionJson(id, version);
         PipelineDefinitionVO vo = new PipelineDefinitionVO();
         vo.setVersionId((long) version);
         vo.setVersionNo(version);
         vo.setJson(json);
-        PipelineDefinitionDTO dto = definitionStore.load(id, version);
+        PipelineDefinitionDTO dto = pipelineStageService.loadDefinition(id, version);
         if (dto.getStages() != null) {
             vo.setStages(dto.getStages().stream().map(this::stageVo).collect(Collectors.toList()));
         }
@@ -169,7 +177,7 @@ public class PipelineServiceImpl extends ServiceImpl<PipelineMapper, Pipeline> i
 
     @Override
     public IPage<VersionVO> versionPage(Long pipelineId, Long current, Long size) {
-        List<Integer> versions = definitionStore.listVersions(pipelineId);
+        List<Integer> versions = pipelineStageService.listVersions(pipelineId);
         long total = versions.size();
         long cur = current == null ? 1 : current;
         long sz = size == null ? 20 : size;
@@ -189,8 +197,8 @@ public class PipelineServiceImpl extends ServiceImpl<PipelineMapper, Pipeline> i
     @Override
     public DiffVO versionDiff(Long leftId, Long rightId) {
         Pipeline pipeline = requirePipeline(leftId);
-        String left = definitionStore.loadJson(pipeline.getId(), leftId.intValue());
-        String right = definitionStore.loadJson(pipeline.getId(), rightId.intValue());
+        String left = pipelineStageService.loadDefinitionJson(pipeline.getId(), leftId.intValue());
+        String right = pipelineStageService.loadDefinitionJson(pipeline.getId(), rightId.intValue());
         DiffVO vo = new DiffVO();
         vo.setLeft(left);
         vo.setRight(right);
@@ -203,11 +211,11 @@ public class PipelineServiceImpl extends ServiceImpl<PipelineMapper, Pipeline> i
     public VersionVO rollback(Long id, Long versionId, String changeNote) {
         Pipeline pipeline = requirePipeline(id);
         int target = versionId.intValue();
-        if (!definitionStore.listVersions(id).contains(target)) {
+        if (!pipelineStageService.listVersions(id).contains(target)) {
             throw new ServiceException("回退版本不存在");
         }
         int newVersion = (pipeline.getVersion() == null ? 0 : pipeline.getVersion()) + 1;
-        String json = definitionStore.loadJson(id, target);
+        String json = pipelineStageService.loadDefinitionJson(id, target);
         createVersion(id, json, changeNote);
         VersionVO vo = new VersionVO();
         vo.setPipelineId(id);
@@ -240,7 +248,7 @@ public class PipelineServiceImpl extends ServiceImpl<PipelineMapper, Pipeline> i
         }
         Pipeline pipeline = getById(pipelineId);
         int version = (pipeline.getVersion() == null ? 0 : pipeline.getVersion()) + 1;
-        definitionStore.save(pipelineId, version, dto);
+        pipelineStageService.saveDefinition(pipelineId, version, dto);
         pipeline.setVersion(version);
         updateById(pipeline);
     }

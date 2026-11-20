@@ -7,7 +7,6 @@ import com.ferry.devops.api.dto.query.PipelineQuery;
 import com.ferry.devops.api.entity.Pipeline;
 import com.ferry.devops.api.vo.DiffVO;
 import com.ferry.devops.api.vo.PipelineDefinitionVO;
-import com.ferry.devops.api.vo.PipelineDetailVO;
 import com.ferry.devops.api.vo.PipelineVO;
 import com.ferry.devops.api.vo.TriggerRecordVO;
 import com.ferry.devops.api.vo.ValidateResultVO;
@@ -22,7 +21,7 @@ public interface IPipelineService extends IService<Pipeline> {
 
     IPage<PipelineVO> pageList(PipelineQuery body);
 
-    PipelineDetailVO detail(Long id);
+    PipelineVO detail(Long id);
 
     boolean save(PipelineDTO body);
 

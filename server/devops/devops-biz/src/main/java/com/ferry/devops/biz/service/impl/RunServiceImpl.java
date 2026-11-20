@@ -52,6 +52,7 @@ import com.ferry.devops.biz.mapper.RunPrecheckMapper;
 import com.ferry.devops.biz.mapper.RunStageMapper;
 import com.ferry.devops.biz.mapper.RunTaskMapper;
 import com.ferry.devops.biz.mapper.RunTriggerMapper;
+import com.ferry.devops.biz.service.IPipelineStageService;
 import com.ferry.devops.biz.service.IRunService;
 import com.ferry.devops.biz.wrapper.RunWrapper;
 import lombok.RequiredArgsConstructor;
@@ -86,7 +87,7 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
     private final PipelineMapper pipelineMapper;
     private final PipelineStageMapper pipelineStageMapper;
     private final PipelineStageTaskMapper pipelineTaskMapper;
-    private final PipelineDefinitionStore definitionStore;
+    private final IPipelineStageService pipelineStageService;
     private final RunStageMapper stageMapper;
     private final RunTaskMapper taskMapper;
     private final RunLogSegmentMapper logMapper;
@@ -544,7 +545,7 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
      * 按版本快照创建阶段（全部未开始）
      */
     private void createStages(Long runId, Long pipelineId, Integer version, Integer fromSeq) {
-        PipelineDefinitionDTO definition = definitionStore.load(pipelineId, version);
+        PipelineDefinitionDTO definition = pipelineStageService.loadDefinition(pipelineId, version);
         List<PipelineStageDTO> stages = definition.getStages();
         if (stages == null || stages.isEmpty()) {
             return;
@@ -584,7 +585,7 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
      * @return 不可运行的提示文本；定义可运行则为 null
      */
     private String checkRunnableDefinition(Long pipelineId, Integer version) {
-        PipelineDefinitionDTO definition = definitionStore.load(pipelineId, version);
+        PipelineDefinitionDTO definition = pipelineStageService.loadDefinition(pipelineId, version);
         List<PipelineStageDTO> stages = definition.getStages();
         if (stages == null || stages.isEmpty()) {
             return "流水线定义未配置任何阶段";

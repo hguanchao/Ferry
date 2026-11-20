@@ -11,14 +11,8 @@ import { appApi, pipelineApi } from '@/api/devops'
 import type { AppOption, PipelineRow, PipelineStageDef, PrecheckResult, TriggerResult } from '@/api/types-devops'
 import { useAuthStore } from '@/stores/auth'
 import { showError } from '@/lib/notify'
-import { COL } from '@/lib/table'
 
-/** 流水线列表行：共享类型 + 后端回填的应用名称 */
-interface PipelineRowExt extends PipelineRow {
-  appName?: string
-}
-
-const STATUS_LABEL: Record<number, string> = {
+const RUN_STATUS_LABEL: Record<number, string> = {
   1: '排队中', 2: '运行中', 3: '阻塞', 4: '成功', 5: '失败', 6: '超时', 7: '已取消', 8: '结果待确认',
 }
 const CONCLUSION_LABEL: Record<number, string> = { 1: '通过', 2: '不通过', 3: '合并', 4: '复用' }
@@ -59,8 +53,8 @@ export default function Pipeline() {
   const [triggerForm] = Form.useForm()
   const [open, setOpen] = useState(false)
   const [triggerOpen, setTriggerOpen] = useState(false)
-  const [editing, setEditing] = useState<PipelineRowExt | null>(null)
-  const [triggerRow, setTriggerRow] = useState<PipelineRowExt | null>(null)
+  const [editing, setEditing] = useState<PipelineRow | null>(null)
+  const [triggerRow, setTriggerRow] = useState<PipelineRow | null>(null)
   const [precheck, setPrecheck] = useState<PrecheckResult | null>(null)
   const [filters, setFilters] = useState<Record<string, unknown>>({})
   const [page, setPage] = useState({ current: 1, size: 30 })
@@ -83,7 +77,7 @@ export default function Pipeline() {
     retry: false,
   })
 
-  const rows = (query.data?.records ?? []) as PipelineRowExt[]
+  const rows = query.data?.records ?? []
 
   const invalidate = () => void queryClient.invalidateQueries({ queryKey: ['pipelines'] })
 
@@ -140,7 +134,7 @@ export default function Pipeline() {
     onError: showError,
   })
 
-  const openEditor = (record: PipelineRowExt | null) => {
+  const openEditor = (record: PipelineRow | null) => {
     setEditing(record)
     form.resetFields()
     originalDefinitionRef.current = ''
@@ -161,7 +155,7 @@ export default function Pipeline() {
     }
   }, [editing, definitionQuery.data])
 
-  const openTrigger = (record: PipelineRowExt | null) => {
+  const openTrigger = (record: PipelineRow | null) => {
     setTriggerRow(record)
     setPrecheck(null)
     triggerForm.resetFields()
@@ -177,12 +171,20 @@ export default function Pipeline() {
     triggerMutation.mutate(body)
   }
 
-  const columns: TableColumnsType<PipelineRowExt> = [
-    { title: 'ID', dataIndex: 'id', width: COL.code, render: (v: string) => <span className="ferry-mono">{v}</span> },
+  const columns: TableColumnsType<PipelineRow> = [
     { title: '流水线名称', dataIndex: 'name', minWidth: 220, ellipsis: true },
-    { title: '应用', dataIndex: 'appName', width: 140 },
+    { title: '应用名称', dataIndex: 'appName', width: 160, render: (v?: string) => v || '—' },
+    {
+      title: '当前分支', dataIndex: 'repoBranch', width: 120,
+      render: (v?: string) => v ? <span className="ferry-mono" style={{ fontSize: 12 }}>{v}</span> : '—',
+    },
     { title: '当前版本', dataIndex: 'version', width: 100,
       render: (v: number) => v ? `V${v}` : '—' },
+    {
+      title: '阶段数', dataIndex: 'stageCount', width: 90,
+      render: (v?: number) => v == null ? '—' : v,
+    },
+    { title: '更新时间', dataIndex: 'updateTime', width: 170, render: (v?: string) => v || '—' },
     {
       title: '操作', width: 160, fixed: 'right',
       render: (_: unknown, record) => (
@@ -267,7 +269,7 @@ export default function Pipeline() {
           <Select mode="multiple" allowClear placeholder="运行状态" style={{ width: 240 }}
             value={filters.statuses as number[] ?? []}
             onChange={(v) => setFilters((p) => ({ ...p, statuses: v.length ? v : undefined }))}
-            options={Object.entries(STATUS_LABEL).map(([k, v]) => ({ value: Number(k), label: v }))}
+            options={Object.entries(RUN_STATUS_LABEL).map(([k, v]) => ({ value: Number(k), label: v }))}
           />
           <div className="ferry-toolbar__spacer" />
           {METRICS.filter((m) => filters[m.key]).map((m) => (
@@ -281,6 +283,7 @@ export default function Pipeline() {
         <div className="ferry-table-wrap">
           <Table
             rowKey="id" columns={columns} dataSource={rows} loading={query.isFetching}
+            scroll={{ x: 'max-content' }}
             pagination={{
               current: page.current, pageSize: page.size, total: query.data?.total ?? 0,
               showSizeChanger: true, pageSizeOptions: ['30', '100', '200', '500', '1000'],

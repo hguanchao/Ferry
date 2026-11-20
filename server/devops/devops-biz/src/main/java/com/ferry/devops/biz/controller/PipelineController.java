@@ -8,7 +8,6 @@ import com.ferry.devops.api.dto.RunTriggerDTO;
 import com.ferry.devops.api.dto.query.PipelineQuery;
 import com.ferry.devops.api.vo.DiffVO;
 import com.ferry.devops.api.vo.PipelineDefinitionVO;
-import com.ferry.devops.api.vo.PipelineDetailVO;
 import com.ferry.devops.api.vo.PipelineVO;
 import com.ferry.devops.api.vo.PrecheckResultVO;
 import com.ferry.devops.api.vo.TriggerRecordVO;
@@ -49,7 +48,7 @@ public class PipelineController {
     @GetMapping("/detail")
     @PreAuthorize("devops:pipeline:detail")
     @Operation(summary = "流水线-详情", parameters = @Parameter(name = "id", description = "流水线id", required = true))
-    public R<PipelineDetailVO> detail(@RequestParam("id") Long id) {
+    public R<PipelineVO> detail(@RequestParam("id") Long id) {
         return R.data(service.detail(id));
     }
 
