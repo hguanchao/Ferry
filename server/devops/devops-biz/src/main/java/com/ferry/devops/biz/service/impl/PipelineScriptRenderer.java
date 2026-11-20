@@ -1,6 +1,5 @@
 package com.ferry.devops.biz.service.impl;
 
-import com.ferry.common.core.utils.JsonUtil;
 import com.ferry.common.core.utils.StrUtil;
 import com.ferry.devops.api.dto.PipelineDefinitionDTO;
 import com.ferry.devops.api.dto.PipelineStageDTO;
@@ -8,141 +7,184 @@ import com.ferry.devops.api.dto.PipelineTaskDTO;
 import com.ferry.devops.api.vo.PipelinePreviewVO;
 
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 
 /**
- * 流水线脚本渲染：触发时的 STAGE_SPEC 与配置页的脚本预览共用同一份阶段筛选逻辑。
+ * 流水线脚本渲染：把三表定义渲染为完整声明式 Jenkins pipeline 脚本。
+ *
+ * <p>配置页预览与 Job 同步共用 {@link #render(PipelineDefinitionDTO)}，保证“预览即所得”；
+ * 渲染结果自包含（checkout 引用 Job 参数，阶段命令静态展开），不再使用 STAGE_SPEC 动态解释协议。
  */
 final class PipelineScriptRenderer {
+
+    /** 阶段超时默认值（秒），与画布编辑器默认一致 */
+    private static final int DEFAULT_STAGE_TIMEOUT_SECONDS = 1800;
+
+    /** 参与 Jenkins 执行的 CI 阶段类型上限：1构建 2单测 3静态扫描 4制品入库；5-8 属部署/审批域，不在本次迁入范围 */
+    private static final int CI_STAGE_TYPE_MAX = 4;
 
     private PipelineScriptRenderer() {
     }
 
     /**
-     * 把流水线版本的 CI 阶段与任务脚本序列化为 Jenkins 参数。
+     * 渲染完整声明式脚本，预览与 Job 同步共用同一结果。
+     *
+     * <p>空定义（无 CI 阶段）渲染为注释 + 最小可解析脚本，配合 Job 禁用位表达“待配置”。
      */
-    static String buildStageSpec(PipelineDefinitionDTO definition) {
-        List<Map<String, Object>> stages = new ArrayList<>();
-        if (definition != null && definition.getStages() != null) {
-            for (PipelineStageDTO stage : definition.getStages()) {
-                if (stage.getType() == null || stage.getType() > 4) {
-                    continue;
-                }
-                Map<String, Object> stageSpec = new LinkedHashMap<>();
-                stageSpec.put("type", stage.getType());
-                stageSpec.put("name", stage.getName());
-                stageSpec.put("buildTool", stage.getBuildTool());
-                stageSpec.put("timeoutSeconds", stage.getTimeoutSeconds());
-                stageSpec.put("outputs", stage.getOutputs());
-                List<Map<String, Object>> tasks = new ArrayList<>();
-                if (stage.getTasks() != null) {
-                    for (PipelineTaskDTO task : stage.getTasks()) {
-                        if (task.getExecutor() != null && !"jenkins".equalsIgnoreCase(task.getExecutor())) {
-                            continue;
-                        }
-                        Map<String, Object> taskSpec = new LinkedHashMap<>();
-                        taskSpec.put("name", task.getName());
-                        taskSpec.put("scriptRef", task.getScriptRef());
-                        taskSpec.put("scriptContent", task.getScriptContent());
-                        taskSpec.put("params", task.getParams());
-                        tasks.add(taskSpec);
-                    }
-                }
-                stageSpec.put("tasks", tasks);
-                stages.add(stageSpec);
-            }
+    static String render(PipelineDefinitionDTO definition) {
+        List<PipelineStageDTO> ciStages = selectCiStages(definition);
+        StringBuilder script = new StringBuilder();
+        script.append("// 本脚本由 Ferry 按流水线定义自动生成，请勿在 Jenkins 侧手工编辑；修改请回到流水线画布保存\n");
+        if (ciStages.isEmpty()) {
+            script.append("// 尚未配置任何 CI 阶段，配置完成后回到 Ferry 重新保存同步\n");
+            script.append("pipeline {\n");
+            script.append("    agent any\n");
+            script.append("}\n");
+            return script.toString();
         }
-        return JsonUtil.toJson(stages);
+        script.append("pipeline {\n");
+        script.append("    agent any\n");
+        script.append("    stages {\n");
+        appendCheckoutStage(script);
+        for (PipelineStageDTO stage : ciStages) {
+            appendCiStage(script, stage);
+        }
+        script.append("    }\n");
+        script.append("}\n");
+        return script.toString();
     }
 
     /**
-     * 按当前定义渲染一段可读的 Jenkins 脚本预览，并收集空命令等告警。
+     * 预览：脚本与 Job 同步完全同源，仅附加告警（空命令、缺产出物等），预览不触发 Jenkins。
      */
     static PipelinePreviewVO preview(PipelineDefinitionDTO definition) {
-        List<String> warnings = new ArrayList<>();
-        StringBuilder script = new StringBuilder();
-        script.append("// Ferry 流水线脚本预览：仅展示 CI 阶段，复制到 Jenkins 前请确认命令与工具链\n");
-        script.append("node {\n");
-        script.append("    currentBuild.displayName = \"#${env.BUILD_NUMBER} ${params.RUN_ID}\"\n");
-        script.append("    stage('Checkout') {\n");
-        script.append("        // checkout REPO_URL，并 git checkout COMMIT_ID\n");
-        script.append("    }\n");
-
-        List<PipelineStageDTO> stages = definition == null ? null : definition.getStages();
-        boolean hasCiStage = false;
-        if (stages != null) {
-            for (PipelineStageDTO stage : stages) {
-                if (stage.getType() == null || stage.getType() > 4) {
-                    continue;
-                }
-                hasCiStage = true;
-                script.append("\n    stage('").append(escapeSingleQuoted(stage.getName())).append("') {\n");
-                if (StrUtil.isNotBlank(stage.getBuildTool())) {
-                    script.append("        // 构建工具: ").append(stage.getBuildTool()).append("\n");
-                }
-                int timeout = stage.getTimeoutSeconds() == null ? 1800 : stage.getTimeoutSeconds();
-                script.append("        timeout(time: ").append(timeout).append(", unit: 'SECONDS') {\n");
-                boolean hasJenkinsTask = false;
-                if (stage.getTasks() != null) {
-                    for (PipelineTaskDTO task : stage.getTasks()) {
-                        if (task.getExecutor() != null && !"jenkins".equalsIgnoreCase(task.getExecutor())) {
-                            continue;
-                        }
-                        hasJenkinsTask = true;
-                        script.append("            // 任务: ").append(task.getName()).append("\n");
-                        if (StrUtil.isNotBlank(task.getScriptContent())) {
-                            if (task.getScriptContent().contains("'''")) {
-                                warnings.add("阶段「" + stage.getName() + "」任务「" + task.getName()
-                                        + "」命令包含 '''，预览无法完整展示");
-                                script.append("            // 命令包含 \"'''\"，请改用脚本文件或拆分命令\n");
-                            } else {
-                                script.append("            sh '''").append(task.getScriptContent()).append("'''\n");
-                            }
-                        } else if (StrUtil.isNotBlank(task.getScriptRef())) {
-                            warnings.add("阶段「" + stage.getName() + "」任务「" + task.getName()
-                                    + "」只配置了 scriptRef，当前不会自动加载执行");
-                            script.append("            // 未配置执行命令，scriptRef=")
-                                    .append(task.getScriptRef()).append("\n");
-                        } else {
-                            warnings.add("阶段「" + stage.getName() + "」任务「" + task.getName()
-                                    + "」未配置执行命令");
-                            script.append("            // 未配置执行命令，当前不会执行任何内容\n");
-                        }
-                    }
-                }
-                if (!hasJenkinsTask) {
-                    warnings.add("阶段「" + stage.getName() + "」没有 Jenkins 任务");
-                }
-                if (stage.getType() == 4) {
-                    if (stage.getOutputs() == null || stage.getOutputs().isEmpty()) {
-                        warnings.add("制品入库阶段「" + stage.getName() + "」未配置产出物路径");
-                    } else {
-                        for (String output : stage.getOutputs()) {
-                            script.append("            archiveArtifacts artifacts: '")
-                                    .append(escapeSingleQuoted(output))
-                                    .append("', allowEmptyArchive: true\n");
-                        }
-                    }
-                }
-                script.append("        }\n");
-                script.append("    }\n");
-            }
-        }
-        if (!hasCiStage) {
-            warnings.add("当前定义没有可下发的 CI 阶段（构建/单元测试/静态扫描/制品入库）");
-        }
-        script.append("}\n");
-
         PipelinePreviewVO vo = new PipelinePreviewVO();
-        vo.setScript(script.toString());
-        vo.setStageSpec(buildStageSpec(definition));
-        vo.setWarnings(warnings);
+        vo.setScript(render(definition));
+        vo.setWarnings(collectWarnings(definition));
         return vo;
     }
 
+    /**
+     * 筛选参与 Jenkins 执行的 CI 阶段（type 1-4）。
+     */
+    private static List<PipelineStageDTO> selectCiStages(PipelineDefinitionDTO definition) {
+        List<PipelineStageDTO> ciStages = new ArrayList<>();
+        if (definition != null && definition.getStages() != null) {
+            for (PipelineStageDTO stage : definition.getStages()) {
+                if (stage.getType() != null && stage.getType() <= CI_STAGE_TYPE_MAX) {
+                    ciStages.add(stage);
+                }
+            }
+        }
+        return ciStages;
+    }
+
+    /**
+     * 代码检出阶段：仓库地址、提交与凭据均来自 Job 参数，触发时注入。
+     */
+    private static void appendCheckoutStage(StringBuilder script) {
+        script.append("        stage('Checkout') {\n");
+        script.append("            steps {\n");
+        script.append("                checkout([$class: 'GitSCM',\n");
+        script.append("                    branches: [[name: params.COMMIT_ID]],\n");
+        script.append("                    userRemoteConfigs: [[\n");
+        script.append("                        url: params.REPO_URL,\n");
+        script.append("                        credentialsId: (params.GIT_CREDENTIALS_ID ?: '')]])\n");
+        script.append("            }\n");
+        script.append("        }\n");
+    }
+
+    private static void appendCiStage(StringBuilder script, PipelineStageDTO stage) {
+        script.append("        stage('").append(escapeSingleQuoted(stage.getName())).append("') {\n");
+        if (StrUtil.isNotBlank(stage.getBuildTool())) {
+            // buildTool 仅作提示注释，工具环境由执行节点提供，不在此安装/切换
+            script.append("            // 构建工具: ").append(singleLine(stage.getBuildTool())).append("\n");
+        }
+        int timeout = stage.getTimeoutSeconds() == null ? DEFAULT_STAGE_TIMEOUT_SECONDS : stage.getTimeoutSeconds();
+        script.append("            options {\n");
+        script.append("                timeout(time: ").append(timeout).append(", unit: 'SECONDS')\n");
+        script.append("            }\n");
+        script.append("            steps {\n");
+        if (stage.getTasks() != null) {
+            for (PipelineTaskDTO task : stage.getTasks()) {
+                if (task.getExecutor() != null && !"jenkins".equalsIgnoreCase(task.getExecutor())) {
+                    continue;
+                }
+                appendTask(script, task);
+            }
+        }
+        if (stage.getType() == 4 && stage.getOutputs() != null) {
+            for (String output : stage.getOutputs()) {
+                script.append("                archiveArtifacts artifacts: '")
+                        .append(escapeSingleQuoted(output))
+                        .append("', allowEmptyArchive: true\n");
+            }
+        }
+        script.append("            }\n");
+        script.append("        }\n");
+    }
+
+    private static void appendTask(StringBuilder script, PipelineTaskDTO task) {
+        script.append("                // 任务: ").append(singleLine(task.getName())).append("\n");
+        if (StrUtil.isNotBlank(task.getScriptContent())) {
+            script.append("                sh '''")
+                    .append(escapeSingleQuoted(task.getScriptContent()))
+                    .append("'''\n");
+        } else if (StrUtil.isNotBlank(task.getScriptRef())) {
+            // scriptRef 只是源码内脚本路径提示，生成的脚本不动态加载执行
+            script.append("                // 仅配置 scriptRef: ").append(singleLine(task.getScriptRef()))
+                    .append("，不自动加载执行\n");
+        } else {
+            script.append("                // 未配置执行命令，本任务不执行任何内容\n");
+        }
+    }
+
+    /**
+     * 收集预览告警，口径与 render() 完全一致。
+     */
+    private static List<String> collectWarnings(PipelineDefinitionDTO definition) {
+        List<String> warnings = new ArrayList<>();
+        List<PipelineStageDTO> ciStages = selectCiStages(definition);
+        if (ciStages.isEmpty()) {
+            warnings.add("当前定义没有可下发的 CI 阶段（构建/单元测试/静态扫描/制品入库）");
+            return warnings;
+        }
+        for (PipelineStageDTO stage : ciStages) {
+            boolean hasJenkinsTask = false;
+            if (stage.getTasks() != null) {
+                for (PipelineTaskDTO task : stage.getTasks()) {
+                    if (task.getExecutor() != null && !"jenkins".equalsIgnoreCase(task.getExecutor())) {
+                        continue;
+                    }
+                    hasJenkinsTask = true;
+                    if (StrUtil.isBlank(task.getScriptContent())) {
+                        if (StrUtil.isNotBlank(task.getScriptRef())) {
+                            warnings.add("阶段「" + stage.getName() + "」任务「" + task.getName()
+                                    + "」只配置了 scriptRef，不会自动加载执行");
+                        } else {
+                            warnings.add("阶段「" + stage.getName() + "」任务「" + task.getName()
+                                    + "」未配置执行命令");
+                        }
+                    }
+                }
+            }
+            if (!hasJenkinsTask) {
+                warnings.add("阶段「" + stage.getName() + "」没有 Jenkins 任务");
+            }
+            if (stage.getType() == 4 && (stage.getOutputs() == null || stage.getOutputs().isEmpty())) {
+                warnings.add("制品入库阶段「" + stage.getName() + "」未配置产出物路径");
+            }
+        }
+        return warnings;
+    }
+
+    /** Groovy 单引号字符串转义：反斜杠与单引号 */
     private static String escapeSingleQuoted(String value) {
         return value == null ? "" : value.replace("\\", "\\\\").replace("'", "\\'");
+    }
+
+    /** 注释内容压成单行，防止用户输入的换行符破坏 // 注释注入代码 */
+    private static String singleLine(String value) {
+        return value == null ? "" : value.replaceAll("\\s*\\r?\\n\\s*", " ");
     }
 }

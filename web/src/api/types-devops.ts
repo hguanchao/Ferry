@@ -68,6 +68,7 @@ export interface PipelineRow {
   id: ID
   appId: ID
   name: string
+  /** 状态 0停用 1启用 2待配置（空定义，Job 已禁用） 3同步失败（可重试同步） */
   status: number
   version: number
   appName?: string
@@ -76,8 +77,8 @@ export interface PipelineRow {
   createTime: string
   updateTime?: string
 }
-/** 版本摘要：与后端 VersionVO 一致，三表存储无版本行 id，仅版本号 + 变更说明 */
-export interface PipelineVersionRow { pipelineId: ID; versionNo: number; changeNote?: string }
+/** 版本摘要：与后端 VersionVO 一致，三表存储无版本行 id，仅版本号 + 变更说明 + 同步后流水线状态 */
+export interface PipelineVersionRow { pipelineId: ID; versionNo: number; changeNote?: string; status?: number }
 /** 触发弹窗提交候选：与后端 RepoCommitVO 对应 */
 export interface RepoCommitOption {
   sha: string
@@ -88,10 +89,9 @@ export interface RepoCommitOption {
 }
 export interface PipelineDefinition { json: string; yaml?: string; versionNo?: number }
 export interface ValidateResult { valid: boolean; errors: Array<{ line: number; message: string }> }
-/** 流水线脚本预览 */
+/** 流水线脚本预览：script 与 Job 同步脚本同源 */
 export interface PipelinePreview {
   script: string
-  stageSpec?: string
   warnings: string[]
 }
 /** 流水线阶段定义：与后端 PipelineStageDTO 对应 */

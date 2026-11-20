@@ -1,6 +1,7 @@
 package com.ferry.devops.biz.service.impl;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.ferry.common.core.exception.ServiceException;
 import com.ferry.common.core.utils.BeanUtil;
 import com.ferry.common.core.utils.CollUtil;
@@ -16,6 +17,7 @@ import com.ferry.devops.api.dto.query.PipelineQuery;
 import com.ferry.devops.api.entity.App;
 import com.ferry.devops.api.entity.Pipeline;
 import com.ferry.devops.api.entity.RunTrigger;
+import com.ferry.devops.api.enums.PipelineStatusEnum;
 import com.ferry.devops.api.vo.DiffVO;
 import com.ferry.devops.api.vo.PipelineDefinitionVO;
 import com.ferry.devops.api.vo.PipelinePreviewVO;
@@ -33,14 +35,22 @@ import com.ferry.devops.biz.service.IPipelineStageService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 /**
- * 流水线服务实现：定义落库到阶段/任务表，按版本号管理，提供校验、回退与 diff。
+ * 流水线服务实现：定义落库到阶段/任务三表，保存后经由 {@link PipelineJobSyncService} 同步 Jenkins Job。
+ *
+ * <p>保存/回退/启停共用同一同步编排，数据库与 Jenkins 不宣称原子事务：
+ * 同步失败时定义已落库（状态落为同步失败），可重试同步；触发侧凭状态拦截未同步脚本。
+ * 版本变更检测用库内定义与提交定义的规范化 JSON 比对（无摘要列）；
+ * 版本递增在事务模板内以 CAS 方式完成，配合分段锁串行化同流水线的并发保存
+ * （内存锁仅单实例有效，多实例部署依赖 CAS 冲突报错兜底）。
  */
 @Service
 @RequiredArgsConstructor
@@ -48,6 +58,11 @@ public class PipelineServiceImpl extends ServiceImpl<PipelineMapper, Pipeline> i
     private final RunTriggerMapper triggerMapper;
     private final IPipelineStageService pipelineStageService;
     private final AppMapper appMapper;
+    private final PipelineJobSyncService jobSyncService;
+    private final TransactionTemplate transactionTemplate;
+
+    /** 同流水线版本递增的分段锁（单实例内存锁） */
+    private final ConcurrentHashMap<Long, Object> versionLocks = new ConcurrentHashMap<>();
 
     @Override
     public IPage<PipelineVO> pageList(PipelineQuery body) {
@@ -76,36 +91,36 @@ public class PipelineServiceImpl extends ServiceImpl<PipelineMapper, Pipeline> i
         return vo;
     }
 
+    /**
+     * 新增或编辑：元数据与阶段定义单一保存入口，保存后同步 Jenkins Job。
+     *
+     * <p>同步失败不回滚保存（配置已保存，状态落为同步失败），响应文案提示可重试。
+     */
     @Override
-    @Transactional(rollbackFor = Exception.class)
-    public boolean save(PipelineDTO body) {
-        Pipeline pipeline;
+    public String save(PipelineDTO body) {
         boolean isNew = ObjUtil.isEmpty(body.getId());
-        if (isNew) {
-            pipeline = new Pipeline();
-            pipeline.setStatus(1);
-            pipeline.setVersion(0);
-        } else {
-            pipeline = requirePipeline(body.getId());
-        }
+        Pipeline pipeline = isNew ? new Pipeline() : requirePipeline(body.getId());
         pipeline.setAppId(body.getAppId());
         pipeline.setName(body.getName());
-        if (ObjUtil.isNotEmpty(body.getStatus())) {
+        if (isNew) {
+            pipeline.setStatus(body.getStatus() == null
+                    ? PipelineStatusEnum.ENABLED.getCode() : body.getStatus());
+            pipeline.setVersion(0);
+        } else if (ObjUtil.isNotEmpty(body.getStatus())) {
             pipeline.setStatus(body.getStatus());
         }
-        boolean success = saveOrUpdate(pipeline);
-        // 新建时若携带阶段定义，生成初版
-        if (isNew && CollUtil.isNotEmpty(body.getStages())) {
-            PipelineDefinitionDTO definition = new PipelineDefinitionDTO();
-            definition.setStages(body.getStages());
-            createVersion(pipeline.getId(), definition);
+        saveOrUpdate(pipeline);
+        // 定义变更：显式提交 stages（空数组=清空旧脚本）；未提交（null）视为不修改定义
+        if (body.getStages() != null) {
+            persistDefinition(pipeline, body.getStages());
         }
-        return success;
+        PipelineJobSyncService.SyncOutcome outcome = jobSyncService.sync(pipeline.getId());
+        return composeMessage(isNew ? "新增成功" : "修改成功", outcome);
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public boolean deleted(List<Long> ids) {
+    public String deleted(List<Long> ids) {
         if (CollUtil.isEmpty(ids)) {
             throw new ServiceException("请选择要删除的流水线");
         }
@@ -117,23 +132,41 @@ public class PipelineServiceImpl extends ServiceImpl<PipelineMapper, Pipeline> i
         for (Long id : ids) {
             pipelineStageService.deleteByPipeline(id);
         }
-        return removeByIds(ids);
+        removeByIds(ids);
+        return "删除成功";
     }
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
-    public boolean enable(Long id) {
+    public String enable(Long id) {
         Pipeline pipeline = requirePipeline(id);
-        pipeline.setStatus(1);
-        return updateById(pipeline);
+        PipelineDefinitionDTO definition = pipelineStageService.loadDefinition(
+                id, pipeline.getVersion() == null ? 0 : pipeline.getVersion());
+        if (definition.getStages() == null || definition.getStages().isEmpty()) {
+            throw new ServiceException("流水线定义未配置，无法启用");
+        }
+        pipeline.setStatus(PipelineStatusEnum.ENABLED.getCode());
+        updateById(pipeline);
+        PipelineJobSyncService.SyncOutcome outcome = jobSyncService.sync(id);
+        return composeMessage("启用成功", outcome);
     }
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
-    public boolean disable(Long id) {
+    public String disable(Long id) {
         Pipeline pipeline = requirePipeline(id);
-        pipeline.setStatus(0);
-        return updateById(pipeline);
+        pipeline.setStatus(PipelineStatusEnum.DISABLED.getCode());
+        updateById(pipeline);
+        PipelineJobSyncService.SyncOutcome outcome = jobSyncService.sync(id);
+        return composeMessage("停用成功", outcome);
+    }
+
+    /**
+     * Jenkins Job 同步重试入口：对同步失败（或停用待补齐禁用位）的流水线重新执行同步编排。
+     */
+    @Override
+    public String sync(Long id) {
+        requirePipeline(id);
+        PipelineJobSyncService.SyncOutcome outcome = jobSyncService.sync(id);
+        return outcome.synced() ? "同步成功" : "同步失败：" + outcome.message();
     }
 
     @Override
@@ -164,21 +197,24 @@ public class PipelineServiceImpl extends ServiceImpl<PipelineMapper, Pipeline> i
         return PipelineScriptRenderer.preview(PipelineDefinitionCodec.decode(definition));
     }
 
+    /**
+     * 保存定义生成新版本（编辑器定义保存）：校验 → 版本落库（内容未变更不建版本）→ 同步。
+     */
     @Override
-    @Transactional(rollbackFor = Exception.class)
     public VersionVO saveDefinition(Long id, String definition, Integer mode, String changeNote) {
         Pipeline pipeline = requirePipeline(id);
-        ValidateResultVO result = PipelineDefinitionCodec.validate(definition, mode);
+        PipelineDefinitionDTO dto = PipelineDefinitionCodec.decode(definition);
+        ValidateResultVO result = PipelineDefinitionCodec.validateDto(dto, false);
         if (!Boolean.TRUE.equals(result.getValid())) {
             throw new ServiceException("流水线定义校验不通过：" + result.getErrors().get(0).getMessage());
         }
-        int newVersion = (pipeline.getVersion() == null ? 0 : pipeline.getVersion()) + 1;
-        createVersion(id, definition);
-        VersionVO vo = new VersionVO();
-        vo.setPipelineId(id);
-        vo.setVersionNo(newVersion);
-        vo.setChangeNote(changeNote);
-        return vo;
+        boolean changed = persistDefinition(pipeline, dto.getStages());
+        PipelineJobSyncService.SyncOutcome outcome = null;
+        // 内容变更必须同步；未变更时若不是已同步启用态（失败重试/待配置补齐）也执行同步
+        if (changed || !PipelineStatusEnum.ENABLED.getCode().equals(pipeline.getStatus())) {
+            outcome = jobSyncService.sync(id);
+        }
+        return versionVo(id, changeNote, outcome, pipeline.getStatus());
     }
 
     @Override
@@ -212,22 +248,26 @@ public class PipelineServiceImpl extends ServiceImpl<PipelineMapper, Pipeline> i
         return vo;
     }
 
+    /**
+     * 版本回退：复制旧版本内容为新当前版本（版本号推进、内容回退）并同步 Jenkins。
+     *
+     * <p>旧版本运行断点重跑也经由该方法先回退到运行时版本，避免新脚本跑旧阶段快照。
+     */
     @Override
-    @Transactional(rollbackFor = Exception.class)
     public VersionVO rollback(Long id, Long versionId, String changeNote) {
         Pipeline pipeline = requirePipeline(id);
         int target = versionId.intValue();
         if (!pipelineStageService.listVersions(id).contains(target)) {
             throw new ServiceException("回退版本不存在");
         }
-        int newVersion = (pipeline.getVersion() == null ? 0 : pipeline.getVersion()) + 1;
-        String json = pipelineStageService.loadDefinitionJson(id, target);
-        createVersion(id, json);
-        VersionVO vo = new VersionVO();
-        vo.setPipelineId(id);
-        vo.setVersionNo(newVersion);
-        vo.setChangeNote(changeNote);
-        return vo;
+        PipelineDefinitionDTO dto = JsonUtil.toBean(
+                pipelineStageService.loadDefinitionJson(id, target), PipelineDefinitionDTO.class);
+        if (dto == null) {
+            throw new ServiceException("回退版本内容缺失，无法回退");
+        }
+        boolean changed = persistDefinition(pipeline, dto.getStages() == null ? List.of() : dto.getStages());
+        PipelineJobSyncService.SyncOutcome outcome = changed ? jobSyncService.sync(id) : null;
+        return versionVo(id, changeNote, outcome, pipeline.getStatus());
     }
 
     @Override
@@ -239,31 +279,71 @@ public class PipelineServiceImpl extends ServiceImpl<PipelineMapper, Pipeline> i
         return result;
     }
 
+    // ==================== 内部实现 ====================
+
     /**
-     * 解析定义 JSON 后创建新版本，供 JSON 文本入参的版本保存与回退使用。
+     * 定义落库（含变更检测）：与库内当前定义做规范化 JSON 比对，内容未变更不建新版本；
+     * 空列表 = 显式清空（建空版本，同步时生成空脚本并禁用 Job）。
+     *
+     * @return 定义是否发生变化（产生新版本）
      */
-    private void createVersion(Long pipelineId, String definitionJson) {
-        PipelineDefinitionDTO dto;
-        try {
-            dto = JsonUtil.toBean(definitionJson, PipelineDefinitionDTO.class);
-        } catch (Exception e) {
-            throw new ServiceException("流水线定义不是合法的 JSON");
+    private boolean persistDefinition(Pipeline pipeline, List<PipelineStageDTO> stages) {
+        Long pipelineId = pipeline.getId();
+        PipelineDefinitionDTO incoming = new PipelineDefinitionDTO();
+        incoming.setStages(stages);
+        Integer currentVersion = pipeline.getVersion();
+        if (currentVersion == null || currentVersion == 0) {
+            if (stages.isEmpty()) {
+                return false;
+            }
+            createVersion(pipelineId, incoming);
+            return true;
         }
-        if (dto == null) {
-            throw new ServiceException("流水线定义格式错误");
+        PipelineDefinitionDTO current = pipelineStageService.loadDefinition(pipelineId, currentVersion);
+        if (ObjUtil.equals(JsonUtil.toJson(current), JsonUtil.toJson(incoming))) {
+            return false;
         }
-        createVersion(pipelineId, dto);
+        createVersion(pipelineId, incoming);
+        return true;
     }
 
     /**
-     * 创建新版本：结构化定义落库到阶段/任务表并更新流水线当前版本号。
+     * 创建新版本：版本号在事务内 CAS 自增后，把结构化定义写入阶段/任务表，失败一起回滚。
      */
     private void createVersion(Long pipelineId, PipelineDefinitionDTO dto) {
-        Pipeline pipeline = getById(pipelineId);
-        int version = (pipeline.getVersion() == null ? 0 : pipeline.getVersion()) + 1;
-        pipelineStageService.saveDefinition(pipelineId, version, dto);
-        pipeline.setVersion(version);
-        updateById(pipeline);
+        Object lock = versionLocks.computeIfAbsent(pipelineId, key -> new Object());
+        synchronized (lock) {
+            transactionTemplate.executeWithoutResult(tx -> {
+                Pipeline pipeline = getById(pipelineId);
+                int current = pipeline.getVersion() == null ? 0 : pipeline.getVersion();
+                boolean updated = update(Wrappers.<Pipeline>lambdaUpdate()
+                        .eq(Pipeline::getId, pipelineId)
+                        .eq(Pipeline::getVersion, current)
+                        .set(Pipeline::getVersion, current + 1));
+                if (!updated) {
+                    throw new ServiceException("流水线版本并发更新冲突，请重试保存");
+                }
+                pipelineStageService.saveDefinition(pipelineId, current + 1, dto);
+            });
+        }
+    }
+
+    private VersionVO versionVo(Long id, String changeNote,
+                                PipelineJobSyncService.SyncOutcome outcome, Integer fallbackStatus) {
+        Pipeline latest = getById(id);
+        VersionVO vo = new VersionVO();
+        vo.setPipelineId(id);
+        vo.setVersionNo(latest.getVersion());
+        vo.setChangeNote(changeNote);
+        vo.setStatus(outcome == null ? fallbackStatus : outcome.status());
+        return vo;
+    }
+
+    private String composeMessage(String base, PipelineJobSyncService.SyncOutcome outcome) {
+        if (outcome.synced()) {
+            return base;
+        }
+        return base + "，但 Jenkins 同步失败：" + outcome.message() + "，可稍后重试同步";
     }
 
     private PipelineStageVO stageVo(PipelineStageDTO stage) {

@@ -1,34 +1,30 @@
 package com.ferry.devops.biz.integration.jenkins;
 
-import com.ferry.common.core.exception.ServiceException;
 import com.ferry.common.core.exception.UtilException;
-import com.ferry.common.core.utils.HttpUtil;
 import com.ferry.common.core.utils.JsonUtil;
 import com.ferry.common.core.utils.StrUtil;
 import com.ferry.devops.biz.config.DevopsIntegrationProperties;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
+import org.w3c.dom.Document;
 import tools.jackson.databind.JsonNode;
 
-import java.io.IOException;
-import java.io.InputStream;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Base64;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Jenkins 客户端实现：一个应用一个 Job，缺失时按模板自动创建；一次运行触发一次构建，
- * 由 Jenkinsfile 内部顺序执行多个 CI 阶段，Ferry 轮询构建/阶段状态。
+ * Jenkins 客户端实现。
+ *
+ * <p>职责分离：{@link #syncJob} 负责创建/更新 Pipeline Job（读取现有 config.xml 验证类型与归属后
+ * 仅改 Ferry 托管字段），{@link #triggerBuild} 只负责以参数触发构建（要求 Job 已同步）。
+ * 一次运行触发一次构建，由生成的声明式脚本顺序执行 CI 阶段，Ferry 轮询构建/阶段状态。
  *
  * <p>未配置 Jenkins 基址时降级为日志模拟；真实调用使用 Cookie 会话 + CSRF crumb。
  * 下发失败区分“明确失败”和“结果待确认”，由调用方决定运行最终状态。
@@ -39,23 +35,70 @@ import java.util.regex.Pattern;
 class JenkinsClientImpl implements JenkinsClient {
 
     private static final Pattern QUEUE_ITEM_PATTERN = Pattern.compile("/queue/item/(\\d+)/?");
-    private static final Pattern APP_CODE_PATTERN = Pattern.compile("[A-Za-z0-9][A-Za-z0-9-]{0,63}");
-    private static final String JOB_TEMPLATE_PATH = "jenkins/ferry-job-template.xml";
     private static final String DEFAULT_BUILD_PATH = "/job/{job}/buildWithParameters";
     private static final int QUEUE_POLLS = 5;
     private static final long QUEUE_POLL_INTERVAL_MS = 300L;
 
     private final DevopsIntegrationProperties properties;
-    private final Set<String> ensuredJobs = ConcurrentHashMap.newKeySet();
-    private final Object ensureLock = new Object();
+
     private volatile JenkinsHttpClient httpClient;
     private volatile String httpClientKey;
-    private volatile String jobTemplate;
 
     @Override
-    public JenkinsDispatchResult triggerBuild(Long runId, String snapshot, BuildSource source, String stageSpec) {
+    public JenkinsDispatchResult syncJob(String jobName, String appCode, String script, boolean disabled) {
         DevopsIntegrationProperties.Jenkins cfg = properties.getJenkins();
-        String jobName = resolveJobName(source);
+        if (cfg == null || StrUtil.isBlank(cfg.getBaseUrl())) {
+            log.info("Jenkins syncJob (mock): jobName={}, disabled={}", jobName, disabled);
+            return new JenkinsDispatchResult(jobName, null, null);
+        }
+        JenkinsHttpClient http = httpClient(cfg);
+        String configPath = "/job/" + encode(jobName) + "/config.xml";
+        JenkinsHttpClient.HttpResult existing = http.get(configPath);
+        if (existing.status() == 404) {
+            if (!cfg.isAutoCreateJob()) {
+                throw new JenkinsDispatchException("Jenkins Job 不存在且未开启自动创建：" + jobName, false);
+            }
+            String xml = JenkinsJobXml.buildMinimalJobXml(jobName, appCode, script, disabled);
+            JenkinsHttpClient.HttpResult created =
+                    http.postXml("/createItem?name=" + encode(jobName), xml);
+            if (created.isOk()) {
+                log.info("Jenkins job created: jobName={}, disabled={}", jobName, disabled);
+                return new JenkinsDispatchResult(jobName, null, null);
+            }
+            // 400/409：并发创建或同名冲突，回读配置校验归属后走更新路径
+            log.info("Jenkins job create conflicted (HTTP {}), fallback to update: jobName={}",
+                    created.status(), jobName);
+            existing = http.get(configPath);
+            if (existing.status() == 404) {
+                throw new JenkinsDispatchException(
+                        "创建 Jenkins Job 失败：" + jobName + "，HTTP " + created.status(),
+                        isUncertain(created.status()));
+            }
+        }
+        if (!existing.isOk()) {
+            throw new JenkinsDispatchException(
+                    "读取 Jenkins Job 配置失败：" + jobName + "，HTTP " + existing.status(),
+                    isUncertain(existing.status()));
+        }
+        // 类型与归属校验：非 Pipeline Job 或非 Ferry 管理的同名 Job 一律拒绝覆盖
+        Document doc = JenkinsJobXml.loadManagedConfig(existing.body(), jobName);
+        if (doc == null) {
+            throw new JenkinsDispatchException("Jenkins Job 非 Ferry 管理，拒绝覆盖：" + jobName, false);
+        }
+        String xml = JenkinsJobXml.applyFerryConfig(doc, script, disabled);
+        JenkinsHttpClient.HttpResult updated = http.postXml(configPath, xml);
+        if (!updated.isOk()) {
+            throw new JenkinsDispatchException(
+                    "更新 Jenkins Job 失败：" + jobName + "，HTTP " + updated.status(),
+                    isUncertain(updated.status()));
+        }
+        log.info("Jenkins job synced: jobName={}, disabled={}", jobName, disabled);
+        return new JenkinsDispatchResult(jobName, null, null);
+    }
+
+    @Override
+    public JenkinsDispatchResult triggerBuild(Long runId, String snapshot, String jobName, BuildSource source) {
+        DevopsIntegrationProperties.Jenkins cfg = properties.getJenkins();
         if (cfg == null || StrUtil.isBlank(cfg.getBaseUrl())) {
             // 降级：未配置 Jenkins 基址时保持模拟日志
             log.info("Jenkins trigger (mock): runId={}, jobName={}, branch={}, commitId={}",
@@ -63,15 +106,12 @@ class JenkinsClientImpl implements JenkinsClient {
             return new JenkinsDispatchResult(jobName, null, null);
         }
         JenkinsHttpClient http = httpClient(cfg);
-        ensureJob(http, cfg, jobName, source);
         String path = buildPath(cfg, jobName);
-        Map<String, String> params = buildParams(runId, snapshot, source, stageSpec, cfg);
+        Map<String, String> params = buildParams(runId, snapshot, source, cfg);
         JenkinsHttpClient.HttpResult response = http.postForm(path, params);
         if (response.status() == 404) {
-            // Job 可能被外部删除：重建后重试一次
-            ensuredJobs.remove(jobName);
-            ensureJob(http, cfg, jobName, source);
-            response = http.postForm(path, params);
+            // Job 只由保存同步创建，触发路径不做自动重建
+            throw new JenkinsDispatchException("Jenkins Job 不存在或未同步，请先保存流水线触发同步：" + jobName, false);
         }
         if (!response.isOk()) {
             throw new JenkinsDispatchException("Jenkins 触发构建失败：" + jobName + "，HTTP " + response.status(),
@@ -85,7 +125,7 @@ class JenkinsClientImpl implements JenkinsClient {
     }
 
     @Override
-    public Long resolveQueueBuild(String appCode, Long queueId) {
+    public Long resolveQueueBuild(String jobName, Long queueId) {
         DevopsIntegrationProperties.Jenkins cfg = properties.getJenkins();
         if (cfg == null || StrUtil.isBlank(cfg.getBaseUrl()) || queueId == null) {
             return null;
@@ -104,16 +144,14 @@ class JenkinsClientImpl implements JenkinsClient {
     }
 
     @Override
-    public JenkinsBuildStatus buildStatus(String appCode, Long buildNo) {
+    public JenkinsBuildStatus buildStatus(String jobName, Long buildNo) {
         DevopsIntegrationProperties.Jenkins cfg = properties.getJenkins();
         if (cfg == null || StrUtil.isBlank(cfg.getBaseUrl())) {
             throw new JenkinsDispatchException("Jenkins 未配置，无法查询构建状态", false);
         }
-        String jobName = resolveJobName(appCode);
         JenkinsHttpClient http = httpClient(cfg);
-        String path = "/job/" + encode(jobName) + "/" + buildNo
-                + "/api/json?tree=building,result,timestamp,duration";
-        JenkinsHttpClient.HttpResult response = http.get(path);
+        JenkinsHttpClient.HttpResult response = http.get("/job/" + encode(jobName) + "/" + buildNo
+                + "/api/json?tree=building,result,timestamp,duration");
         if (!response.isOk()) {
             throw new JenkinsDispatchException("查询 Jenkins 构建失败：" + jobName + " #" + buildNo
                     + "，HTTP " + response.status(), isUncertain(response.status()));
@@ -140,6 +178,29 @@ class JenkinsClientImpl implements JenkinsClient {
         }
         return new JenkinsBuildStatus(buildNo, building, result, timestamp, duration,
                 fetchStageStatuses(http, jobName, buildNo));
+    }
+
+    @Override
+    public void abortBuild(String jobName, Long buildNo) {
+        DevopsIntegrationProperties.Jenkins cfg = properties.getJenkins();
+        if (cfg == null || StrUtil.isBlank(cfg.getBaseUrl())) {
+            log.info("Jenkins abort (mock): jobName={}, buildNo={}", jobName, buildNo);
+            return;
+        }
+        if (buildNo == null) {
+            // 构建号尚未分配（仍在队列），无可中止对象，运行状态由轮询/取消标记收口
+            log.info("Jenkins abort skipped (no buildNo): jobName={}", jobName);
+            return;
+        }
+        JenkinsHttpClient http = httpClient(cfg);
+        JenkinsHttpClient.HttpResult response =
+                http.postForm("/job/" + encode(jobName) + "/" + buildNo + "/stop", Map.of());
+        if (!response.isOk()) {
+            throw new JenkinsDispatchException(
+                    "Jenkins 中止构建失败：" + jobName + "#" + buildNo + "，HTTP " + response.status(),
+                    isUncertain(response.status()));
+        }
+        log.info("Jenkins abort ok: jobName={}, buildNo={}", jobName, buildNo);
     }
 
     /**
@@ -169,83 +230,8 @@ class JenkinsClientImpl implements JenkinsClient {
         return stages;
     }
 
-    @Override
-    public void abortBuild(Long runId, Long buildNo) {
-        DevopsIntegrationProperties.Jenkins cfg = properties.getJenkins();
-        if (cfg == null || StrUtil.isBlank(cfg.getBaseUrl())) {
-            log.info("Jenkins abort (mock): runId={}, buildNo={}", runId, buildNo);
-            return;
-        }
-        // 运行级 buildNo 尚未接线，保留原有 stop 调用；后续按应用 Job + 阶段构建号再收敛
-        String url = trimTrailingSlash(cfg.getBaseUrl()) + "/build/" + (buildNo == null ? "" : buildNo) + "/stop";
-        Map<String, String> headers = authHeaders(cfg);
-        log.info("Jenkins abort: runId={}, buildNo={}, url={}", runId, buildNo, url);
-        try {
-            HttpUtil.Response resp = HttpUtil.post(url, null, headers);
-            if (!resp.isOk()) {
-                throw new ServiceException("Jenkins 中止失败: HTTP " + resp.status());
-            }
-            log.info("Jenkins abort ok: runId={}, buildNo={}, status={}", runId, buildNo, resp.status());
-        } catch (UtilException e) {
-            log.error("Jenkins 中止失败: runId={}, buildNo={}", runId, buildNo, e);
-            throw new ServiceException("Jenkins 中止失败: " + e.getMessage());
-        }
-    }
-
-    /**
-     * 确保 Job 存在：先查，404 时按模板创建；并发创建冲突则重新确认。
-     */
-    private void ensureJob(JenkinsHttpClient http, DevopsIntegrationProperties.Jenkins cfg,
-                           String jobName, BuildSource source) {
-        if (ensuredJobs.contains(jobName)) {
-            return;
-        }
-        synchronized (ensureLock) {
-            if (ensuredJobs.contains(jobName)) {
-                return;
-            }
-            String jobPath = "/job/" + encode(jobName) + "/api/json";
-            JenkinsHttpClient.HttpResult exists = http.get(jobPath);
-            if (exists.status() == 200) {
-                // 旧模板创建的 Job 参数不匹配时按新模板更新，避免必须手工删除
-                if (cfg.isAutoCreateJob() && managedAndOutdated(http, jobName)) {
-                    String xml = renderJobTemplate(jobName, source.appCode());
-                    JenkinsHttpClient.HttpResult updated = http.postXml("/job/" + encode(jobName) + "/config.xml", xml);
-                    if (!updated.isOk()) {
-                        throw new JenkinsDispatchException("更新 Jenkins Job 失败：" + jobName
-                                + "，HTTP " + updated.status(), isUncertain(updated.status()));
-                    }
-                    log.info("Jenkins job updated: {}", jobName);
-                }
-                ensuredJobs.add(jobName);
-                return;
-            }
-            if (exists.status() != 404) {
-                throw new JenkinsDispatchException("检查 Jenkins Job 失败：" + jobName + "，HTTP " + exists.status(),
-                        isUncertain(exists.status()));
-            }
-            if (!cfg.isAutoCreateJob()) {
-                throw new JenkinsDispatchException("Jenkins Job 不存在且未开启自动创建：" + jobName, false);
-            }
-            String xml = renderJobTemplate(jobName, source.appCode());
-            JenkinsHttpClient.HttpResult created = http.postXml("/createItem?name=" + encode(jobName), xml);
-            if (created.isOk()) {
-                ensuredJobs.add(jobName);
-                log.info("Jenkins job created: {}", jobName);
-                return;
-            }
-            // 并发创建时可能返回 400/409，重新确认一次即可
-            JenkinsHttpClient.HttpResult recheck = http.get(jobPath);
-            if (recheck.status() == 200) {
-                ensuredJobs.add(jobName);
-                return;
-            }
-            throw new JenkinsDispatchException("创建 Jenkins Job 失败：" + jobName + "，HTTP " + created.status(), false);
-        }
-    }
-
     private Map<String, String> buildParams(Long runId, String snapshot, BuildSource source,
-                                            String stageSpec, DevopsIntegrationProperties.Jenkins cfg) {
+                                            DevopsIntegrationProperties.Jenkins cfg) {
         Map<String, String> params = new LinkedHashMap<>();
         params.put("RUN_ID", String.valueOf(runId));
         params.put("APP_CODE", source.appCode());
@@ -256,7 +242,6 @@ class JenkinsClientImpl implements JenkinsClient {
         params.put("REPO_URL", source.repoUrl());
         params.put("SNAPSHOT", snapshot);
         params.put("GIT_CREDENTIALS_ID", cfg.getGitCredentialsId());
-        params.put("STAGE_SPEC", stageSpec);
         return params;
     }
 
@@ -264,40 +249,6 @@ class JenkinsClientImpl implements JenkinsClient {
         String template = StrUtil.isBlank(cfg.getBuildPath()) ? DEFAULT_BUILD_PATH : cfg.getBuildPath().trim();
         String path = template.replace("{job}", jobName);
         return path.startsWith("/") ? path : "/" + path;
-    }
-
-    /**
-     * Job 名直接使用应用编码；编码限制为字母/数字/中划线，避免路径注入。
-     */
-    private String resolveJobName(BuildSource source) {
-        return resolveJobName(source == null ? null : source.appCode());
-    }
-
-    private String resolveJobName(String appCode) {
-        String code = appCode == null ? "" : appCode.trim();
-        if (StrUtil.isBlank(code) || !APP_CODE_PATTERN.matcher(code).matches()) {
-            throw new JenkinsDispatchException("应用编码不合法，无法生成 Jenkins Job：" + code, false);
-        }
-        return code;
-    }
-
-    /**
-     * 仅更新 Ferry 自动创建的 Job，且只在参数结构不匹配时更新，避免覆盖人工修改。
-     *
-     * <p>直接读 config.xml 做关键字判断，避免依赖不同 Jenkins 版本的 tree 查询能力。
-     */
-    private boolean managedAndOutdated(JenkinsHttpClient http, String jobName) {
-        JenkinsHttpClient.HttpResult config = http.get("/job/" + encode(jobName) + "/config.xml");
-        if (!config.isOk()) {
-            log.debug("read Jenkins job config failed: job={}, HTTP={}", jobName, config.status());
-            return false;
-        }
-        String xml = config.body();
-        return xml != null
-                && xml.contains("Ferry 自动创建")
-                && (!xml.contains("STAGE_SPEC")
-                || xml.contains("STAGE_ID")
-                || xml.contains("CALLBACK_URL"));
     }
 
     private Long parseQueueId(String location) {
@@ -347,33 +298,6 @@ class JenkinsClientImpl implements JenkinsClient {
         return null;
     }
 
-    private String renderJobTemplate(String jobName, String appCode) {
-        return jobTemplate()
-                .replace("{{APP_CODE}}", xmlEscape(appCode))
-                .replace("{{JOB_NAME}}", xmlEscape(jobName));
-    }
-
-    private String jobTemplate() {
-        String cached = jobTemplate;
-        if (cached != null) {
-            return cached;
-        }
-        synchronized (this) {
-            if (jobTemplate != null) {
-                return jobTemplate;
-            }
-            try (InputStream input = getClass().getClassLoader().getResourceAsStream(JOB_TEMPLATE_PATH)) {
-                if (input == null) {
-                    throw new JenkinsDispatchException("缺少 Jenkins Job 模板：" + JOB_TEMPLATE_PATH, false);
-                }
-                jobTemplate = new String(input.readAllBytes(), StandardCharsets.UTF_8);
-                return jobTemplate;
-            } catch (IOException e) {
-                throw new JenkinsDispatchException("读取 Jenkins Job 模板失败", false, e);
-            }
-        }
-    }
-
     private JenkinsHttpClient httpClient(DevopsIntegrationProperties.Jenkins cfg) {
         String key = cfg.getBaseUrl() + "|" + cfg.getUser() + "|" + cfg.getToken();
         JenkinsHttpClient current = httpClient;
@@ -386,8 +310,6 @@ class JenkinsClientImpl implements JenkinsClient {
             }
             httpClient = new JenkinsHttpClient(cfg.getBaseUrl(), cfg.getUser(), cfg.getToken());
             httpClientKey = key;
-            // 基址/凭据变化后本地 Job 存在性缓存不再可信
-            ensuredJobs.clear();
             return httpClient;
         }
     }
@@ -396,31 +318,7 @@ class JenkinsClientImpl implements JenkinsClient {
         return status >= 500 || status == 408;
     }
 
-    private String xmlEscape(String value) {
-        return value == null ? "" : value
-                .replace("&", "&amp;")
-                .replace("<", "&lt;")
-                .replace(">", "&gt;")
-                .replace("\"", "&quot;")
-                .replace("'", "&apos;");
-    }
-
     private String encode(String value) {
         return URLEncoder.encode(value == null ? "" : value, StandardCharsets.UTF_8);
-    }
-
-    /** user:token 做 Basic 认证头；未配置凭据时不带头（匿名 Jenkins 或仅日志环境） */
-    private Map<String, String> authHeaders(DevopsIntegrationProperties.Jenkins cfg) {
-        Map<String, String> headers = new HashMap<>();
-        if (StrUtil.isNotBlank(cfg.getUser()) && StrUtil.isNotBlank(cfg.getToken())) {
-            String basic = Base64.getEncoder().encodeToString(
-                    (cfg.getUser() + ":" + cfg.getToken()).getBytes(StandardCharsets.UTF_8));
-            headers.put("Authorization", "Basic " + basic);
-        }
-        return headers;
-    }
-
-    private String trimTrailingSlash(String s) {
-        return s.endsWith("/") ? s.substring(0, s.length() - 1) : s;
     }
 }

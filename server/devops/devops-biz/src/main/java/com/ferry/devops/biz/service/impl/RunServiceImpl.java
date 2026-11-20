@@ -30,6 +30,7 @@ import com.ferry.devops.api.entity.RunTask;
 import com.ferry.devops.api.entity.RunTrigger;
 import com.ferry.devops.api.enums.BlockReasonEnum;
 import com.ferry.devops.api.enums.DevopsStateMachine;
+import com.ferry.devops.api.enums.PipelineStatusEnum;
 import com.ferry.devops.api.enums.RunStatusEnum;
 import com.ferry.devops.api.enums.StageStatusEnum;
 import com.ferry.devops.api.enums.TriggerResultEnum;
@@ -39,10 +40,12 @@ import com.ferry.devops.api.vo.RunDetailVO;
 import com.ferry.devops.api.vo.RunStageVO;
 import com.ferry.devops.api.vo.RunTaskVO;
 import com.ferry.devops.api.vo.TriggerResultVO;
+import com.ferry.devops.api.vo.VersionVO;
 import com.ferry.devops.biz.integration.jenkins.BuildSource;
 import com.ferry.devops.biz.integration.jenkins.JenkinsClient;
 import com.ferry.devops.biz.integration.jenkins.JenkinsDispatchException;
 import com.ferry.devops.biz.integration.jenkins.JenkinsDispatchResult;
+import com.ferry.devops.biz.integration.jenkins.JenkinsJobNames;
 import com.ferry.devops.biz.mapper.AppMapper;
 import com.ferry.devops.biz.mapper.PipelineMapper;
 import com.ferry.devops.biz.mapper.PipelineStageMapper;
@@ -55,6 +58,7 @@ import com.ferry.devops.biz.mapper.RunPrecheckMapper;
 import com.ferry.devops.biz.mapper.RunStageMapper;
 import com.ferry.devops.biz.mapper.RunTaskMapper;
 import com.ferry.devops.biz.mapper.RunTriggerMapper;
+import com.ferry.devops.biz.service.IPipelineService;
 import com.ferry.devops.biz.service.IPipelineStageService;
 import com.ferry.devops.biz.service.IRunService;
 import com.ferry.devops.biz.wrapper.RunWrapper;
@@ -104,6 +108,7 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
     private final RunIdempotencyMapper idempotencyMapper;
     private final JenkinsClient jenkinsClient;
     private final AppMapper appMapper;
+    private final IPipelineService pipelineService;
 
     /**
      * 触发生效的代码源。
@@ -377,7 +382,10 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
         updateById(run);
         writeOperation(id, 3, reason);
         if (run.getJenkinsBuildNo() != null) {
-            jenkinsClient.abortBuild(id, run.getJenkinsBuildNo());
+            String jobName = resolveRunJobName(run);
+            if (jobName != null) {
+                jenkinsClient.abortBuild(jobName, run.getJenkinsBuildNo());
+            }
         }
         return true;
     }
@@ -409,11 +417,26 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
         List<RunStage> oldStages = stageMapper.selectByRun(original.getId());
         // 复用范围：fromStageId 之前且成功的阶段；未指定则从首个失败阶段算起
         int fromSeq = resolveFromSeq(oldStages, body.getFromStageId());
-        // 新建运行（不覆盖原运行）
+        // 旧版本重跑先回退生成当前版本：复制运行时定义为新版本并同步 Job，避免新脚本跑旧阶段快照
+        Pipeline pipeline = pipelineMapper.selectById(original.getPipelineId());
+        if (pipeline == null) {
+            throw new ServiceException("流水线不存在，无法重跑");
+        }
+        if (original.getPipelineVersion() == null) {
+            throw new ServiceException("原运行缺少版本信息，无法自动回退重跑");
+        }
+        if (!ObjUtil.equals(pipeline.getVersion(), original.getPipelineVersion())) {
+            VersionVO rolled = pipelineService.rollback(original.getPipelineId(),
+                    Long.valueOf(original.getPipelineVersion()), "断点重跑自动回退");
+            if (!ObjUtil.equals(rolled.getStatus(), PipelineStatusEnum.ENABLED.getCode())) {
+                throw new ServiceException("自动回退后 Jenkins 同步未成功，请稍后重试重跑");
+            }
+        }
+        // 新建运行（不覆盖原运行），固定到回退后的当前版本
         Run run = new Run();
         run.setRunNo(generateRunNo());
         run.setPipelineId(original.getPipelineId());
-        run.setPipelineVersion(original.getPipelineVersion());
+        run.setPipelineVersion(pipelineMapper.selectById(original.getPipelineId()).getVersion());
         run.setAppId(original.getAppId());
         run.setBranch(original.getBranch());
         run.setCommitId(original.getCommitId());
@@ -505,18 +528,24 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
         }
         items.add(item(3, commitOk, commitDetail));
 
-        // 4 定义匹配：流水线启用 + 存在当前版本 + 定义中无空阶段/空任务
+        // 4 定义匹配：流水线启用（含已同步语义）+ 存在当前版本 + 定义中无空阶段/空任务/空命令
         Pipeline pipeline = pipelineMapper.selectById(pipelineId);
-        boolean defOk = pipeline != null && ObjUtil.equals(pipeline.getStatus(), IntConst.ONE)
+        PipelineStatusEnum pipelineStatus = pipeline == null ? null : PipelineStatusEnum.of(pipeline.getStatus());
+        boolean defOk = pipeline != null && PipelineStatusEnum.ENABLED == pipelineStatus
                 && ObjUtil.isNotEmpty(pipeline.getVersion());
         String defDetail;
         if (!defOk) {
-            defDetail = "流水线未启用或无当前版本";
+            defDetail = switch (pipelineStatus == null ? PipelineStatusEnum.DISABLED : pipelineStatus) {
+                case PENDING_CONFIG -> "流水线待配置：请先在画布完成定义并保存同步";
+                case SYNC_FAILED -> "Jenkins 同步失败：请重试同步后再触发";
+                case DISABLED -> "流水线已停用";
+                case ENABLED -> "流水线无当前版本";
+            };
         } else {
             // 保存阶段允许空任务，运行时才拦截：给出明确提示让用户在画布补齐后再触发
             defDetail = checkRunnableDefinition(pipeline.getId(), pipeline.getVersion());
             if (defDetail == null) {
-                defDetail = "流水线已启用且存在当前版本";
+                defDetail = "流水线已启用且脚本已同步";
             } else {
                 defOk = false;
             }
@@ -654,6 +683,16 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
             if (stage.getTasks() == null || stage.getTasks().isEmpty()) {
                 return "第 " + seq + " 个阶段「" + stage.getName() + "」未添加任务，请先在画布中补充";
             }
+            // CI 阶段（1-4）须至少一个 jenkins 任务带可执行命令，否则生成的脚本为空命令
+            if (stage.getType() != null && stage.getType() <= 4) {
+                boolean hasCommand = stage.getTasks().stream()
+                        .filter(t -> t.getExecutor() == null || "jenkins".equalsIgnoreCase(t.getExecutor()))
+                        .anyMatch(t -> StrUtil.isNotBlank(t.getScriptContent())
+                                || StrUtil.isNotBlank(t.getScriptRef()));
+                if (!hasCommand) {
+                    return "第 " + seq + " 个 CI 阶段「" + stage.getName() + "」缺少可执行的 Jenkins 命令";
+                }
+            }
             seq++;
         }
         return null;
@@ -698,24 +737,29 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
             markRunFailed(latest);
             return;
         }
-        String jobName = app.getCode().trim();
-        BuildSource source = new BuildSource(jobName, app.getRepoUrl(), latest.getBranch(),
-                latest.getCommitId(), latest.getRefType(), latest.getRefValue());
-        PipelineDefinitionDTO definition;
-        try {
-            definition = pipelineStageService.loadDefinition(latest.getPipelineId(), latest.getPipelineVersion());
-        } catch (RuntimeException e) {
-            log.error("load pipeline definition failed: runId={}, pipelineId={}, version={}",
-                    latest.getId(), latest.getPipelineId(), latest.getPipelineVersion(), e);
+        // 并发兜底：触发后若有并发保存推进版本或同步失败，Job 脚本与运行固定版本不一致，禁止旧脚本触发
+        Pipeline pipeline = pipelineMapper.selectById(latest.getPipelineId());
+        if (pipeline == null
+                || !ObjUtil.equals(pipeline.getStatus(), PipelineStatusEnum.ENABLED.getCode())
+                || !ObjUtil.equals(pipeline.getVersion(), latest.getPipelineVersion())) {
+            log.warn("Jenkins trigger aborted: pipeline state changed, runId={}, runVersion={}, pipelineVersion={}, status={}",
+                    latest.getId(), latest.getPipelineVersion(),
+                    pipeline == null ? null : pipeline.getVersion(),
+                    pipeline == null ? null : pipeline.getStatus());
             markRunFailed(latest);
             return;
         }
-        String stageSpec = PipelineScriptRenderer.buildStageSpec(definition);
+        String appCode = app.getCode().trim();
+        String jobName = JenkinsJobNames.pipelineJobName(appCode, latest.getPipelineId());
+        BuildSource source = new BuildSource(appCode, app.getRepoUrl(), latest.getBranch(),
+                latest.getCommitId(), latest.getRefType(), latest.getRefValue());
         try {
             JenkinsDispatchResult result = jenkinsClient.triggerBuild(latest.getId(),
-                    "snapshot:" + latest.getPipelineVersion(), source, stageSpec);
+                    "snapshot:" + latest.getPipelineVersion(), jobName, source);
             latest.setJenkinsBuildNo(result.buildNo());
             latest.setJenkinsQueueId(result.queueId());
+            // 记录实际构建的 Job 名，供轮询/中止使用；旧数据回退应用编码 Job
+            latest.setJobName(result.jobName());
             runMapper.updateById(latest);
             log.info("Jenkins build triggered: runId={}, jobName={}, queueId={}, buildNo={}",
                     latest.getId(), result.jobName(), result.queueId(), result.buildNo());
@@ -728,6 +772,17 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
                 markRunFailed(latest);
             }
         }
+    }
+
+    /**
+     * 运行实际构建的 Job 名：新运行记录于 run.job_name；旧数据回退应用编码 Job（旧命名协议）。
+     */
+    private String resolveRunJobName(Run run) {
+        if (StrUtil.isNotBlank(run.getJobName())) {
+            return run.getJobName();
+        }
+        App app = appMapper.selectById(run.getAppId());
+        return app == null || StrUtil.isBlank(app.getCode()) ? null : app.getCode().trim();
     }
 
 

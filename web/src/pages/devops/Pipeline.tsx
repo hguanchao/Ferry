@@ -19,6 +19,13 @@ const RUN_STATUS_LABEL: Record<number, string> = {
   1: '排队中', 2: '运行中', 3: '阻塞', 4: '成功', 5: '失败', 6: '超时', 7: '已取消', 8: '结果待确认',
 }
 const CONCLUSION_LABEL: Record<number, string> = { 1: '通过', 2: '不通过', 3: '合并', 4: '复用' }
+/** 流水线状态（含 Jenkins 同步态，与后端 dev_pipeline.status 口径一致） */
+const PIPELINE_STATUS: Record<number, { label: string; color: string }> = {
+  0: { label: '停用', color: 'default' },
+  1: { label: '启用', color: 'green' },
+  2: { label: '待配置', color: 'orange' },
+  3: { label: '同步失败', color: 'red' },
+}
 
 interface TriggerValues {
   appId: string
@@ -86,7 +93,8 @@ export default function Pipeline() {
   const [stages, setStages] = useState<PipelineStageDef[]>([])
   const [previewOpen, setPreviewOpen] = useState(false)
   const [preview, setPreview] = useState<PipelinePreview | null>(null)
-  const originalDefinitionRef = useRef<string>('')
+  // 用户是否手动改过画布：为 true 时定义回填不再覆盖草稿（防缓存回填吞掉草稿）
+  const draftDirtyRef = useRef(false)
 
   const query = useQuery({
     queryKey: ['pipelines', filters, page],
@@ -161,26 +169,23 @@ export default function Pipeline() {
           ? `默认取应用登记提交：${triggerApp.repoCommitId}`
           : '应用未登记默认提交，请选择或手动填写'
 
-  const invalidate = () => void queryClient.invalidateQueries({ queryKey: ['pipelines'] })
+  const invalidate = () => {
+    void queryClient.invalidateQueries({ queryKey: ['pipelines'] })
+    void queryClient.invalidateQueries({ queryKey: ['pipeline-definition'] })
+  }
 
-  // 保存：新建时 stages 随档案一起提交作为初版定义；编辑时先存档案再存定义生成新版本
+  // 保存：单一请求同时提交档案与 stages（空数组=显式清空旧脚本），后端内容比对决定是否生成新版本并同步 Job
   const saveMutation = useMutation({
     mutationFn: async (values: Record<string, unknown>) => {
-      const definition = stages.length ? buildDefinition(stages) : undefined
-      const text = await pipelineApi.save({ ...values, ...(stages.length ? { stages } : {}) })
-      return { text, base: values, definition, isNew: !values.id }
+      const text = await pipelineApi.save({ ...values, stages })
+      return text
     },
-    onSuccess: async ({ text, base, definition, isNew }) => {
-      // 编辑场景：仅当阶段定义确实变化时才保存生成新版本（避免"内容未变更"报错）
-      if (!isNew && definition && definition !== originalDefinitionRef.current) {
-        try {
-          await pipelineApi.saveDefinition({ id: base.id, definition, mode: 1, changeNote: '画布编辑阶段配置' })
-        } catch (error) {
-          showError(error)
-        }
-      }
-      message.success(text || '保存成功')
-      setOpen(false)
+    onSuccess: (text) => {
+      // 同步失败已在服务端落「同步失败」状态并记日志：提示但不算保存失败
+      if (text?.includes('同步失败')) message.warning(text)
+      else message.success(text || '保存成功')
+      draftDirtyRef.current = false
+      closeEditor()
       invalidate()
     },
     onError: showError,
@@ -207,14 +212,31 @@ export default function Pipeline() {
     onSuccess: (text) => { message.success(text || '删除成功'); invalidate() },
     onError: showError,
   })
+  const syncMutation = useMutation({
+    mutationFn: (id: string) => pipelineApi.syncRetry(id),
+    onSuccess: (text) => {
+      if (text?.includes('同步失败')) message.warning(text)
+      else message.success(text || '同步成功')
+      invalidate()
+    },
+    onError: showError,
+  })
   const enableMutation = useMutation({
     mutationFn: (body: Record<string, unknown>) => pipelineApi.enable(body),
-    onSuccess: (text) => { message.success(text || '操作成功'); invalidate() },
+    onSuccess: (text) => {
+      if (text?.includes('同步失败')) message.warning(text)
+      else message.success(text || '操作成功')
+      invalidate()
+    },
     onError: showError,
   })
   const disableMutation = useMutation({
     mutationFn: (body: Record<string, unknown>) => pipelineApi.disable(body),
-    onSuccess: (text) => { message.success(text || '操作成功'); invalidate() },
+    onSuccess: (text) => {
+      if (text?.includes('同步失败')) message.warning(text)
+      else message.success(text || '操作成功')
+      invalidate()
+    },
     onError: showError,
   })
   const precheckMutation = useMutation({
@@ -253,10 +275,17 @@ export default function Pipeline() {
     && precheck.values.commitId === currentTriggerValues.commitId
     && precheck.values.refType === currentTriggerValues.refType
 
+  // 关闭编辑器：失效当前流水线的定义缓存，保证下次打开拉到最新版本（避免旧缓存回填）
+  const closeEditor = () => {
+    setOpen(false)
+    draftDirtyRef.current = false
+    if (editing) void queryClient.invalidateQueries({ queryKey: ['pipeline-definition', editing.id] })
+  }
+
   const openEditor = (record: PipelineRow | null) => {
     setEditing(record)
     form.resetFields()
-    originalDefinitionRef.current = ''
+    draftDirtyRef.current = false
     if (record) {
       form.setFieldsValue({ id: record.id, appId: record.appId, name: record.name })
     }
@@ -265,11 +294,10 @@ export default function Pipeline() {
     setOpen(true)
   }
 
-  // 编辑时 definition 异步返回后回填画布阶段
+  // 编辑时 definition 异步返回后回填画布阶段；用户已手动编辑过画布则不覆盖草稿
   useEffect(() => {
-    if (editing && definitionQuery.data?.json) {
+    if (editing && definitionQuery.data?.json && !draftDirtyRef.current) {
       const loaded = parseDefinition(definitionQuery.data.json)
-      originalDefinitionRef.current = buildDefinition(loaded)
       if (loaded.length) setStages(loaded)
     }
   }, [editing, definitionQuery.data])
@@ -324,6 +352,14 @@ export default function Pipeline() {
     },
     { title: '当前版本', dataIndex: 'version', render: (v: number) => v ? `V${v}` : '—' },
     { title: '阶段数', dataIndex: 'stageCount', render: (v?: number) => v == null ? '—' : v },
+    {
+      // 状态含 Jenkins 同步态：待配置（无定义/已清空）与同步失败时禁止触发，可重试同步
+      title: '状态', dataIndex: 'status', width: 96,
+      render: (v: number) => {
+        const meta = PIPELINE_STATUS[v]
+        return <Tag color={meta?.color ?? 'default'}>{meta?.label ?? `未知(${v})`}</Tag>
+      },
+    },
     { title: '更新时间', dataIndex: 'updateTime', render: (v?: string) => v || '—' },
     {
       title: '操作',
@@ -349,6 +385,12 @@ export default function Pipeline() {
             <Tooltip title="停用">
               <Button type="link" size="small" icon={<CirclePause size={15} />}
                 onClick={() => disableMutation.mutate({ id: record.id })} />
+            </Tooltip>
+          )}
+          {can('devops:pipeline:save') && record.status === 3 && (
+            <Tooltip title="重新同步 Jenkins Job">
+              <Button type="link" size="small" icon={<RotateCw size={15} />}
+                onClick={() => syncMutation.mutate(record.id)} />
             </Tooltip>
           )}
           {can('devops:pipeline:deleted') && (
@@ -433,15 +475,17 @@ export default function Pipeline() {
       </div>
 
       <Drawer open={open} title={editing ? `编辑流水线 · ${editing.name}` : '新建流水线'}
-        onClose={() => setOpen(false)} width="100%" placement="right"
+        onClose={closeEditor} width="100%" placement="right"
         destroyOnHidden styles={{ body: { padding: 0, display: 'flex', flexDirection: 'column' } }}
         extra={
           <div style={{ display: 'flex', gap: 8 }}>
             <Button icon={<Code2 size={14} />} loading={previewMutation.isPending}
               disabled={!!editing && definitionQuery.isFetching}
               onClick={() => previewMutation.mutate()}>预览脚本</Button>
-            <Button onClick={() => setOpen(false)}>取消</Button>
-            <Button type="primary" loading={saveMutation.isPending} onClick={() => form.submit()}>保存</Button>
+            <Button onClick={closeEditor}>取消</Button>
+            <Button type="primary" loading={saveMutation.isPending}
+              disabled={!!editing && (definitionQuery.isPending || definitionQuery.isFetching)}
+              onClick={() => form.submit()}>保存</Button>
           </div>
         }>
         <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
@@ -463,7 +507,7 @@ export default function Pipeline() {
             </div>
           </Form>
           <div style={{ flex: 1, minHeight: 0, padding: '8px 20px 16px' }}>
-            <PipelineCanvasEditor value={stages} onChange={setStages} />
+            <PipelineCanvasEditor value={stages} onChange={(s) => { draftDirtyRef.current = true; setStages(s) }} />
           </div>
         </div>
       </Drawer>

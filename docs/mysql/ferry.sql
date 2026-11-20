@@ -318,7 +318,7 @@ DROP TABLE IF EXISTS `dev_pipeline`;
 CREATE TABLE `dev_pipeline`  (
   `id` bigint NOT NULL COMMENT '主键id',
   `name` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '流水线名称',
-  `status` tinyint(1) NOT NULL DEFAULT 1 COMMENT '状态 0停用 1启用',
+  `status` tinyint(1) NOT NULL DEFAULT 1 COMMENT '状态 0停用 1启用 2待配置 3同步失败（同步态并入本字段：保存即同步 Jenkins Job，待配置=空定义且 Job 已禁用）',
   `app_id` bigint NOT NULL COMMENT '应用id',
   `version` int NOT NULL DEFAULT 0 COMMENT '当前版本号',
   `create_user` bigint DEFAULT NULL COMMENT '创建人',
@@ -330,6 +330,9 @@ CREATE TABLE `dev_pipeline`  (
   KEY `idx_pipeline_app` (`app_id`) USING BTREE,
   KEY `idx_pipeline_name` (`name`) USING BTREE
 ) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '流水线表' ROW_FORMAT = DYNAMIC;
+
+-- 存量库升级（状态口径扩展：同步态并入 status，仅注释变化，可执行可不执行）：
+-- ALTER TABLE `dev_pipeline` MODIFY COLUMN `status` tinyint(1) NOT NULL DEFAULT 1 COMMENT '状态 0停用 1启用 2待配置 3同步失败（同步态并入本字段：保存即同步 Jenkins Job，待配置=空定义且 Job 已禁用）';
 
 -- ----------------------------
 -- Table structure for dev_pipeline_stage
@@ -387,6 +390,8 @@ CREATE TABLE `dev_pipeline_stage_task`  (
 -- ALTER TABLE `dev_pipeline_stage` ADD COLUMN `build_tool` varchar(30) NULL COMMENT '构建工具，如 Maven/Node/Gradle' AFTER `name`;
 -- 存量库升级（轮询 Jenkins 构建状态需要保存队列项 id）：
 -- ALTER TABLE `dev_run` ADD COLUMN `jenkins_queue_id` bigint NULL COMMENT 'Jenkins 队列项id（构建号未分配时轮询用）' AFTER `jenkins_build_no`;
+-- 存量库升级（运行记录保存实际构建 Job 名，旧数据为空、轮询回退应用编码 Job）：
+-- ALTER TABLE `dev_run` ADD COLUMN `job_name` varchar(128) NULL COMMENT '实际构建的 Jenkins Job 名（旧数据为空，轮询时回退应用编码 Job）' AFTER `jenkins_queue_id`;
 -- 存量库升级（Tag/Ref 最长 100 字符，commit_id 需同步扩容）：
 -- ALTER TABLE `dev_run` MODIFY COLUMN `commit_id` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '提交或引用值（未接入仓库解析前存触发时生效值）';
 -- ALTER TABLE `dev_run_trigger` MODIFY COLUMN `commit_id` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '提交或引用值（与运行生效值一致）';
@@ -413,6 +418,7 @@ CREATE TABLE `dev_run`  (
   `artifact_id` bigint NULL COMMENT '产出制品',
   `jenkins_build_no` bigint NULL COMMENT 'Jenkins 构建号',
   `jenkins_queue_id` bigint NULL COMMENT 'Jenkins 队列项id（构建号未分配时轮询用）',
+  `job_name` varchar(128) NULL COMMENT '实际构建的 Jenkins Job 名（旧数据为空，轮询时回退应用编码 Job）',
   `result_expire_time` datetime(3) NULL COMMENT '结果待确认截止时间',
   `start_time` datetime(3) NULL COMMENT '开始时间',
   `end_time` datetime(3) NULL COMMENT '结束时间',

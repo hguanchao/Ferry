@@ -59,32 +59,37 @@ public class PipelineController {
 
     @PostMapping("/save")
     @PreAuthorize("devops:pipeline:save")
-    @Operation(summary = "流水线-新增或编辑")
+    @Operation(summary = "流水线-新增或编辑（保存后同步 Jenkins Job）")
     public R<String> save(@RequestBody @Valid PipelineDTO body) {
-        boolean ok = service.save(body);
-        String msg = body.getId() == null ? "新增" : "修改";
-        return ok ? R.success(msg + "成功") : R.fail(msg + "失败");
+        return R.data(service.save(body));
     }
 
     @PostMapping("/deleted")
     @PreAuthorize("devops:pipeline:deleted")
     @Operation(summary = "流水线-删除")
     public R<String> deleted(@RequestBody List<Long> ids) {
-        return service.deleted(ids) ? R.success("删除成功") : R.fail("删除失败");
+        return R.data(service.deleted(ids));
     }
 
     @PostMapping("/enable")
     @PreAuthorize("devops:pipeline:enable")
-    @Operation(summary = "流水线-启用")
+    @Operation(summary = "流水线-启用并同步 Job")
     public R<String> enable(@RequestBody PipelineDTO body) {
-        return service.enable(body.getId()) ? R.success("启用成功") : R.fail("启用失败");
+        return R.data(service.enable(body.getId()));
     }
 
     @PostMapping("/disable")
     @PreAuthorize("devops:pipeline:disable")
-    @Operation(summary = "流水线-停用")
+    @Operation(summary = "流水线-停用并同步 Job")
     public R<String> disable(@RequestBody PipelineDTO body) {
-        return service.disable(body.getId()) ? R.success("停用成功") : R.fail("停用失败");
+        return R.data(service.disable(body.getId()));
+    }
+
+    @PostMapping("/sync")
+    @PreAuthorize("devops:pipeline:save")
+    @Operation(summary = "流水线-Jenkins Job 同步（保存/启停同步失败后的重试入口）")
+    public R<String> sync(@RequestBody PipelineDTO body) {
+        return R.data(service.sync(body.getId()));
     }
 
     @GetMapping("/definition")

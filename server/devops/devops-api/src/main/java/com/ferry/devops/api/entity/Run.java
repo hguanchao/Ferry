@@ -81,6 +81,9 @@ public class Run extends BaseEntity implements Serializable {
     /** Jenkins 队列项id（构建号尚未分配时轮询用） */
     private Long jenkinsQueueId;
 
+    /** 实际构建的 Jenkins Job 名（旧数据为空，轮询时回退应用编码 Job） */
+    private String jobName;
+
     /** 结果待确认截止时间 */
     private java.util.Date resultExpireTime;
 

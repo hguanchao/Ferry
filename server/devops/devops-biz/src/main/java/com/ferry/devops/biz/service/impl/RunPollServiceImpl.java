@@ -80,7 +80,8 @@ public class RunPollServiceImpl implements IRunPollService {
         if (app == null || StrUtil.isBlank(app.getCode())) {
             return;
         }
-        String jobName = app.getCode().trim();
+        // Job 名取运行记录的实际值；旧数据（旧命名协议）回退应用编码 Job
+        String jobName = StrUtil.isNotBlank(run.getJobName()) ? run.getJobName() : app.getCode().trim();
         Long buildNo = run.getJenkinsBuildNo();
         if (buildNo == null) {
             if (run.getJenkinsQueueId() == null) {

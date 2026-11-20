@@ -18,4 +18,7 @@ public class VersionVO {
 
     @Schema(description = "变更说明（保存/回退接口回显，版本列表暂不落库）")
     private String changeNote;
+
+    @Schema(description = "同步后的流水线状态 0停用 1启用 2待配置 3同步失败（版本列表不返回）")
+    private Integer status;
 }

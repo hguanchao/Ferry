@@ -13,8 +13,8 @@ import java.util.List;
  * 流水线定义编解码：JSON ↔ 定义对象（JSON only）。
  *
  * <p>snakeyaml 未引入 classpath，且项目使用 Jackson 3（tools.jackson）无 YAML 模块，
- * 因此 YAML 模式按「最小实现优先保证编译」降级为 JSON only：YAML 原文原样保存、不解析，
- * validate 时不报 YAML 错，仅对 JSON 模式做结构化校验。真实 YAML 解析可在引入依赖后替换本类。
+ * YAML 模式显式校验不通过（此前是假通过：validate 放行但保存/预览必然失败）；
+ * 真实 YAML 解析可在引入依赖后替换本类。
  */
 final class PipelineDefinitionCodec {
 
@@ -45,32 +45,40 @@ final class PipelineDefinitionCodec {
     }
 
     /**
-     * 结构化校验：阶段 1–8、类型唯一、任务 0–30、超时 60–86400、执行器任务要求。
+     * 结构化校验（对外校验端点）：阶段 1–8、类型唯一、任务 0–30、超时 60–86400、执行器任务要求。
      *
      * <p>阶段允许零任务（画布可先建空阶段再补任务）；空阶段/空任务的完整性与可执行性
      * 交由运行触发预校验（RunServiceImpl#doPrecheck）提示，不在保存阶段拦截。
      */
     static ValidateResultVO validate(String definition, Integer mode) {
-        ValidateResultVO result = new ValidateResultVO();
-        List<ValidateResultVO.ValidateError> errors = new ArrayList<>();
-        // YAML 模式降级：仅保留原文、不做语法解析，不报 YAML 错
+        // YAML 未支持：显式不通过，避免“校验通过但保存/预览必然失败”的假象
         if (Integer.valueOf(2).equals(mode)) {
-            result.setValid(true);
-            result.setErrors(errors);
-            return result;
+            ValidateResultVO rejected = new ValidateResultVO();
+            rejected.setValid(false);
+            rejected.setErrors(List.of(error(0, "YAML 模式暂不支持，请使用表单（JSON）模式")));
+            return rejected;
         }
         PipelineDefinitionDTO dto;
         try {
             dto = decode(definition);
         } catch (ServiceException e) {
-            errors.add(error(0, e.getMessage()));
+            ValidateResultVO result = new ValidateResultVO();
             result.setValid(false);
-            result.setErrors(errors);
+            result.setErrors(List.of(error(0, e.getMessage())));
             return result;
         }
+        return validateDto(dto, true);
+    }
+
+    /**
+     * 结构化校验（已解码对象）：保存链路复用，allowEmpty=true 时放开阶段数量下限以支持显式清空定义。
+     */
+    static ValidateResultVO validateDto(PipelineDefinitionDTO dto, boolean requireNonEmpty) {
+        ValidateResultVO result = new ValidateResultVO();
+        List<ValidateResultVO.ValidateError> errors = new ArrayList<>();
         List<com.ferry.devops.api.dto.PipelineStageDTO> stages = dto.getStages();
-        if (stages == null || stages.isEmpty() || stages.size() > 8) {
-            errors.add(error(0, "阶段数量须在 1–8 之间"));
+        if (stages == null || stages.size() > 8 || (requireNonEmpty && stages.isEmpty())) {
+            errors.add(error(0, requireNonEmpty ? "阶段数量须在 1–8 之间" : "阶段数量不能超过 8"));
         } else {
             java.util.Set<Integer> types = new java.util.HashSet<>();
             int line = 1;
@@ -89,7 +97,7 @@ final class PipelineDefinitionCodec {
                 if (taskCount > 30) {
                     errors.add(error(line, "单阶段任务数量不能超过 30"));
                 } else if (taskCount > 0 && stage.getType() != null && stage.getType() <= 4) {
-                    boolean hasJenkins = tasks.stream().anyMatch(t -> "jenkins".equals(t.getExecutor()));
+                    boolean hasJenkins = tasks.stream().anyMatch(t -> "jenkins".equalsIgnoreCase(t.getExecutor()));
                     if (!hasJenkins) {
                         errors.add(error(line, "前四类阶段须包含至少一个 executor=jenkins 的任务"));
                     }

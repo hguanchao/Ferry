@@ -57,6 +57,8 @@ export const pipelineApi = {
   validateDefinition: (body: Record<string, unknown>) => post<ValidateResult>(`${B}/pipeline/definition/validate`, body),
   previewDefinition: (body: Record<string, unknown>) => post<PipelinePreview>(`${B}/pipeline/definition/preview`, body),
   saveDefinition: (body: Record<string, unknown>) => post<PipelineVersionRow>(`${B}/pipeline/definition/save`, body),
+  /** Jenkins Job 同步重试：保存/启停同步失败后调用 */
+  syncRetry: (id: string) => post<string>(`${B}/pipeline/sync`, { id }),
   versionPage: (pipelineId: string, current = 1, size = 20) => get<ApiPage<PipelineVersionRow>>(`${B}/pipeline/version/pageList`, { pipelineId, current, size }),
   versionDiff: (leftId: string, rightId: string) => get<DiffResult>(`${B}/pipeline/version/diff`, { leftId, rightId }),
   versionRollback: (body: Record<string, unknown>) => post<PipelineVersionRow>(`${B}/pipeline/version/rollback`, body),

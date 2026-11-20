@@ -11,11 +11,8 @@ import java.util.List;
 @Data
 public class PipelinePreviewVO {
 
-    @Schema(description = "按当前定义渲染的 Jenkins 脚本预览")
+    @Schema(description = "按当前定义渲染的完整 Jenkins 声明式脚本，与 Job 同步脚本同源")
     private String script;
-
-    @Schema(description = "触发时实际下发给 Jenkins 的 STAGE_SPEC")
-    private String stageSpec;
 
     @Schema(description = "预览告警：空命令、缺少产出物等")
     private List<String> warnings;
