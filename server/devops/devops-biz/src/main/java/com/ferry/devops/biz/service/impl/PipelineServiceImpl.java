@@ -6,7 +6,6 @@ import com.ferry.common.core.utils.BeanUtil;
 import com.ferry.common.core.utils.CollUtil;
 import com.ferry.common.core.utils.JsonUtil;
 import com.ferry.common.core.utils.ObjUtil;
-import com.ferry.common.core.utils.StrUtil;
 import com.ferry.common.jdbc.base.ServiceImpl;
 import com.ferry.common.jdbc.provider.Page;
 import com.ferry.devops.api.dto.PipelineDTO;
@@ -95,12 +94,11 @@ public class PipelineServiceImpl extends ServiceImpl<PipelineMapper, Pipeline> i
             pipeline.setStatus(body.getStatus());
         }
         boolean success = saveOrUpdate(pipeline);
-        // 新建时若携带定义，生成初版
-        if (isNew) {
-            String definition = body.getDefinition();
-            if (StrUtil.isNotBlank(definition)) {
-                createVersion(pipeline.getId(), definition, body.getChangeNote());
-            }
+        // 新建时若携带阶段定义，生成初版
+        if (isNew && CollUtil.isNotEmpty(body.getStages())) {
+            PipelineDefinitionDTO definition = new PipelineDefinitionDTO();
+            definition.setStages(body.getStages());
+            createVersion(pipeline.getId(), definition);
         }
         return success;
     }
@@ -144,7 +142,6 @@ public class PipelineServiceImpl extends ServiceImpl<PipelineMapper, Pipeline> i
         int version = versionId == null ? (pipeline.getVersion() == null ? 0 : pipeline.getVersion()) : versionId.intValue();
         String json = pipelineStageService.loadDefinitionJson(id, version);
         PipelineDefinitionVO vo = new PipelineDefinitionVO();
-        vo.setVersionId((long) version);
         vo.setVersionNo(version);
         vo.setJson(json);
         PipelineDefinitionDTO dto = pipelineStageService.loadDefinition(id, version);
@@ -176,7 +173,7 @@ public class PipelineServiceImpl extends ServiceImpl<PipelineMapper, Pipeline> i
             throw new ServiceException("流水线定义校验不通过：" + result.getErrors().get(0).getMessage());
         }
         int newVersion = (pipeline.getVersion() == null ? 0 : pipeline.getVersion()) + 1;
-        createVersion(id, definition, changeNote);
+        createVersion(id, definition);
         VersionVO vo = new VersionVO();
         vo.setPipelineId(id);
         vo.setVersionNo(newVersion);
@@ -225,7 +222,7 @@ public class PipelineServiceImpl extends ServiceImpl<PipelineMapper, Pipeline> i
         }
         int newVersion = (pipeline.getVersion() == null ? 0 : pipeline.getVersion()) + 1;
         String json = pipelineStageService.loadDefinitionJson(id, target);
-        createVersion(id, json, changeNote);
+        createVersion(id, json);
         VersionVO vo = new VersionVO();
         vo.setPipelineId(id);
         vo.setVersionNo(newVersion);
@@ -243,9 +240,9 @@ public class PipelineServiceImpl extends ServiceImpl<PipelineMapper, Pipeline> i
     }
 
     /**
-     * 创建新版本：阶段/任务落库并更新流水线当前版本号。
+     * 解析定义 JSON 后创建新版本，供 JSON 文本入参的版本保存与回退使用。
      */
-    private void createVersion(Long pipelineId, String definitionJson, String changeNote) {
+    private void createVersion(Long pipelineId, String definitionJson) {
         PipelineDefinitionDTO dto;
         try {
             dto = JsonUtil.toBean(definitionJson, PipelineDefinitionDTO.class);
@@ -255,6 +252,13 @@ public class PipelineServiceImpl extends ServiceImpl<PipelineMapper, Pipeline> i
         if (dto == null) {
             throw new ServiceException("流水线定义格式错误");
         }
+        createVersion(pipelineId, dto);
+    }
+
+    /**
+     * 创建新版本：结构化定义落库到阶段/任务表并更新流水线当前版本号。
+     */
+    private void createVersion(Long pipelineId, PipelineDefinitionDTO dto) {
         Pipeline pipeline = getById(pipelineId);
         int version = (pipeline.getVersion() == null ? 0 : pipeline.getVersion()) + 1;
         pipelineStageService.saveDefinition(pipelineId, version, dto);
@@ -266,6 +270,7 @@ public class PipelineServiceImpl extends ServiceImpl<PipelineMapper, Pipeline> i
         PipelineStageVO vo = new PipelineStageVO();
         vo.setType(stage.getType());
         vo.setName(stage.getName());
+        vo.setBuildTool(stage.getBuildTool());
         vo.setTimeoutSeconds(stage.getTimeoutSeconds());
         vo.setOutputs(stage.getOutputs());
         if (stage.getTasks() != null) {
@@ -275,6 +280,7 @@ public class PipelineServiceImpl extends ServiceImpl<PipelineMapper, Pipeline> i
                 taskVo.setName(task.getName());
                 taskVo.setExecutor(task.getExecutor());
                 taskVo.setScriptRef(task.getScriptRef());
+                taskVo.setScriptContent(task.getScriptContent());
                 taskVo.setParams(task.getParams());
                 tasks.add(taskVo);
             }

@@ -48,6 +48,10 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements IAppS
             if (!ObjUtil.equals(old.getCode(), body.getCode())) {
                 throw new ServiceException("应用编码创建后不可修改");
             }
+            // 列表/详情不回显 repoToken，编辑表单提交空值时保留已存令牌，防止误清空
+            if (StrUtil.isBlank(body.getRepoToken())) {
+                body.setRepoToken(old.getRepoToken());
+            }
         }
         App app = BeanUtil.copy(body, App.class);
         return saveOrUpdate(app);

@@ -20,6 +20,9 @@ public class PipelineTaskVO {
     @Schema(description = "脚本引用")
     private String scriptRef;
 
+    @Schema(description = "自定义脚本内容")
+    private String scriptContent;
+
     @Schema(description = "参数")
     private Map<String, Object> params;
 }

@@ -23,45 +23,21 @@ public class PipelineQuery extends Query {
     @Schema(description = "状态 0停用 1启用")
     private Integer status;
 
-    @Schema(description = "运行状态")
+    @Schema(description = "运行状态过滤（1排队 2运行中 3阻塞 4成功 5失败 6超时 7已取消 8结果待确认）：存在指定状态的运行")
     private List<Integer> statuses;
 
-    @Schema(description = "分支")
-    private List<String> branches;
-
-    @Schema(description = "触发方式")
-    private List<Integer> triggerTypes;
-
-    @Schema(description = "门禁结论")
-    private List<Integer> gateConclusions;
-
-    @Schema(description = "是否存在豁免 0否 1是")
-    private Integer hasExemption;
-
-    @Schema(description = "制品形态")
-    private List<Integer> artifactForms;
-
-    @Schema(description = "负责人")
-    private List<Long> ownerIds;
-
-    @Schema(description = "最近运行开始")
-    private String lastRunStart;
-
-    @Schema(description = "最近运行结束")
-    private String lastRunEnd;
-
-    @Schema(description = "指标卡过滤：运行中")
+    @Schema(description = "指标卡过滤：运行中（存在排队/运行中的运行）")
     private Integer metricRunning;
 
-    @Schema(description = "指标卡过滤：今日失败")
+    @Schema(description = "指标卡过滤：今日失败（当日存在失败的运行）")
     private Integer metricFailedToday;
 
-    @Schema(description = "指标卡过滤：门禁阻塞")
+    @Schema(description = "指标卡过滤：门禁阻塞（存在被门禁阻塞的运行）")
     private Integer metricGateBlocked;
 
-    @Schema(description = "指标卡过滤：待准入")
+    @Schema(description = "指标卡过滤：待准入（存在卡在准入阶段的运行）")
     private Integer metricPendingAdmission;
 
-    @Schema(description = "指标卡过滤：发布观察中")
+    @Schema(description = "指标卡过滤：发布观察中（存在结果待确认的运行）")
     private Integer metricObserving;
 }

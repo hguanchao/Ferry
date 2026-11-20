@@ -27,15 +27,6 @@ public class PipelineDTO {
     @Schema(description = "状态 0停用 1启用")
     private Integer status;
 
-    @Schema(description = "新建时初始定义（可选，结构化 JSON）")
-    private String definition;
-
-    @Schema(description = "变更说明")
-    private String changeNote;
-
-    @Schema(description = "回退来源版本id")
-    private Long sourceVersionId;
-
-    @Schema(description = "阶段列表（表单模式）")
+    @Schema(description = "阶段列表（新建时作为初始版本定义）")
     private List<PipelineStageDTO> stages;
 }

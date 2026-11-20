@@ -14,7 +14,6 @@ export interface AppRow {
   coreLink: number
   repoType: number
   repoUrl?: string
-  repoToken?: string
   repoBranch?: string
   repoCommitId?: string
   description?: string
@@ -77,7 +76,8 @@ export interface PipelineRow {
   createTime: string
   updateTime?: string
 }
-export interface PipelineVersionRow { id: ID; pipelineId: ID; versionNo: number; changeNote: string; sourceType: number; createTime: string }
+/** 版本摘要：与后端 VersionVO 一致，三表存储无版本行 id，仅版本号 + 变更说明 */
+export interface PipelineVersionRow { pipelineId: ID; versionNo: number; changeNote?: string }
 /** 触发弹窗提交候选：与后端 RepoCommitVO 对应 */
 export interface RepoCommitOption {
   sha: string
@@ -86,7 +86,7 @@ export interface RepoCommitOption {
   authorName?: string
   committedAt?: string
 }
-export interface PipelineDefinition { json: string; yaml?: string; versionId?: ID }
+export interface PipelineDefinition { json: string; yaml?: string; versionNo?: number }
 export interface ValidateResult { valid: boolean; errors: Array<{ line: number; message: string }> }
 /** 流水线脚本预览 */
 export interface PipelinePreview {

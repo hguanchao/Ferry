@@ -163,11 +163,11 @@ export default function Pipeline() {
 
   const invalidate = () => void queryClient.invalidateQueries({ queryKey: ['pipelines'] })
 
-  // 保存：新建时把 stages 转成 definition 随档案一起提交；编辑时先存档案再存定义生成新版本
+  // 保存：新建时 stages 随档案一起提交作为初版定义；编辑时先存档案再存定义生成新版本
   const saveMutation = useMutation({
     mutationFn: async (values: Record<string, unknown>) => {
       const definition = stages.length ? buildDefinition(stages) : undefined
-      const text = await pipelineApi.save({ ...values, ...(definition ? { definition } : {}) })
+      const text = await pipelineApi.save({ ...values, ...(stages.length ? { stages } : {}) })
       return { text, base: values, definition, isNew: !values.id }
     },
     onSuccess: async ({ text, base, definition, isNew }) => {

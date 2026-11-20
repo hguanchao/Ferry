@@ -11,9 +11,6 @@ import java.util.List;
 @Data
 public class PipelineDefinitionVO {
 
-    @Schema(description = "版本id")
-    private Long versionId;
-
     @Schema(description = "版本号")
     private Integer versionNo;
 

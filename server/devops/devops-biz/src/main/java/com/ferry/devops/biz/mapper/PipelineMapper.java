@@ -31,7 +31,7 @@ public interface PipelineMapper extends BaseMapper<Pipeline> {
     String selectAppName(@Param("appId") Long appId);
 
     /**
-     * 分页查询流水线列表（XML 联表：应用/负责人/最近运行摘要）。
+     * 分页查询流水线列表（XML 联表应用名称/分支；运行状态与指标卡过滤见 XML 注释）。
      *
      * @param page  分页参数
      * @param query 筛选条件

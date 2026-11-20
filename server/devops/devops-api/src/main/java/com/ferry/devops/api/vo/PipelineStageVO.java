@@ -17,6 +17,9 @@ public class PipelineStageVO {
     @Schema(description = "阶段名")
     private String name;
 
+    @Schema(description = "构建工具，如 Maven/Node/Gradle")
+    private String buildTool;
+
     @Schema(description = "超时秒数")
     private Integer timeoutSeconds;
 
