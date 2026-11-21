@@ -134,7 +134,9 @@ class AppServiceImplTest {
         App app = new App();
         app.setId(APP_ID);
         app.setCode("order-service");
-        when(appMapper.existsUnfinishedBusiness(List.of(APP_ID))).thenReturn(false);
+        when(appMapper.countActiveRun(APP_ID)).thenReturn(0L);
+        when(appMapper.countActiveDeploy(APP_ID)).thenReturn(0L);
+        when(appMapper.countOpenRelease(APP_ID)).thenReturn(0L);
         when(appMapper.selectByIds(List.of(APP_ID))).thenReturn(List.of(app));
         when(appMapper.deleteByIds(List.of(APP_ID))).thenReturn(1);
 
@@ -145,7 +147,7 @@ class AppServiceImplTest {
 
     @Test
     void 应用存在进行中运行或部署或未关闭发布单时拒绝删除() {
-        when(appMapper.existsUnfinishedBusiness(List.of(APP_ID))).thenReturn(true);
+        when(appMapper.countActiveRun(APP_ID)).thenReturn(1L);
 
         ServiceException exception = assertThrows(ServiceException.class,
                 () -> service.deleted(List.of(APP_ID)));
@@ -173,7 +175,9 @@ class AppServiceImplTest {
         App app = new App();
         app.setId(APP_ID);
         app.setCode("order-service");
-        when(appMapper.existsUnfinishedBusiness(List.of(APP_ID))).thenReturn(false);
+        when(appMapper.countActiveRun(APP_ID)).thenReturn(0L);
+        when(appMapper.countActiveDeploy(APP_ID)).thenReturn(0L);
+        when(appMapper.countOpenRelease(APP_ID)).thenReturn(0L);
         when(appMapper.selectByIds(List.of(APP_ID))).thenReturn(List.of(app));
         when(appMapper.deleteByIds(List.of(APP_ID))).thenReturn(1);
         doThrow(new RuntimeException("jenkins down")).when(jenkinsClient).deleteJob(anyString());

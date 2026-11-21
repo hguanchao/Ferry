@@ -49,13 +49,16 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements IAppS
     public boolean save(AppDTO body) {
         checkCode(body.getCode(), body.getId());
         if (ObjUtil.isNotEmpty(body.getId())) {
-            App old = requireApp(body.getId());
-            if (!ObjUtil.equals(old.getCode(), body.getCode())) {
+            App app = getById(body.getId());
+            if (app == null) {
+                throw new ServiceException("应用不存在");
+            }
+            if (!ObjUtil.equals(app.getCode(), body.getCode())) {
                 throw new ServiceException("应用编码创建后不可修改");
             }
             // 列表/详情不回显 repoToken，编辑表单提交空值时保留已存令牌，防止误清空
             if (StrUtil.isBlank(body.getRepoToken())) {
-                body.setRepoToken(old.getRepoToken());
+                body.setRepoToken(app.getRepoToken());
             }
         }
         App app = BeanUtil.copy(body, App.class);
@@ -103,27 +106,6 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements IAppS
         return isSuccess;
     }
 
-
-    @Override
-    public List<AppOptionVO> options(String keyword, Integer scope) {
-        List<App> appList = list(Wrappers.<App>lambdaQuery()
-                .like(StrUtil.isNotBlank(keyword), App::getName, keyword).orderByAsc(App::getName));
-        if (CollUtil.isEmpty(appList)){
-            return Collections.emptyList();
-        }
-       return appList .stream().map(app -> {
-            AppOptionVO vo = new AppOptionVO();
-            vo.setValue(app.getId());
-            vo.setLabel(app.getName());
-            vo.setCode(app.getCode());
-            // 触发弹窗据此过滤未配置代码源的应用，并预填默认分支/提交
-            vo.setRepoUrl(app.getRepoUrl());
-            vo.setRepoBranch(app.getRepoBranch());
-            vo.setRepoCommitId(app.getRepoCommitId());
-            return vo;
-        }).collect(Collectors.toList());
-    }
-
     @Override
     public Map<String, String> optionMap() {
         Map<String, String> result = new LinkedHashMap<>();
@@ -149,13 +131,5 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements IAppS
     @Override
     public boolean saveOrUpdateApp(App app) {
         return saveOrUpdate(app);
-    }
-
-    private App requireApp(Long id) {
-        App app = getById(id);
-        if (app == null) {
-            throw new ServiceException("应用不存在");
-        }
-        return app;
     }
 }

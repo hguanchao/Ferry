@@ -18,10 +18,6 @@ export interface AppRow {
   repoCommitId?: string
   description?: string
   status: number
-  prodDeployTypes?: string
-  pipelineCount?: number
-  lastRunStatus?: number
-  lastRunTime?: string
   createTime: string
 }
 

@@ -21,9 +21,6 @@ public interface IAppService extends IService<App> {
     boolean save(AppDTO body);
 
     boolean deleted(List<Long> ids);
-
-    List<AppOptionVO> options(String keyword, Integer scope);
-
     /** 内部接口：应用id到名称的映射 */
     Map<String, String> optionMap();
 

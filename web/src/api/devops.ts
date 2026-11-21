@@ -20,7 +20,17 @@ export const appApi = {
   pageList: (body: Record<string, unknown>) => post<ApiPage<AppRow>>(`${B}/app/pageList`, body),
   save: (body: Record<string, unknown>) => post<string>(`${B}/app/save`, body),
   deleted: (ids: string[]) => post<string>(`${B}/app/deleted`, ids),
-  options: (keyword?: string) => get<AppOption[]>(`${B}/app/options`, { keyword }),
+  // 复用分页接口取全量应用（大页容量）映射为选项；keyword 走应用列表的 code/name 模糊条件
+  options: (keyword?: string) =>
+    post<ApiPage<AppRow>>(`${B}/app/pageList`, { keyword, current: 1, size: 200 }).then((page) =>
+      (page.records ?? []).map((r) => ({
+        value: r.id,
+        label: r.name,
+        code: r.code,
+        repoUrl: r.repoUrl,
+        repoBranch: r.repoBranch,
+        repoCommitId: r.repoCommitId,
+      }))),
   // TODO(dev_app-schema): dev_app_repo 已删除，repoList/saveRepo/deletedRepo 接口已移除。
   dependencyList: (appId: string) => get<AppDependencyRow[]>(`${B}/app/dependency/list`, { appId }),
   saveDependency: (body: Record<string, unknown>) => post<string>(`${B}/app/dependency/save`, body),

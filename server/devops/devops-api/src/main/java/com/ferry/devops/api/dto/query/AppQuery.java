@@ -31,4 +31,7 @@ public class AppQuery extends Query {
 
     @Schema(description = "核心链路 0否 1是")
     private Integer coreLink;
+
+    @Schema(description = "关键字")
+    private String keyword;
 }

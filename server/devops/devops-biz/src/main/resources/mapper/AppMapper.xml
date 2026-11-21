@@ -55,6 +55,10 @@
             <if test="query.name != null and query.name != ''">
                 AND a.`name` LIKE CONCAT('%', CONCAT(#{query.name}, '%'))
             </if>
+            <if test="query.keyword != null and query.keyword != ''">
+                AND (a.code LIKE CONCAT('%', CONCAT(#{query.keyword}, '%'))
+                    OR a.`name` LIKE CONCAT('%', CONCAT(#{query.keyword}, '%')))
+            </if>
             <if test="query.deptIds != null and query.deptIds.size() > 0">
                 AND a.dept_id IN
                 <foreach collection="query.deptIds" item="deptId" open="(" separator="," close=")">

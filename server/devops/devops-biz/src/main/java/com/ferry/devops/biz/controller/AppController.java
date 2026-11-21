@@ -43,9 +43,9 @@ public class AppController {
     @PreAuthorize("devops:app:save")
     @Operation(summary = "应用管理-新增或编辑")
     public R<String> save(@RequestBody @Valid AppDTO body) {
-        boolean ok = service.save(body);
+        boolean isSuccess = service.save(body);
         String msg = ObjUtil.isEmpty(body.getId()) ? "新增" : "修改";
-        return ok ? R.success(msg + "成功") : R.fail(msg + "失败");
+        return isSuccess ? R.success(msg + "成功") : R.fail(msg + "失败");
     }
 
     @PostMapping("/deleted")
@@ -53,13 +53,5 @@ public class AppController {
     @Operation(summary = "应用管理-删除")
     public R<String> deleted(@RequestBody List<Long> ids) {
         return service.deleted(ids) ? R.success("删除成功") : R.fail("删除失败");
-    }
-
-    @GetMapping("/options")
-    @PreAuthorize("devops:app:option")
-    @Operation(summary = "应用选项")
-    public R<List<AppOptionVO>> options(@RequestParam(value = "keyword", required = false) String keyword,
-                                        @RequestParam(value = "scope", required = false) Integer scope) {
-        return R.data(service.options(keyword, scope));
     }
 }
