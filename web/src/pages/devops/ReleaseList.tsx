@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useNavigate } from 'react-router-dom'
 import { App, Button, Form, Input, Modal, Select, Space, Tag, Tooltip, type TableColumnsType } from 'antd'
 import FerryTable from '@/components/FerryTable'
-import { Eye, Plus, RotateCw, Search, Send, Trash2, Undo2 } from 'lucide-react'
+import { Eye, Play, Plus, RotateCw, Search, Send, Trash2, Undo2 } from 'lucide-react'
 import PageHeader from '@/components/PageHeader'
 import { RoleTag } from '@/components/StatusTag'
 import { changeTicketApi, releaseApi } from '@/api/devops'
@@ -20,6 +21,7 @@ const RISK: Record<number, { text: string; color: string }> = { 1: { text: '低'
 export default function ReleaseList() {
   const { message, modal } = App.useApp()
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
   const can = useAuthStore((s) => s.can)
   const [form] = Form.useForm()
   const [open, setOpen] = useState(false)
@@ -48,9 +50,15 @@ export default function ReleaseList() {
     { title: '创建时间', dataIndex: 'createTime',  render: (v: string) => <span className="ferry-mono" style={{ fontSize: 12, color: 'var(--text-3)' }}>{v ?? '—'}</span> },
     { title: '操作', key: 'action',   render: (_, r) => (
       <Space size={2}>
+        {/* 评审/执行页读 ?id= query 参数，须用查询串跳转 */}
         <Tooltip title="评审">
-          <Button type="link" size="small" icon={<Eye size={14} />} onClick={() => { location.href = `/release/review/${r.id}` }} />
+          <Button type="link" size="small" icon={<Eye size={14} />} onClick={() => navigate(`/release/review?id=${r.id}`)} />
         </Tooltip>
+        {[3, 4, 5].includes(r.status) && can('devops:release:start') && (
+          <Tooltip title="发布执行">
+            <Button type="link" size="small" icon={<Play size={14} />} onClick={() => navigate(`/release/execute?id=${r.id}`)} />
+          </Tooltip>
+        )}
         {r.status === 1 && can('devops:release:submit') && (
           <Tooltip title="提交">
             <Button type="link" size="small" icon={<Send size={14} />} onClick={() => simple(() => releaseApi.submit(r.id), '提交成功')} />

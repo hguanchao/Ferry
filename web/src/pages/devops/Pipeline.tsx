@@ -18,7 +18,7 @@ import { useDebouncedValue } from '@/lib/debounce'
 const RUN_STATUS_LABEL: Record<number, string> = {
   1: '排队中', 2: '运行中', 3: '阻塞', 4: '成功', 5: '失败', 6: '超时', 7: '已取消', 8: '结果待确认',
 }
-const CONCLUSION_LABEL: Record<number, string> = { 1: '通过', 2: '不通过', 3: '合并', 4: '复用' }
+const CONCLUSION_LABEL: Record<number, string> = { 1: '通过', 2: '不通过', 3: '合并' }
 /** 流水线状态（含 Jenkins 同步态，与后端 dev_pipeline.status 口径一致） */
 const PIPELINE_STATUS: Record<number, { label: string; color: string }> = {
   0: { label: '停用', color: 'default' },
