@@ -15,7 +15,7 @@ SET FOREIGN_KEY_CHECKS = 0;
 -- ----------------------------
 DROP TABLE IF EXISTS `sys_config`;
 CREATE TABLE `sys_config`  (
-  `id` bigint NOT NULL COMMENT '数据id',
+  `id` bigint NOT NULL COMMENT '主键id',
   `tenant_id` varchar(12) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '租户编码',
   `name` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '配置名称',
   `code` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '配置键名',
@@ -34,7 +34,7 @@ CREATE TABLE `sys_config`  (
 -- ----------------------------
 DROP TABLE IF EXISTS `sys_dept`;
 CREATE TABLE `sys_dept`  (
-  `id` bigint NOT NULL COMMENT '数据id',
+  `id` bigint NOT NULL COMMENT '主键id',
   `tenant_id` varchar(12) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '租户编码',
   `parent_id` bigint NULL DEFAULT 0 COMMENT '父部门id',
   `ancestors` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '祖级列表',
@@ -55,7 +55,7 @@ CREATE TABLE `sys_dept`  (
 -- ----------------------------
 DROP TABLE IF EXISTS `sys_dict`;
 CREATE TABLE `sys_dict`  (
-  `id` bigint NOT NULL COMMENT '数据id',
+  `id` bigint NOT NULL COMMENT '主键id',
   `tenant_id` varchar(12) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '租户编码',
   `parent_id` bigint NULL DEFAULT 0 COMMENT '父字典id',
   `code` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '字典码',
@@ -75,7 +75,7 @@ CREATE TABLE `sys_dict`  (
 -- ----------------------------
 DROP TABLE IF EXISTS `sys_menu`;
 CREATE TABLE `sys_menu`  (
-  `id` bigint NOT NULL COMMENT '数据id',
+  `id` bigint NOT NULL COMMENT '主键id',
   `tenant_id` varchar(12) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '租户编码',
   `parent_id` bigint NULL DEFAULT 0 COMMENT '父菜单id',
   `name` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '菜单名称',
@@ -102,7 +102,7 @@ CREATE TABLE `sys_menu`  (
 -- ----------------------------
 DROP TABLE IF EXISTS `sys_post`;
 CREATE TABLE `sys_post`  (
-  `id` bigint NOT NULL COMMENT '数据id',
+  `id` bigint NOT NULL COMMENT '主键id',
   `tenant_id` varchar(12) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '租户编码',
   `code` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '岗位编码',
   `name` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '岗位名称',
@@ -121,7 +121,7 @@ CREATE TABLE `sys_post`  (
 -- ----------------------------
 DROP TABLE IF EXISTS `sys_region`;
 CREATE TABLE `sys_region`  (
-  `id` bigint NOT NULL COMMENT '数据id',
+  `id` bigint NOT NULL COMMENT '主键id',
   `parent_id` bigint NOT NULL DEFAULT 0 COMMENT '父级区域ID',
   `code` varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '区域编码',
   `name` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '区域名称',
@@ -143,7 +143,7 @@ CREATE TABLE `sys_region`  (
 -- ----------------------------
 DROP TABLE IF EXISTS `sys_role`;
 CREATE TABLE `sys_role`  (
-  `id` bigint NOT NULL COMMENT '数据id',
+  `id` bigint NOT NULL COMMENT '主键id',
   `tenant_id` varchar(12) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '租户编码',
   `code` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '角色编码',
   `name` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '角色名称',
@@ -183,7 +183,7 @@ CREATE TABLE `sys_role_dept`  (
 -- ----------------------------
 DROP TABLE IF EXISTS `sys_tenant`;
 CREATE TABLE `sys_tenant`  (
-  `id` bigint NOT NULL COMMENT '数据id',
+  `id` bigint NOT NULL COMMENT '主键id',
   `code` varchar(10) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '租户编码',
   `name` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '租户名称',
   `status` tinyint(1) NULL DEFAULT 1 COMMENT '租户状态 0：禁用 1：正常',
@@ -200,7 +200,7 @@ CREATE TABLE `sys_tenant`  (
 -- ----------------------------
 DROP TABLE IF EXISTS `sys_user`;
 CREATE TABLE `sys_user`  (
-  `id` bigint NOT NULL COMMENT '数据id',
+  `id` bigint NOT NULL COMMENT '主键id',
   `tenant_id` varchar(12) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '租户编码',
   `account` varchar(15) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '用户账号',
   `password` varchar(60) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '用户密码',
@@ -238,8 +238,6 @@ CREATE TABLE `sys_user_role`  (
 
 -- ----------------------------
 -- Table structure for dev_app
--- TODO(dev_app-schema): 字段已重命名/精简，后端 App 实体通过 @TableField 映射旧 Java 字段名，
--- 业务代码暂保留旧命名并加 TODO 占位，待后续统一重构；dev_app_repo 已删除，仓库信息内联到本表。
 -- ----------------------------
 DROP TABLE IF EXISTS `dev_app`;
 CREATE TABLE `dev_app`  (
@@ -266,8 +264,6 @@ CREATE TABLE `dev_app`  (
   KEY `idx_app_dept` (`dept_id`) USING BTREE,
   KEY `idx_app_name` (`name`) USING BTREE
 ) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '应用档案表' ROW_FORMAT = DYNAMIC;
-
--- TODO(dev_app-schema): dev_app_repo 已删除，仓库字段（repo_type/repo_branch/repo_commit_id/repo_url/repo_token）内联到 dev_app。
 
 -- ----------------------------
 -- Table structure for dev_app_dependency
@@ -331,9 +327,6 @@ CREATE TABLE `dev_pipeline`  (
   KEY `idx_pipeline_name` (`name`) USING BTREE
 ) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '流水线表' ROW_FORMAT = DYNAMIC;
 
--- 存量库升级（状态口径扩展：同步态并入 status，仅注释变化，可执行可不执行）：
--- ALTER TABLE `dev_pipeline` MODIFY COLUMN `status` tinyint(1) NOT NULL DEFAULT 1 COMMENT '状态 0停用 1启用 2待配置 3同步失败（同步态并入本字段：保存即同步 Jenkins Job，待配置=空定义且 Job 已禁用）';
-
 -- ----------------------------
 -- Table structure for dev_pipeline_stage
 -- ----------------------------
@@ -386,19 +379,10 @@ CREATE TABLE `dev_pipeline_stage_task`  (
 -- ----------------------------
 -- Table structure for dev_run
 -- ----------------------------
--- 存量库升级（流水线阶段构建工具）：
--- ALTER TABLE `dev_pipeline_stage` ADD COLUMN `build_tool` varchar(30) NULL COMMENT '构建工具，如 Maven/Node/Gradle' AFTER `name`;
--- 存量库升级（轮询 Jenkins 构建状态需要保存队列项 id）：
--- ALTER TABLE `dev_run` ADD COLUMN `jenkins_queue_id` bigint NULL COMMENT 'Jenkins 队列项id（构建号未分配时轮询用）' AFTER `jenkins_build_no`;
--- 存量库升级（运行记录保存实际构建 Job 名，旧数据为空、轮询回退应用编码 Job）：
--- ALTER TABLE `dev_run` ADD COLUMN `job_name` varchar(128) NULL COMMENT '实际构建的 Jenkins Job 名（旧数据为空，轮询时回退应用编码 Job）' AFTER `jenkins_queue_id`;
--- 存量库升级（Tag/Ref 最长 100 字符，commit_id 需同步扩容）：
--- ALTER TABLE `dev_run` MODIFY COLUMN `commit_id` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '提交或引用值（未接入仓库解析前存触发时生效值）';
--- ALTER TABLE `dev_run_trigger` MODIFY COLUMN `commit_id` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '提交或引用值（与运行生效值一致）';
 DROP TABLE IF EXISTS `dev_run`;
 CREATE TABLE `dev_run`  (
-  `id` bigint NOT NULL COMMENT '主键',
-  `run_no` varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '运行编号 RUN-yyyyMMdd-序号',
+  `id` bigint NOT NULL COMMENT '主键id',
+  `run_no` varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '运行编号',
   `pipeline_id` bigint NOT NULL COMMENT '流水线id',
   `pipeline_version` int NOT NULL COMMENT '触发时流水线版本号',
   `app_id` bigint NOT NULL COMMENT '应用id',
@@ -432,7 +416,8 @@ CREATE TABLE `dev_run`  (
   UNIQUE KEY `uk_run_no` (`run_no`) USING BTREE,
   KEY `idx_run_pipeline` (`pipeline_id`,`start_time`) USING BTREE,
   KEY `idx_run_app_status` (`app_id`,`status`) USING BTREE,
-  KEY `idx_run_job` (`jenkins_build_no`) USING BTREE
+  KEY `idx_run_job` (`jenkins_build_no`) USING BTREE,
+  KEY `idx_run_status_ctime` (`status`,`create_time`) USING BTREE
 ) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '运行表' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------

@@ -39,8 +39,6 @@ public class AppController {
         return R.data(service.pageList(body));
     }
 
-    // TODO(dev_app-schema): /app/detail 已移除——详情与分页返回同一 AppVO，前端复用列表数据，无独立调用方。
-
     @PostMapping("/save")
     @PreAuthorize("devops:app:save")
     @Operation(summary = "应用管理-新增或编辑")

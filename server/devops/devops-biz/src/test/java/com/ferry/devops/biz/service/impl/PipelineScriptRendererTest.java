@@ -54,10 +54,25 @@ class PipelineScriptRendererTest {
         String script = PipelineScriptRenderer.render(definition);
         assertTrue(script.contains("pipeline {"));
         assertTrue(script.contains("agent any"));
+        // webhook 主通道：回传函数与阶段钩子必须注入（CALLBACK_URL 为空时运行时自动跳过）
+        assertTrue(script.contains("def ferryNotify(String stageType, String status)"));
+        assertTrue(script.contains("if (!params.CALLBACK_URL) {"));
+        assertTrue(script.contains("withCredentials([string(credentialsId: 'ferry-callback-secret'"));
+        assertTrue(script.contains("|| true"));
+        assertTrue(script.contains("ferryNotify('1', 'RUNNING')"));
+        assertTrue(script.contains("post {"));
+        assertTrue(script.contains("success { ferryNotify('1', 'SUCCESS') }"));
+        assertTrue(script.contains("failure { ferryNotify('1', 'FAILURE') }"));
+        assertTrue(script.contains("aborted { ferryNotify('1', 'CANCELLED') }"));
+        // Checkout 前置失败约定：stageType=0 上报，无阶段映射直接收敛运行终态
+        assertTrue(script.contains("failure { ferryNotify('0', 'FAILURE') }"));
+        assertTrue(script.contains("if (stageType != '0') {"));
         // 代码检出使用 Job 参数，运行时注入
         assertTrue(script.contains("stage('Checkout')"));
         assertTrue(script.contains("params.REPO_URL"));
         assertTrue(script.contains("params.COMMIT_ID"));
+        // 检出语句括号必须配平：曾因少一个 ] 导致整段脚本 Groovy 编译失败（Jenkins 侧构建未跑即挂）
+        assertTrue(script.contains("credentialsId: (params.GIT_CREDENTIALS_ID ?: '')]]])"));
         assertTrue(script.contains("stage('构建')"));
         assertTrue(script.contains("stage('单元测试')"));
         assertTrue(script.contains("sh '''mvn -B package'''"));
@@ -128,5 +143,23 @@ class PipelineScriptRendererTest {
         PipelinePreviewVO vo = PipelineScriptRenderer.preview(definition);
         assertTrue(vo.getScript().contains("// 仅配置 scriptRef: script/build.sh"));
         assertTrue(vo.getWarnings().stream().anyMatch(w -> w.contains("只配置了 scriptRef")));
+    }
+
+    @Test
+    void 渲染脚本整体括号配平_防止注入块引入语法回归() {
+        PipelineDefinitionDTO definition = definition(
+                stage(1, "构建", "Maven", null, List.of(task("打包", "jenkins", null, "mvn -B package")), null),
+                stage(2, "单元测试", null, null, List.of(task("单测", "jenkins", null, "mvn test")), null));
+        String script = PipelineScriptRenderer.render(definition);
+        // 括号守恒是脚本可编译的必要条件；此前 Checkout 曾因少一个 ] 导致整段脚本编译失败
+        assertEquals(0, count(script, '(') - count(script, ')'));
+        assertEquals(0, count(script, '[') - count(script, ']'));
+        assertEquals(0, count(script, '{') - count(script, '}'));
+        // 回传函数定义必须先于 pipeline 块出现
+        assertTrue(script.indexOf("def ferryNotify") < script.indexOf("pipeline {"));
+    }
+
+    private static long count(String s, char c) {
+        return s.chars().filter(ch -> ch == c).count();
     }
 }

@@ -23,6 +23,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.List;
@@ -30,10 +31,12 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
- * 轮询 Jenkins 构建状态并同步运行/阶段。
+ * 轮询 Jenkins 构建状态并同步运行/阶段：状态同步的兜底对账通道（主通道为脚本内 webhook 回调）。
  *
- * <p>只轮询最近 24 小时内、状态为排队中/运行中/结果待确认的运行；构建号未分配时先通过
- * 队列项解析。阶段状态来自 Pipeline Stage View 的 wfapi，插件不可用时降级为构建级状态。
+ * <p>按状态分频：活动运行（排队中/运行中）60 秒级、结果待确认 300 秒级；
+ * 均只处理最近 24 小时内的运行。构建号未分配时先通过队列项解析。
+ * 阶段状态来自 Pipeline Stage View 的 wfapi，插件不可用时降级为构建级状态；
+ * 回调已写入的终态阶段在此保持幂等（终态不覆盖）。
  */
 @Slf4j
 @Service
@@ -56,13 +59,26 @@ public class RunPollServiceImpl implements IRunPollService {
 
     @Override
     public void pollActiveRuns() {
+        pollRuns(RunStatusEnum.QUEUED, RunStatusEnum.RUNNING);
+    }
+
+    @Override
+    public void pollUnknownRuns() {
+        pollRuns(RunStatusEnum.UNKNOWN);
+    }
+
+    /**
+     * 按状态集合轮询运行并同步 Jenkins 状态。
+     *
+     * @param statuses 本次要轮询的运行状态
+     */
+    private void pollRuns(RunStatusEnum... statuses) {
         if (properties.getJenkins() == null || StrUtil.isBlank(properties.getJenkins().getBaseUrl())) {
             return;
         }
         Date since = new Date(System.currentTimeMillis() - LOOKBACK_MS);
         List<Run> runs = runMapper.selectList(Wrappers.<Run>lambdaQuery()
-                .in(Run::getStatus, RunStatusEnum.QUEUED.getCode(), RunStatusEnum.RUNNING.getCode(),
-                        RunStatusEnum.UNKNOWN.getCode())
+                .in(Run::getStatus, Arrays.stream(statuses).map(RunStatusEnum::getCode).toList())
                 .gt(Run::getCreateTime, since)
                 .orderByAsc(Run::getId)
                 .last("LIMIT " + POLL_LIMIT));

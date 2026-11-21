@@ -40,6 +40,12 @@ public class DevopsIntegrationProperties {
         private String token = "";
         /** 回调验签密钥（复用现有 webhook 配置，这里给出默认对接项） */
         private String callbackSecret = "";
+        /**
+         * Ferry 状态回调完整地址（须含接口路径），Jenkins 容器必须能访问到，
+         * 如 http://172.21.0.1:9100/ferry-devops/callback/jenkins/status（WSL 原生 docker 用 Windows 侧 vEthernet 网关 IP）；
+         * 为空时构建参数 CALLBACK_URL 为空，生成的脚本自动跳过回调，状态同步退化为纯轮询兜底
+         */
+        private String callbackUrl = "";
     }
 
     @Data

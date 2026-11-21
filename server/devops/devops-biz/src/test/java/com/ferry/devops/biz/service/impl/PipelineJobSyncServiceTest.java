@@ -34,6 +34,7 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -78,6 +79,7 @@ class PipelineJobSyncServiceTest {
         app.setId(1L);
         app.setCode("order-service");
         app.setName("订单服务");
+        app.setRepoUrl("https://github.com/yangzongzhuan/RuoYi");
         return app;
     }
 
@@ -112,9 +114,13 @@ class PipelineJobSyncServiceTest {
 
         assertTrue(outcome.synced());
         assertEquals(PipelineStatusEnum.ENABLED.getCode(), outcome.status());
-        // Job 名 = 应用编码-pipeline-流水线id；启用态 Job 不禁用
-        verify(jenkinsClient).syncJob(eq(JenkinsJobNames.pipelineJobName("order-service", PIPELINE_ID)),
-                eq("order-service"), anyString(), eq(false));
+        // Job 名 = 应用编码；GitHub 项目属性随应用档案下发
+        verify(jenkinsClient).createJob(eq(JenkinsJobNames.appJobName("order-service")),
+                eq("order-service"), anyString(), eq(false),
+                eq("https://github.com/yangzongzhuan/RuoYi"), eq("订单服务"));
+        verify(jenkinsClient).updateJob(eq(JenkinsJobNames.appJobName("order-service")),
+                eq("order-service"), anyString(), eq(false),
+                eq("https://github.com/yangzongzhuan/RuoYi"), eq("订单服务"));
         ArgumentCaptor<Pipeline> captor = ArgumentCaptor.forClass(Pipeline.class);
         verify(pipelineMapper).updateById(captor.capture());
         assertEquals(PipelineStatusEnum.ENABLED.getCode(), captor.getValue().getStatus());
@@ -130,7 +136,8 @@ class PipelineJobSyncServiceTest {
 
         assertTrue(outcome.synced());
         assertEquals(PipelineStatusEnum.PENDING_CONFIG.getCode(), outcome.status());
-        verify(jenkinsClient).syncJob(anyString(), eq("order-service"), anyString(), eq(true));
+        verify(jenkinsClient).createJob(anyString(), eq("order-service"), anyString(), eq(true), any(), any());
+        verify(jenkinsClient).updateJob(anyString(), eq("order-service"), anyString(), eq(true), any(), any());
     }
 
     @Test
@@ -144,7 +151,8 @@ class PipelineJobSyncServiceTest {
 
         assertTrue(outcome.synced());
         assertEquals(PipelineStatusEnum.DISABLED.getCode(), outcome.status());
-        verify(jenkinsClient).syncJob(anyString(), eq("order-service"), anyString(), eq(true));
+        verify(jenkinsClient).createJob(anyString(), eq("order-service"), anyString(), eq(true), any(), any());
+        verify(jenkinsClient).updateJob(anyString(), eq("order-service"), anyString(), eq(true), any(), any());
     }
 
     @Test
@@ -160,7 +168,8 @@ class PipelineJobSyncServiceTest {
         assertEquals(PipelineStatusEnum.SYNC_FAILED.getCode(), outcome.status());
         assertTrue(outcome.message().contains("暂不能覆盖可执行脚本"));
         assertTrue(outcome.message().contains("重试同步"));
-        verify(jenkinsClient, never()).syncJob(anyString(), anyString(), anyString(), anyBoolean());
+        verify(jenkinsClient, never()).createJob(anyString(), anyString(), anyString(), anyBoolean(), any(), any());
+        verify(jenkinsClient, never()).updateJob(anyString(), anyString(), anyString(), anyBoolean(), any(), any());
     }
 
     @Test
@@ -172,7 +181,8 @@ class PipelineJobSyncServiceTest {
         PipelineJobSyncService.SyncOutcome outcome = service.sync(PIPELINE_ID);
 
         assertTrue(outcome.synced());
-        verify(jenkinsClient).syncJob(anyString(), anyString(), anyString(), eq(true));
+        verify(jenkinsClient).createJob(anyString(), anyString(), anyString(), eq(true), any(), any());
+        verify(jenkinsClient).updateJob(anyString(), anyString(), anyString(), eq(true), any(), any());
     }
 
     @Test
@@ -181,8 +191,8 @@ class PipelineJobSyncServiceTest {
         when(appMapper.selectById(1L)).thenReturn(app());
         when(pipelineStageService.loadDefinition(PIPELINE_ID, 1)).thenReturn(definitionWithCiStage());
         when(runMapper.countActiveByPipeline(PIPELINE_ID)).thenReturn(0L);
-        when(jenkinsClient.syncJob(anyString(), anyString(), anyString(), anyBoolean()))
-                .thenThrow(new JenkinsDispatchException("更新 Jenkins Job 失败：HTTP 403", false));
+        doThrow(new JenkinsDispatchException("更新 Jenkins Job 失败：HTTP 403", false))
+                .when(jenkinsClient).updateJob(anyString(), anyString(), anyString(), anyBoolean(), any(), any());
 
         PipelineJobSyncService.SyncOutcome outcome = service.sync(PIPELINE_ID);
 
@@ -197,8 +207,8 @@ class PipelineJobSyncServiceTest {
         when(appMapper.selectById(1L)).thenReturn(app());
         when(pipelineStageService.loadDefinition(PIPELINE_ID, 1)).thenReturn(definitionWithCiStage());
         when(runMapper.countActiveByPipeline(PIPELINE_ID)).thenReturn(0L);
-        when(jenkinsClient.syncJob(anyString(), anyString(), anyString(), anyBoolean()))
-                .thenThrow(new JenkinsDispatchException("Jenkins 请求失败：/job/secret-host/x", true));
+        doThrow(new JenkinsDispatchException("Jenkins 请求失败：/job/secret-host/x", true))
+                .when(jenkinsClient).updateJob(anyString(), anyString(), anyString(), anyBoolean(), any(), any());
 
         PipelineJobSyncService.SyncOutcome outcome = service.sync(PIPELINE_ID);
 
@@ -213,8 +223,8 @@ class PipelineJobSyncServiceTest {
         when(appMapper.selectById(1L)).thenReturn(app());
         when(pipelineStageService.loadDefinition(PIPELINE_ID, 2)).thenReturn(definitionWithCiStage());
         when(runMapper.countActiveByPipeline(PIPELINE_ID)).thenReturn(0L);
-        when(jenkinsClient.syncJob(anyString(), anyString(), anyString(), anyBoolean()))
-                .thenThrow(new JenkinsDispatchException("更新失败", false));
+        doThrow(new JenkinsDispatchException("更新失败", false))
+                .when(jenkinsClient).updateJob(anyString(), anyString(), anyString(), anyBoolean(), any(), any());
 
         PipelineJobSyncService.SyncOutcome outcome = service.sync(PIPELINE_ID);
 
@@ -227,6 +237,7 @@ class PipelineJobSyncServiceTest {
         when(pipelineMapper.selectById(PIPELINE_ID)).thenReturn(pipeline(1, PipelineStatusEnum.ENABLED));
         when(appMapper.selectById(1L)).thenReturn(null);
         assertThrows(ServiceException.class, () -> service.sync(PIPELINE_ID));
-        verify(jenkinsClient, never()).syncJob(anyString(), anyString(), anyString(), anyBoolean());
+        verify(jenkinsClient, never()).createJob(anyString(), anyString(), anyString(), anyBoolean(), any(), any());
+        verify(jenkinsClient, never()).updateJob(anyString(), anyString(), anyString(), anyBoolean(), any(), any());
     }
 }

@@ -20,9 +20,6 @@ public class PrecheckResultVO {
     @Schema(description = "幂等命中：既有运行id")
     private Long mergedRunId;
 
-    @Schema(description = "幂等命中：可复用运行id")
-    private Long reusedRunId;
-
     @Schema(description = "幂等命中：可复用制品摘要")
     private String artifactDigest;
 }

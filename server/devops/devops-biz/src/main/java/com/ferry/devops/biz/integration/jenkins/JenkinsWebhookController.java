@@ -3,6 +3,7 @@ package com.ferry.devops.biz.integration.jenkins;
 import com.ferry.common.core.exception.ServiceException;
 import com.ferry.common.core.exception.UtilException;
 import com.ferry.common.core.http.R;
+import com.ferry.common.core.utils.CollUtil;
 import com.ferry.common.core.utils.HttpUtil;
 import com.ferry.common.core.utils.JsonUtil;
 import com.ferry.common.core.utils.ObjUtil;
@@ -10,11 +11,13 @@ import com.ferry.common.core.utils.StrUtil;
 import com.ferry.devops.api.entity.GateResult;
 import com.ferry.devops.api.entity.Run;
 import com.ferry.devops.api.entity.RunStage;
+import com.ferry.devops.api.entity.RunTask;
 import com.ferry.devops.api.enums.BlockReasonEnum;
 import com.ferry.devops.api.enums.RunStatusEnum;
 import com.ferry.devops.api.enums.StageStatusEnum;
 import com.ferry.devops.biz.mapper.RunMapper;
 import com.ferry.devops.biz.mapper.RunStageMapper;
+import com.ferry.devops.biz.mapper.RunTaskMapper;
 import com.ferry.devops.biz.service.IGateResultService;
 import com.ferry.devops.biz.service.IRunService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -34,6 +37,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HexFormat;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -41,7 +45,9 @@ import java.util.Map;
  *
  * <p>签名：以请求参数按字典序拼成 {@code k=v&...} 作为待签串，HMAC-SHA256(secret, 待签串) 转小写十六进制，
  * 放在请求头 {@code X-Ferry-Signature}。secret 未配置时跳过验签（本地/试点环境）；配置后校验不通过返回 401 语义失败。
- * 状态以本系统为准；状态同步主通道为轮询任务，本回调保留给自定义 Job 作为快速通道；结果待确认不直接置成功。
+ * 状态以本系统为准；Ferry 生成的 Job 通过脚本内 {@code ferryNotify} 主动上报，本通道为主通道，
+ * {@code RunPollingScheduler} 降频轮询兜底对账；结果待确认不直接置成功。
+ * 约定 {@code stageId=0} 为构建前置失败（Checkout 等 Ferry 阶段之前的步骤），直接收敛运行终态。
  */
 @Slf4j
 @RestController
@@ -50,8 +56,18 @@ import java.util.Map;
 @Tag(name = "Jenkins回调", description = "Jenkins 结果回传入站接口")
 public class JenkinsWebhookController {
 
+    /** 参与 Jenkins 执行的 CI 阶段类型上限：1构建 2单测 3静态扫描 4制品入库；5-8 属部署/审批域，由 Ferry 侧执行器推进 */
+    private static final int CI_STAGE_TYPE_MAX = 4;
+
+    /** 任务状态镜像码（与轮询 syncTaskStatus 同口径）：3成功 4失败 6跳过 9已取消 */
+    private static final int TASK_STATUS_SUCCESS = 3;
+    private static final int TASK_STATUS_FAILURE = 4;
+    private static final int TASK_STATUS_SKIPPED = 6;
+    private static final int TASK_STATUS_CANCELLED = 9;
+
     private final RunMapper runMapper;
     private final RunStageMapper stageMapper;
+    private final RunTaskMapper taskMapper;
     private final IRunService runService;
     private final IGateResultService gateResultService;
 
@@ -82,10 +98,17 @@ public class JenkinsWebhookController {
         if (!verify(runId, stageId, buildNo, status, signature, request)) {
             return R.fail(401, "回调签名校验失败");
         }
-        RunStage stage = stageMapper.selectById(stageId);
         Run run = runMapper.selectById(runId);
-        if (stage == null || run == null) {
-            throw new ServiceException("回调对应的运行或阶段不存在");
+        if (run == null) {
+            throw new ServiceException("回调对应的运行不存在");
+        }
+        // 约定 stageId=0 表示构建前置失败（Checkout 等 Ferry 阶段之前的步骤），无对应运行阶段
+        if (Long.valueOf(0L).equals(stageId)) {
+            return buildLevelCallback(run, status);
+        }
+        RunStage stage = stageMapper.selectById(stageId);
+        if (stage == null) {
+            throw new ServiceException("回调对应的阶段不存在");
         }
         RunStatusEnum runStatus = parseRunStatus(status);
         StageStatusEnum stageStatus = parseStageStatus(status);
@@ -130,15 +153,26 @@ public class JenkinsWebhookController {
             stage.setDuration(now.getTime() - stage.getStartTime().getTime());
         }
         stageMapper.updateById(stage);
+        mirrorTasks(stage, stageStatus);
         if (stageStatus == StageStatusEnum.SUCCESS) {
-            // 阶段成功只更新阶段与运行中状态；运行最终结果由轮询任务按整条构建收敛
             if (run.getStartTime() == null) {
                 run.setStartTime(now);
             }
-            if (!isTerminalRunStatus(run.getStatus())) {
+            if (allCiSettled(runId)) {
+                // webhook 为主通道：CI 阶段全部终态时立即收敛运行终态，不等轮询兜底；
+                // 已有终态（如先行阶段失败）不覆盖，后面再到的迟到 SUCCESS 只更新阶段本身
+                if (!isTerminalRunStatus(run.getStatus())) {
+                    run.setStatus(RunStatusEnum.SUCCESS.getCode());
+                    run.setEndTime(now);
+                    if (run.getStartTime() != null) {
+                        run.setDuration(run.getEndTime().getTime() - run.getStartTime().getTime());
+                    }
+                    skipNonCiNotStarted(runId);
+                }
+            } else if (!isTerminalRunStatus(run.getStatus())) {
                 run.setStatus(RunStatusEnum.RUNNING.getCode());
-                runMapper.updateById(run);
             }
+            runMapper.updateById(run);
             return R.success("回调已接收");
         }
         // 阶段失败/超时/取消：后续未开始阶段全部跳过，运行进入对应终态
@@ -147,6 +181,7 @@ public class JenkinsWebhookController {
                     && ObjUtil.equals(later.getStatus(), StageStatusEnum.NOT_STARTED.getCode())) {
                 later.setStatus(StageStatusEnum.SKIPPED.getCode());
                 stageMapper.updateById(later);
+                mirrorTasks(later, StageStatusEnum.SKIPPED);
             }
         }
         RunStatusEnum terminalRunStatus = switch (stageStatus) {
@@ -321,6 +356,88 @@ public class JenkinsWebhookController {
         }
         runService.saveLog(runId, taskId, content);
         return R.success("日志已接收");
+    }
+
+    /**
+     * 构建前置失败回调：Checkout 等前置步骤失败时无对应运行阶段，直接收敛运行终态。
+     *
+     * <p>仅终态（失败/超时/已取消）有意义；运行态/成功对前置阶段无意义，忽略不处理。
+     * 构建未进入任何 Ferry 阶段，全部未开始阶段（含 CI）置跳过。
+     */
+    private R<String> buildLevelCallback(Run run, String status) {
+        RunStatusEnum runStatus = parseRunStatus(status);
+        if (runStatus == null || runStatus == RunStatusEnum.RUNNING || runStatus == RunStatusEnum.SUCCESS) {
+            return R.success("回调已接收");
+        }
+        if (isTerminalRunStatus(run.getStatus())) {
+            return R.success("回调已接收");
+        }
+        RunStatusEnum terminal = switch (runStatus) {
+            case TIMEOUT -> RunStatusEnum.TIMEOUT;
+            case CANCELLED -> RunStatusEnum.CANCELLED;
+            default -> RunStatusEnum.FAILURE;
+        };
+        Date now = new Date();
+        run.setStatus(terminal.getCode());
+        run.setEndTime(now);
+        if (run.getStartTime() != null) {
+            run.setDuration(run.getEndTime().getTime() - run.getStartTime().getTime());
+        }
+        runMapper.updateById(run);
+        for (RunStage stage : stageMapper.selectByRun(run.getId())) {
+            if (ObjUtil.equals(stage.getStatus(), StageStatusEnum.NOT_STARTED.getCode())) {
+                stage.setStatus(StageStatusEnum.SKIPPED.getCode());
+                stageMapper.updateById(stage);
+                mirrorTasks(stage, StageStatusEnum.SKIPPED);
+            }
+        }
+        return R.success("回调已接收");
+    }
+
+    /** CI 阶段（type≤4）是否已全部进入终态；REUSED 复用阶段按终态计，断点重跑不受影响 */
+    private boolean allCiSettled(Long runId) {
+        return stageMapper.selectByRun(runId).stream()
+                .filter(stage -> stage.getStageType() != null && stage.getStageType() <= CI_STAGE_TYPE_MAX)
+                .allMatch(stage -> isTerminalStageStatus(stage.getStatus()));
+    }
+
+    /** 部署/发布域未开始阶段置跳过，与轮询 markNotStartedSkipped 口径一致 */
+    private void skipNonCiNotStarted(Long runId) {
+        for (RunStage stage : stageMapper.selectByRun(runId)) {
+            if (stage.getStageType() != null && stage.getStageType() > CI_STAGE_TYPE_MAX
+                    && ObjUtil.equals(stage.getStatus(), StageStatusEnum.NOT_STARTED.getCode())) {
+                stage.setStatus(StageStatusEnum.SKIPPED.getCode());
+                stageMapper.updateById(stage);
+                mirrorTasks(stage, StageStatusEnum.SKIPPED);
+            }
+        }
+    }
+
+    /**
+     * 任务状态镜像阶段状态（与轮询 syncTaskStatus 同口径）：Jenkins 阶段级结果无法精确到任务，
+     * 先保证页面状态一致；仅在状态变化时更新，回调与轮询双通道写入天然幂等。
+     */
+    private void mirrorTasks(RunStage stage, StageStatusEnum stageStatus) {
+        Integer taskStatus = switch (stageStatus) {
+            case SUCCESS -> TASK_STATUS_SUCCESS;
+            case FAILURE -> TASK_STATUS_FAILURE;
+            case SKIPPED -> TASK_STATUS_SKIPPED;
+            case CANCELLED -> TASK_STATUS_CANCELLED;
+            default -> null;
+        };
+        if (taskStatus == null) {
+            return;
+        }
+        List<RunTask> tasks = taskMapper.selectByStage(stage.getId());
+        if (CollUtil.isEmpty(tasks)) {
+            return;
+        }
+        for (RunTask task : tasks) {
+            if (!ObjUtil.equals(task.getStatus(), taskStatus)) {
+                task.setStatus(taskStatus);
+                taskMapper.updateById(task);
+            }
+        }
     }
 
     /**

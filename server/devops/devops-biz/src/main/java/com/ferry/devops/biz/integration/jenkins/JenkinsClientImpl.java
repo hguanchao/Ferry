@@ -44,36 +44,67 @@ class JenkinsClientImpl implements JenkinsClient {
     private volatile JenkinsHttpClient httpClient;
     private volatile String httpClientKey;
 
+    /**
+     * 创建 Job（幂等）：先查 Job 是否存在，存在直接完成返回。
+     */
     @Override
-    public JenkinsDispatchResult syncJob(String jobName, String appCode, String script, boolean disabled) {
+    public void createJob(String jobName, String appCode, String script, boolean disabled,
+                          String projectUrl, String projectDisplayName) {
         DevopsIntegrationProperties.Jenkins cfg = properties.getJenkins();
         if (cfg == null || StrUtil.isBlank(cfg.getBaseUrl())) {
-            log.info("Jenkins syncJob (mock): jobName={}, disabled={}", jobName, disabled);
-            return new JenkinsDispatchResult(jobName, null, null);
+            log.info("Jenkins createJob (mock): jobName={}, disabled={}", jobName, disabled);
+            return;
         }
         JenkinsHttpClient http = httpClient(cfg);
-        String configPath = "/job/" + encode(jobName) + "/config.xml";
-        JenkinsHttpClient.HttpResult existing = http.get(configPath);
+        JenkinsHttpClient.HttpResult existing = http.get(configPath(jobName));
+        if (existing.isOk()) {
+            // 幂等：Job 已存在时创建动作直接完成，脚本更新交给 updateJob
+            log.info("Jenkins job already exists, createJob skipped: jobName={}", jobName);
+            return;
+        }
+        if (existing.status() != 404) {
+            throw new JenkinsDispatchException(
+                    "读取 Jenkins Job 配置失败：" + jobName + "，HTTP " + existing.status(),
+                    isUncertain(existing.status()));
+        }
+        if (!cfg.isAutoCreateJob()) {
+            throw new JenkinsDispatchException("Jenkins Job 不存在且未开启自动创建：" + jobName, false);
+        }
+        String xml = JenkinsJobXml.buildMinimalJobXml(jobName, appCode, script, disabled,
+                projectUrl, projectDisplayName);
+        JenkinsHttpClient.HttpResult created =
+                http.postXml("/createItem?name=" + encode(jobName), xml);
+        if (created.isOk()) {
+            log.info("Jenkins job created: jobName={}, disabled={}", jobName, disabled);
+            return;
+        }
+        // 400/409：并发创建或同名冲突，回读确认存在即视为完成
+        JenkinsHttpClient.HttpResult confirm = http.get(configPath(jobName));
+        if (confirm.isOk()) {
+            log.info("Jenkins job create conflicted but confirmed present: jobName={}", jobName);
+            return;
+        }
+        throw new JenkinsDispatchException(
+                "创建 Jenkins Job 失败：" + jobName + "，HTTP " + created.status(),
+                isUncertain(created.status()));
+    }
+
+    /**
+     * 更新 Job 配置：先查 Job 是否存在，不存在抛出异常（创建走 {@link #createJob}）。
+     */
+    @Override
+    public void updateJob(String jobName, String appCode, String script, boolean disabled,
+                          String projectUrl, String projectDisplayName) {
+        DevopsIntegrationProperties.Jenkins cfg = properties.getJenkins();
+        if (cfg == null || StrUtil.isBlank(cfg.getBaseUrl())) {
+            log.info("Jenkins updateJob (mock): jobName={}, disabled={}", jobName, disabled);
+            return;
+        }
+        JenkinsHttpClient http = httpClient(cfg);
+        JenkinsHttpClient.HttpResult existing = http.get(configPath(jobName));
         if (existing.status() == 404) {
-            if (!cfg.isAutoCreateJob()) {
-                throw new JenkinsDispatchException("Jenkins Job 不存在且未开启自动创建：" + jobName, false);
-            }
-            String xml = JenkinsJobXml.buildMinimalJobXml(jobName, appCode, script, disabled);
-            JenkinsHttpClient.HttpResult created =
-                    http.postXml("/createItem?name=" + encode(jobName), xml);
-            if (created.isOk()) {
-                log.info("Jenkins job created: jobName={}, disabled={}", jobName, disabled);
-                return new JenkinsDispatchResult(jobName, null, null);
-            }
-            // 400/409：并发创建或同名冲突，回读配置校验归属后走更新路径
-            log.info("Jenkins job create conflicted (HTTP {}), fallback to update: jobName={}",
-                    created.status(), jobName);
-            existing = http.get(configPath);
-            if (existing.status() == 404) {
-                throw new JenkinsDispatchException(
-                        "创建 Jenkins Job 失败：" + jobName + "，HTTP " + created.status(),
-                        isUncertain(created.status()));
-            }
+            throw new JenkinsDispatchException(
+                    "Jenkins Job 不存在，请先初始化：" + jobName, false);
         }
         if (!existing.isOk()) {
             throw new JenkinsDispatchException(
@@ -85,15 +116,43 @@ class JenkinsClientImpl implements JenkinsClient {
         if (doc == null) {
             throw new JenkinsDispatchException("Jenkins Job 非 Ferry 管理，拒绝覆盖：" + jobName, false);
         }
-        String xml = JenkinsJobXml.applyFerryConfig(doc, script, disabled);
-        JenkinsHttpClient.HttpResult updated = http.postXml(configPath, xml);
+        String xml = JenkinsJobXml.applyFerryConfig(doc, script, disabled, projectUrl, projectDisplayName);
+        JenkinsHttpClient.HttpResult updated = http.postXml(configPath(jobName), xml);
         if (!updated.isOk()) {
             throw new JenkinsDispatchException(
                     "更新 Jenkins Job 失败：" + jobName + "，HTTP " + updated.status(),
                     isUncertain(updated.status()));
         }
-        log.info("Jenkins job synced: jobName={}, disabled={}", jobName, disabled);
-        return new JenkinsDispatchResult(jobName, null, null);
+        log.info("Jenkins job updated: jobName={}, disabled={}", jobName, disabled);
+    }
+
+    /** Job 配置读取路径（构造 config.xml 地址） */
+    private String configPath(String jobName) {
+        return "/job/" + encode(jobName) + "/config.xml";
+    }
+
+    /**
+     * 删除 Job：POST doDelete。404 视为成功（幂等删除）；302/200 为 Jenkins 的删除成功响应；
+     * 其余非成功状态按确定性规则抛出。
+     */
+    @Override
+    public void deleteJob(String jobName) {
+        DevopsIntegrationProperties.Jenkins cfg = properties.getJenkins();
+        if (cfg == null || StrUtil.isBlank(cfg.getBaseUrl())) {
+            log.info("Jenkins deleteJob (mock): jobName={}", jobName);
+            return;
+        }
+        JenkinsHttpClient http = httpClient(cfg);
+        JenkinsHttpClient.HttpResult response =
+                http.postForm("/job/" + encode(jobName) + "/doDelete", Map.of());
+        if (response.status() == 404 || response.isOk()
+                || response.status() == 302 || response.status() == 303) {
+            log.info("Jenkins job deleted: jobName={}, status={}", jobName, response.status());
+            return;
+        }
+        throw new JenkinsDispatchException(
+                "删除 Jenkins Job 失败：" + jobName + "，HTTP " + response.status(),
+                isUncertain(response.status()));
     }
 
     @Override
@@ -242,6 +301,8 @@ class JenkinsClientImpl implements JenkinsClient {
         params.put("REPO_URL", source.repoUrl());
         params.put("SNAPSHOT", snapshot);
         params.put("GIT_CREDENTIALS_ID", cfg.getGitCredentialsId());
+        params.put("CALLBACK_URL", source.callbackUrl() == null ? "" : source.callbackUrl());
+        params.put("STAGE_MAP", source.stageMap() == null ? "" : source.stageMap());
         return params;
     }
 

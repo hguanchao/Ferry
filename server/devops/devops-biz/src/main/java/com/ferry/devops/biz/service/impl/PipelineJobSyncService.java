@@ -65,7 +65,7 @@ public class PipelineJobSyncService {
             throw new ServiceException("应用不存在或未登记编码，无法同步 Jenkins Job");
         }
         String appCode = app.getCode().trim();
-        String jobName = JenkinsJobNames.pipelineJobName(appCode, pipeline.getId());
+        String jobName = JenkinsJobNames.appJobName(appCode);
         PipelineDefinitionDTO definition = pipelineStageService.loadDefinition(
                 pipelineId, pipeline.getVersion() == null ? 0 : pipeline.getVersion());
         boolean emptyDefinition = definition.getStages() == null || definition.getStages().isEmpty();
@@ -76,7 +76,11 @@ public class PipelineJobSyncService {
                 throw new ServiceException("存在排队/运行/结果未确认的构建，暂不能覆盖可执行脚本，请稍后重试同步");
             }
             boolean disabled = emptyDefinition || PipelineStatusEnum.DISABLED.getCode().equals(currentStatus);
-            jenkinsClient.syncJob(jobName, appCode, script, disabled);
+            // 两段式：createJob 保证 Job 存在（已存在幂等跳过），updateJob 更新脚本与属性
+            jenkinsClient.createJob(jobName, appCode, script, disabled,
+                    app.getRepoUrl(), app.getName());
+            jenkinsClient.updateJob(jobName, appCode, script, disabled,
+                    app.getRepoUrl(), app.getName());
         } catch (Exception e) {
             // 脱敏日志：仅 Job 名与失败原因文本，不输出 Jenkins 地址、凭据与响应体
             log.warn("Pipeline job sync failed: pipelineId={}, jobName={}, reason={}", pipelineId, jobName, e.getMessage());

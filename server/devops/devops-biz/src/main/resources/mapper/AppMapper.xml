@@ -1,35 +1,51 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.ferry.devops.biz.mapper.AppMapper">
-
-    <!-- 公共列 + 联表：统一获取部门名称与负责人名称 -->
-    <sql id="App_From">
-        FROM dev_app a
-                 LEFT JOIN sys_dept d ON d.id = a.dept_id AND d.is_deleted = 0
-                 LEFT JOIN sys_user u ON u.id = a.owner_id AND u.is_deleted = 0
-    </sql>
-
-    <sql id="App_Columns">
-        a.id              AS id,
-        a.code            AS code,
-        a.`name`          AS name,
-        a.dept_id         AS deptId,
-        d.`name`          AS deptName,
-        a.owner_id        AS ownerId,
-        u.nickname        AS ownerName,
-        a.core_link       AS coreLink,
-        a.repo_type       AS repoType,
-        a.repo_url        AS repoUrl,
-        a.repo_branch     AS repoBranch,
-        a.repo_commit_id  AS repoCommitId,
-        a.`status`        AS status,
-        a.description     AS description,
-        a.create_time     AS createTime
+    <resultMap id="BaseResultMap" type="com.ferry.devops.api.entity.App">
+        <id column="id" jdbcType="BIGINT" property="id"/>
+        <result column="dept_id" jdbcType="BIGINT" property="deptId"/>
+        <result column="owner_id" jdbcType="BIGINT" property="ownerId"/>
+        <result column="code" jdbcType="VARCHAR" property="code"/>
+        <result column="name" jdbcType="VARCHAR" property="name"/>
+        <result column="description" jdbcType="VARCHAR" property="description"/>
+        <result column="core_link" jdbcType="TINYINT" property="coreLink"/>
+        <result column="repo_type" jdbcType="TINYINT" property="repoType"/>
+        <result column="repo_branch" jdbcType="VARCHAR" property="repoBranch"/>
+        <result column="repo_commit_id" jdbcType="VARCHAR" property="repoCommitId"/>
+        <result column="repo_url" jdbcType="VARCHAR" property="repoUrl"/>
+        <result column="repo_token" jdbcType="VARCHAR" property="repoToken"/>
+        <result column="status" jdbcType="TINYINT" property="status"/>
+        <result column="create_user" jdbcType="BIGINT" property="createUser"/>
+        <result column="create_time" jdbcType="TIMESTAMP" property="createTime"/>
+        <result column="update_user" jdbcType="BIGINT" property="updateUser"/>
+        <result column="update_time" jdbcType="TIMESTAMP" property="updateTime"/>
+        <result column="is_deleted" jdbcType="TINYINT" property="isDeleted"/>
+    </resultMap>
+    <sql id="Base_Column_List">
+        id, dept_id, owner_id, code, name, description, core_link, repo_type, repo_branch,
+        repo_commit_id, repo_url, repo_token, status, create_user, create_time, update_user,
+        update_time, is_deleted
     </sql>
 
     <select id="selectPageList" resultType="com.ferry.devops.api.vo.AppVO">
-        SELECT <include refid="App_Columns"/>
-        <include refid="App_From"/>
+        SELECT a.id             AS id,
+               a.code           AS code,
+               a.`name`         AS name,
+               a.dept_id        AS deptId,
+               d.`name`         AS deptName,
+               a.owner_id       AS ownerId,
+               u.nickname       AS ownerName,
+               a.core_link      AS coreLink,
+               a.repo_type      AS repoType,
+               a.repo_url       AS repoUrl,
+               a.repo_branch    AS repoBranch,
+               a.repo_commit_id AS repoCommitId,
+               a.`status`       AS status,
+               a.description    AS description,
+               a.create_time    AS createTime
+        FROM dev_app a
+                 LEFT JOIN sys_dept d ON d.id = a.dept_id AND d.is_deleted = 0
+                 LEFT JOIN sys_user u ON u.id = a.owner_id AND u.is_deleted = 0
         <where>
             a.is_deleted = 0
             <if test="query.code != null and query.code != ''">
@@ -63,5 +79,4 @@
         </where>
         ORDER BY a.create_time DESC
     </select>
-
 </mapper>

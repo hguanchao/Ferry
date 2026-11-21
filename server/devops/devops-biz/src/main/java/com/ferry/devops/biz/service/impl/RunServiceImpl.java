@@ -41,6 +41,7 @@ import com.ferry.devops.api.vo.RunStageVO;
 import com.ferry.devops.api.vo.RunTaskVO;
 import com.ferry.devops.api.vo.TriggerResultVO;
 import com.ferry.devops.api.vo.VersionVO;
+import com.ferry.devops.biz.config.DevopsIntegrationProperties;
 import com.ferry.devops.biz.integration.jenkins.BuildSource;
 import com.ferry.devops.biz.integration.jenkins.JenkinsClient;
 import com.ferry.devops.biz.integration.jenkins.JenkinsDispatchException;
@@ -109,6 +110,7 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
     private final JenkinsClient jenkinsClient;
     private final AppMapper appMapper;
     private final IPipelineService pipelineService;
+    private final DevopsIntegrationProperties properties;
 
     /**
      * 触发生效的代码源。
@@ -283,14 +285,6 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
             vo.setMessage("命中幂等键，已合并到进行中的运行");
             return vo;
         }
-        if (ObjUtil.isNotEmpty(precheck.getReusedRunId())) {
-            writeTriggerRecord(body, source, 3, precheck.getReusedRunId(), null);
-            TriggerResultVO vo = new TriggerResultVO();
-            vo.setResult(TriggerResultEnum.REUSED.getCode());
-            vo.setRunId(precheck.getReusedRunId());
-            vo.setMessage("命中成功运行，将复用其制品");
-            return vo;
-        }
         // 幂等键
         Pipeline pipeline = pipelineMapper.selectById(body.getPipelineId());
         String idemKey = idemKey(body.getAppId(), source.commitId(), pipeline.getVersion());
@@ -447,7 +441,9 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
         run.setTriggerNote(body.getNote());
         run.setStatus(RunStatusEnum.QUEUED.getCode());
         run.setIsPrecheckPass(IntConst.ONE);
-        run.setIdempotentKey(original.getIdempotentKey() + "-R" + System.currentTimeMillis());
+        // 重跑生成全新幂等键：列宽 varchar(64) 只装得下 64 位哈希，直接拼后缀必超长（曾致重跑 500）；
+        // 对原键+时间戳再哈希，保持格式统一且同源多次重跑互不冲突
+        run.setIdempotentKey(CryptoUtil.sha256Hex(original.getIdempotentKey() + "-R" + System.currentTimeMillis()));
         run.setRerunFromRunId(original.getId());
         save(run);
         // 阶段：复用成功阶段（status=8 已复用，写 reused_from_stage_id），其余未开始
@@ -562,8 +558,10 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
             idemItem.setConclusion(3);
             idemItem.setDetail("命中幂等键，将合并到运行 " + active.getId());
         } else if (success != null) {
-            idemItem.setConclusion(4);
-            idemItem.setDetail("命中成功运行 " + success.getId());
+            // 同提交已有成功运行不再强制复用：手动触发语义回归"重新执行"，
+            // 制品复用交由制品管理页/发布域按需引用，这里仅提示不阻断
+            idemItem.setConclusion(1);
+            idemItem.setDetail("同提交存在成功运行 " + success.getId() + "，本次新建运行，其制品可在制品管理页复用");
         } else {
             idemItem.setConclusion(1);
             idemItem.setDetail("未命中幂等键，将创建新运行");
@@ -576,10 +574,6 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
         result.setCanTrigger(canTrigger);
         if (active != null) {
             result.setMergedRunId(active.getId());
-        }
-        if (success != null) {
-            result.setReusedRunId(success.getId());
-            result.setArtifactDigest(null);
         }
         return result;
     }
@@ -721,7 +715,7 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
 
     /**
      * 触发一次完整 CI 构建。一次运行只产生一个 Jenkins build，Jenkinsfile 内部顺序执行多个 CI 阶段；
-     * 构建状态由 {@code RunPollingScheduler} 轮询更新。
+     * 构建状态以脚本内 webhook 回调为主通道，{@code RunPollingScheduler} 降频轮询兜底对账。
      *
      * <p>明确失败（鉴权、Job 创建失败、4xx）直接置运行失败；可能已送达 Jenkins 的失败
      * （超时、连接中断、5xx）置「结果待确认」，由轮询任务继续尝试补正。
@@ -750,9 +744,10 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
             return;
         }
         String appCode = app.getCode().trim();
-        String jobName = JenkinsJobNames.pipelineJobName(appCode, latest.getPipelineId());
+        String jobName = JenkinsJobNames.appJobName(appCode);
         BuildSource source = new BuildSource(appCode, app.getRepoUrl(), latest.getBranch(),
-                latest.getCommitId(), latest.getRefType(), latest.getRefValue());
+                latest.getCommitId(), latest.getRefType(), latest.getRefValue(),
+                buildCallbackUrl(), buildStageMap(latest.getId()));
         try {
             JenkinsDispatchResult result = jenkinsClient.triggerBuild(latest.getId(),
                     "snapshot:" + latest.getPipelineVersion(), jobName, source);
@@ -772,6 +767,32 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
                 markRunFailed(latest);
             }
         }
+    }
+
+    /**
+     * 状态回调地址：来自集成配置 callback-url，空时脚本自动跳过回调走轮询兜底。
+     *
+     * @return 回调基址，可能为空串
+     */
+    private String buildCallbackUrl() {
+        DevopsIntegrationProperties.Jenkins cfg = properties.getJenkins();
+        return cfg == null || StrUtil.isBlank(cfg.getCallbackUrl()) ? "" : cfg.getCallbackUrl().trim();
+    }
+
+    /**
+     * CI 阶段类型到运行阶段ID映射（type:id,...），供脚本回调上报定位运行时阶段。
+     *
+     * <p>回调校验的是运行时 dev_run_stage.id（每次运行新生成），静态脚本无法预知，
+     * 只能在触发时随参数下发。部署/发布域阶段（type&gt;4）不在 Jenkins 执行，不进映射。
+     *
+     * @param runId 运行id
+     * @return 映射串，无 CI 阶段时为空串
+     */
+    private String buildStageMap(Long runId) {
+        return stageMapper.selectByRun(runId).stream()
+                .filter(stage -> stage.getStageType() != null && stage.getStageType() <= 4)
+                .map(stage -> stage.getStageType() + ":" + stage.getId())
+                .collect(Collectors.joining(","));
     }
 
     /**

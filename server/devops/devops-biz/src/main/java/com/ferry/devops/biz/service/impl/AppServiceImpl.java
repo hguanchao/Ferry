@@ -11,31 +11,36 @@ import com.ferry.common.core.utils.StrUtil;
 import com.ferry.common.jdbc.base.ServiceImpl;
 import com.ferry.common.jdbc.provider.Page;
 import com.ferry.devops.api.dto.AppDTO;
+import com.ferry.devops.api.dto.PipelineDefinitionDTO;
 import com.ferry.devops.api.dto.query.AppQuery;
 import com.ferry.devops.api.entity.App;
 import com.ferry.devops.api.vo.AppOptionVO;
 import com.ferry.devops.api.vo.AppVO;
+import com.ferry.devops.biz.integration.jenkins.JenkinsClient;
+import com.ferry.devops.biz.integration.jenkins.JenkinsJobNames;
 import com.ferry.devops.biz.mapper.AppMapper;
 import com.ferry.devops.biz.service.IAppService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
- * 应用档案服务实现
+ * 应用档案服务实现。
  */
 @Service
 @RequiredArgsConstructor
 public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements IAppService {
+    private final JenkinsClient jenkinsClient;
 
     @Override
     public IPage<AppVO> pageList(AppQuery body) {
-        // 联表 sys_dept / sys_user 由 XML 一次查出部门名称与负责人名称
         return baseMapper.selectPageList(Page.create(body), body);
     }
 
@@ -54,7 +59,22 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements IAppS
             }
         }
         App app = BeanUtil.copy(body, App.class);
-        return saveOrUpdate(app);
+        boolean isSuccess = saveOrUpdate(app);
+        if (isSuccess) {
+            // Job 与应用同生命周期：Jenkins 失败即整体回滚，应用不落库，用户重试
+            String jobName = JenkinsJobNames.appJobName(app.getCode());
+            String script = PipelineScriptRenderer.render(new PipelineDefinitionDTO());
+            if (ObjUtil.isNotEmpty(body.getId())) {
+                // 编辑：Job 已存在，刷新脚本与 GitHub 项目属性
+                jenkinsClient.updateJob(jobName, app.getCode().trim(), script, true,
+                        app.getRepoUrl(), app.getName());
+            } else {
+                // 新建：初始化空白 Job
+                jenkinsClient.createJob(jobName, app.getCode().trim(), script, true,
+                        app.getRepoUrl(), app.getName());
+            }
+        }
+        return isSuccess;
     }
 
     @Override
@@ -74,14 +94,24 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements IAppS
                 throw new ServiceException("应用存在未关闭的发布单，不可删除");
             }
         }
-        return removeByIds(ids);
+        List<App> appList = listByIds(ids);
+        boolean isSuccess = removeByIds(ids);
+        if (isSuccess) {
+            // Job 与应用同生命周期：Jenkins 删除失败即整体回滚，应用保留
+            appList.forEach(app -> jenkinsClient.deleteJob(JenkinsJobNames.appJobName(app.getCode())));
+        }
+        return isSuccess;
     }
+
 
     @Override
     public List<AppOptionVO> options(String keyword, Integer scope) {
-        return list(Wrappers.<App>lambdaQuery()
-                .like(StrUtil.isNotBlank(keyword), App::getName, keyword)
-                .orderByAsc(App::getName)).stream().map(app -> {
+        List<App> appList = list(Wrappers.<App>lambdaQuery()
+                .like(StrUtil.isNotBlank(keyword), App::getName, keyword).orderByAsc(App::getName));
+        if (CollUtil.isEmpty(appList)){
+            return Collections.emptyList();
+        }
+       return appList .stream().map(app -> {
             AppOptionVO vo = new AppOptionVO();
             vo.setValue(app.getId());
             vo.setLabel(app.getName());

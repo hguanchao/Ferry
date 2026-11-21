@@ -9,12 +9,11 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 
+import java.util.List;
+
 @Mapper
 public interface AppMapper extends BaseMapper<App> {
 
-    /**
-     * 应用分页列表：联表 sys_dept / sys_user 获取部门名称与负责人名称
-     */
     IPage<AppVO> selectPageList(IPage<App> page, @Param("query") AppQuery query);
 
     /**

@@ -99,6 +99,13 @@ public class PipelineServiceImpl extends ServiceImpl<PipelineMapper, Pipeline> i
     @Override
     public String save(PipelineDTO body) {
         boolean isNew = ObjUtil.isEmpty(body.getId());
+        if (isNew) {
+            // 应用与流水线 1:1：Jenkins Job 以应用编码命名，多流水线会互相覆盖脚本
+            long exists = count(Wrappers.<Pipeline>lambdaQuery().eq(Pipeline::getAppId, body.getAppId()));
+            if (exists > 0) {
+                throw new ServiceException("该应用已存在流水线，请直接编辑");
+            }
+        }
         Pipeline pipeline = isNew ? new Pipeline() : requirePipeline(body.getId());
         pipeline.setAppId(body.getAppId());
         pipeline.setName(body.getName());

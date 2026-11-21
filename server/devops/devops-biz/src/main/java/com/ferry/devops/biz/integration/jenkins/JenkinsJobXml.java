@@ -38,6 +38,11 @@ final class JenkinsJobXml {
     /** 脚本节点：CpsFlowDefinition/script */
     private static final String TAG_SCRIPT = "script";
 
+    /** GitHub 项目属性节点（GitHub 插件）：仓库主页链接 + 显示名称，纯装饰性元数据 */
+    private static final String GITHUB_PROPERTY_TAG = "hudson.plugins.github.GitHubProjectProperty";
+    private static final String GITHUB_URL_TAG = "projectUrl";
+    private static final String GITHUB_NAME_TAG = "displayName";
+
     /** 禁用位节点：flow-definition/disabled */
     private static final String TAG_DISABLED = "disabled";
 
@@ -51,7 +56,9 @@ final class JenkinsJobXml {
             new ParamDef("REF_VALUE", "原始引用值", ""),
             new ParamDef("REPO_URL", "仓库 Git 地址", ""),
             new ParamDef("SNAPSHOT", "流水线版本快照", ""),
-            new ParamDef("GIT_CREDENTIALS_ID", "Jenkins 凭据 ID，可为空", ""));
+            new ParamDef("GIT_CREDENTIALS_ID", "Jenkins 凭据 ID，可为空", ""),
+            new ParamDef("CALLBACK_URL", "Ferry 状态回调地址，空则不上报走轮询兜底", ""),
+            new ParamDef("STAGE_MAP", "CI 阶段类型到运行阶段ID映射，如 1:100,2:101", ""));
 
     /** 旧 STAGE_SPEC 协议参数名，同步时从托管 Job 中移除 */
     private static final String LEGACY_PARAM_STAGE_SPEC = "STAGE_SPEC";
@@ -65,12 +72,15 @@ final class JenkinsJobXml {
     /**
      * 生成最小 Pipeline Job 配置。
      *
-     * @param jobName  Job 名（同时写入归属标记）
-     * @param appCode  应用编码（仅写入 description 便于人工辨认）
-     * @param script   完整声明式脚本
-     * @param disabled 是否禁用（待配置流水线为 true）
+     * @param jobName             Job 名（同时写入归属标记）
+     * @param appCode             应用编码（仅写入 description 便于人工辨认）
+     * @param script              完整声明式脚本
+     * @param disabled            是否禁用（待配置流水线为 true）
+     * @param projectUrl          代码仓库主页地址（写入 GitHub 项目属性，空则不生成该属性）
+     * @param projectDisplayName  仓库显示名称（GitHub 项目属性的显示名）
      */
-    static String buildMinimalJobXml(String jobName, String appCode, String script, boolean disabled) {
+    static String buildMinimalJobXml(String jobName, String appCode, String script, boolean disabled,
+                                     String projectUrl, String projectDisplayName) {
         try {
             Document doc = secureFactory().newDocumentBuilder().newDocument();
             Element root = doc.createElement(ROOT_ELEMENT);
@@ -95,6 +105,7 @@ final class JenkinsJobXml {
             appendChild(strategy, "numToKeep", "30");
             appendChild(strategy, "artifactDaysToKeep", "-1");
             appendChild(strategy, "artifactNumToKeep", "-1");
+            applyGitHubProperty(properties, projectUrl, projectDisplayName);
 
             Element definition = appendChild(root, "definition");
             definition.setAttribute("class", "org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition");
@@ -141,10 +152,11 @@ final class JenkinsJobXml {
     }
 
     /**
-     * 在已验证归属的配置上更新 Ferry 托管字段：脚本、禁用位、Ferry 参数（含清理遗留 STAGE_SPEC）。
-     * 其余节点（含人工追加的属性与自定义参数）原样保留。
+     * 在已验证归属的配置上更新 Ferry 托管字段：脚本、禁用位、Ferry 参数（含清理遗留 STAGE_SPEC）、
+     * GitHub 项目属性。其余节点（含人工追加的属性与自定义参数）原样保留。
      */
-    static String applyFerryConfig(Document doc, String script, boolean disabled) {
+    static String applyFerryConfig(Document doc, String script, boolean disabled,
+                                   String projectUrl, String projectDisplayName) {
         Element root = doc.getDocumentElement();
         Element definition = firstChild(root, "definition");
         if (definition == null) {
@@ -174,7 +186,45 @@ final class JenkinsJobXml {
                 }
             }
         }
+        applyGitHubProperty(firstChild(root, "properties"), projectUrl, projectDisplayName);
         return serialize(doc);
+    }
+
+    /**
+     * 托管 GitHub 项目属性：url 非空时插入/更新（projectUrl + displayName），空时移除既有属性。
+     *
+     * @param properties         properties 节点（可为 null，null 时仅执行移除前的空守卫）
+     * @param projectUrl         仓库主页地址，空表示不保留该属性
+     * @param projectDisplayName 仓库显示名称
+     */
+    private static void applyGitHubProperty(Element properties, String projectUrl, String projectDisplayName) {
+        if (properties == null) {
+            return;
+        }
+        Element property = firstChild(properties, GITHUB_PROPERTY_TAG);
+        if (StrUtil.isBlank(projectUrl)) {
+            if (property != null) {
+                properties.removeChild(property);
+            }
+            return;
+        }
+        if (property == null) {
+            property = appendChild(properties, GITHUB_PROPERTY_TAG);
+            appendChild(property, GITHUB_URL_TAG, projectUrl.trim());
+            appendChild(property, GITHUB_NAME_TAG, StrUtil.defaultIfBlank(projectDisplayName, ""));
+            return;
+        }
+        // 既有属性节点可能缺子节点（旧配置/手改），更新前先补齐
+        Element urlNode = firstChild(property, GITHUB_URL_TAG);
+        if (urlNode == null) {
+            urlNode = appendChild(property, GITHUB_URL_TAG);
+        }
+        setText(urlNode, projectUrl.trim());
+        Element nameNode = firstChild(property, GITHUB_NAME_TAG);
+        if (nameNode == null) {
+            nameNode = appendChild(property, GITHUB_NAME_TAG);
+        }
+        setText(nameNode, StrUtil.defaultIfBlank(projectDisplayName, ""));
     }
 
     // ==================== 内部实现 ====================
