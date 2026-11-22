@@ -27,10 +27,4 @@ public @interface Idempotent {
 
     /** 重复命中提示 */
     String message() default "请勿重复提交";
-
-    /** 业务异常时是否释放幂等键，允许修正参数后立即重试 */
-    boolean releaseOnError() default true;
-
-    /** Redis 异常时是否放行；false 表示拒绝请求 */
-    boolean failOpen() default true;
 }

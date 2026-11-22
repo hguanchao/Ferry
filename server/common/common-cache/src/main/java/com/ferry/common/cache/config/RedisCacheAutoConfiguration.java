@@ -4,7 +4,6 @@ import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.PropertyAccessor;
 import com.ferry.common.cache.aspect.IdempotentAspect;
-import com.ferry.common.cache.config.props.IdempotentProperties;
 import com.ferry.common.cache.utils.LockUtil;
 import com.ferry.common.cache.utils.RedisUtil;
 import com.ferry.common.core.constant.IntConst;
@@ -46,26 +45,18 @@ import java.util.Objects;
  * <p>排在 Boot 的 Redis 与 Cache 自动配置之前：先提供带 Jackson 序列化的模板与缓存管理器，
  * Boot 侧看到同类型 Bean 后自动退让，避免两套 CacheManager 竞争导致序列化方式不确定。
  *
- * <p>同时导入 {@link RedisUtil} 与 {@link LockUtil}：两者都用静态字段持有客户端，必须由容器实例化一次才能完成注入。
+ * <p>同时导入 {@link RedisUtil}、{@link LockUtil} 与 {@link IdempotentAspect}：前两者用静态字段持有客户端，
+ * 必须由容器实例化一次才能完成注入；切面本身无配置依赖，直接注册为 Bean 使 {@code @Idempotent} 生效。
  *
  * <p>Redisson 只用核心包，starter 绑定的是 Boot 3，因此这里按 Boot 的 Redis 连接参数
  * 自行构建 {@link RedissonClient}，保证锁与缓存指向同一个 Redis。
  */
 @EnableCaching
-@Import({RedisUtil.class, LockUtil.class})
-@EnableConfigurationProperties({CacheProperties.class, DataRedisProperties.class, IdempotentProperties.class})
+@Import({RedisUtil.class, LockUtil.class, IdempotentAspect.class})
+@EnableConfigurationProperties({CacheProperties.class, DataRedisProperties.class})
 @ConditionalOnClass({RedisTemplate.class, RedisConnectionFactory.class})
 @AutoConfiguration(before = {DataRedisAutoConfiguration.class, CacheAutoConfiguration.class})
 public class RedisCacheAutoConfiguration {
-
-    /**
-     * 幂等切面：Redis SETNX + TTL，供 @Idempotent 使用。
-     */
-    @Bean
-    @ConditionalOnMissingBean(IdempotentAspect.class)
-    public IdempotentAspect idempotentAspect(IdempotentProperties properties) {
-        return new IdempotentAspect(properties);
-    }
 
     /**
      * redis模板配置

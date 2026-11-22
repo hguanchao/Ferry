@@ -1,11 +1,8 @@
 package com.ferry.common.cache.aspect;
 
-import java.lang.reflect.Method;
-import java.util.concurrent.TimeUnit;
-
 import com.ferry.common.cache.annotation.Idempotent;
-import com.ferry.common.cache.config.props.IdempotentProperties;
 import com.ferry.common.cache.utils.RedisUtil;
+import com.ferry.common.core.constant.IntConst;
 import com.ferry.common.core.constant.SysConst;
 import com.ferry.common.core.exception.ServiceException;
 import com.ferry.common.core.utils.CryptoUtil;
@@ -23,6 +20,9 @@ import org.springframework.expression.ExpressionParser;
 import org.springframework.expression.spel.standard.SpelExpressionParser;
 import org.springframework.expression.spel.support.StandardEvaluationContext;
 
+import java.lang.reflect.Method;
+import java.util.concurrent.TimeUnit;
+
 /**
  * Redis 幂等切面：SET NX PX 抢占幂等键，重复调用直接拒绝。
  */
@@ -30,36 +30,26 @@ import org.springframework.expression.spel.support.StandardEvaluationContext;
 @Aspect
 @RequiredArgsConstructor
 public class IdempotentAspect {
-
     private static final ExpressionParser EXPRESSION_PARSER = new SpelExpressionParser();
     private static final ParameterNameDiscoverer PARAMETER_NAME_DISCOVERER = new DefaultParameterNameDiscoverer();
 
-    private final IdempotentProperties properties;
-
     @Around("@annotation(idempotent)")
     public Object around(ProceedingJoinPoint joinPoint, Idempotent idempotent) throws Throwable {
-        if (properties == null || !properties.isEnabled()) {
-            return joinPoint.proceed();
-        }
         Method method = ((MethodSignature) joinPoint.getSignature()).getMethod();
         String key = buildKey(method, joinPoint.getArgs(), idempotent);
-        int ttl = idempotent.ttl() > 0 ? idempotent.ttl() : properties.getDefaultTtlSeconds();
+        int ttl = idempotent.ttl() > 0 ? idempotent.ttl() : IntConst.SIXTY;
         Boolean acquired = RedisUtil.trySetNx(key, "1", ttl, TimeUnit.SECONDS);
         if (Boolean.FALSE.equals(acquired)) {
             throw new ServiceException(idempotent.message());
         }
         if (acquired == null) {
-            if (!idempotent.failOpen()) {
-                throw new ServiceException("幂等校验失败，请稍后重试");
-            }
-            log.warn("Redis unavailable, idempotent check skipped: key={}", key);
+            log.warn("Redis unavailable, idempotent check rejected: key={}", key);
+            throw new ServiceException("幂等校验失败，请稍后重试");
         }
         try {
             return joinPoint.proceed();
         } catch (Throwable e) {
-            if (idempotent.releaseOnError() && Boolean.TRUE.equals(acquired)) {
-                RedisUtil.del(key);
-            }
+            RedisUtil.del(key);
             throw e;
         }
     }

@@ -111,7 +111,7 @@ public class RunController {
 
     @PostMapping("/rerun")
     @PreAuthorize("devops:run:rerun")
-    @Idempotent(key = "'rerun:' + #body.id", ttl = 60)
+    @Idempotent(key = "'rerun:' + #body.id")
     @Operation(summary = "运行-断点重跑（新建运行）")
     public R<TriggerResultVO> rerun(@RequestBody RunTriggerDTO body) {
         return R.data(service.rerun(body));

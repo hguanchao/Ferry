@@ -179,7 +179,7 @@ public class PipelineController {
 
     @PostMapping("/trigger")
     @PreAuthorize("devops:pipeline:trigger")
-    @Idempotent(key = "#body.appId + ':' + #body.pipelineId + ':' + (#body.commitId ?: '')", ttl = 60)
+    @Idempotent(key = "#body.appId + ':' + #body.pipelineId + ':' + (#body.commitId ?: '')")
     @Operation(summary = "流水线-手动触发（幂等）")
     public R<TriggerResultVO> trigger(@RequestBody @Valid RunTriggerDTO body) {
         return R.data(runService.trigger(body));
