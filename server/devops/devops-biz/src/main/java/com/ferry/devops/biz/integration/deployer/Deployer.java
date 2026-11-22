@@ -5,7 +5,7 @@ import java.util.List;
 /**
  * 部署执行器统一接口。
  *
- * <p>三个实现通过 DevopsIntegrationProperties#getDeploy().isExecute() 控制：
+ * <p>三个实现通过 DevopsProperties#getDeploy().isExecute() 控制：
  * 开启时用 {@code ProcessBuilder} 真实执行 shell/CLI 命令，关闭时保留原模拟日志与模拟成功结果。
  */
 public interface Deployer {

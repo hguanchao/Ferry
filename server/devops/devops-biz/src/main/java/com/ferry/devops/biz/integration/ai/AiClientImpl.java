@@ -2,7 +2,7 @@ package com.ferry.devops.biz.integration.ai;
 
 import com.ferry.common.core.utils.HttpUtil;
 import com.ferry.common.core.utils.JsonUtil;
-import com.ferry.devops.biz.config.DevopsIntegrationProperties;
+import com.ferry.devops.biz.config.DevopsProperties;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -16,7 +16,7 @@ import java.util.Map;
  * AI 客户端实现。
  *
  * <p>复用 {@link HttpUtil} + {@link JsonUtil} 调 OpenAI 兼容的 {@code /chat/completions}，
- * 外部端点一律从 {@link DevopsIntegrationProperties} 读取，不新增任何 Maven 依赖。
+ * 外部端点一律从 {@link DevopsProperties} 读取，不新增任何 Maven 依赖。
  * 未配置端点或调用失败均降级返回 {@link AiClient#FALLBACK_RESULT}，绝不抛异常阻断主流程。
  */
 @Slf4j
@@ -27,11 +27,11 @@ public class AiClientImpl implements AiClient {
     /** 系统提示词：要求模型只输出结构化 JSON */
     private static final String SYSTEM_PROMPT = "你是研发交付分析助手，只输出JSON，字段category/conclusion/suggestions";
 
-    private final DevopsIntegrationProperties properties;
+    private final DevopsProperties properties;
 
     @Override
     public String chat(String prompt) {
-        DevopsIntegrationProperties.Ai ai = properties.getAi();
+        DevopsProperties.Ai ai = properties.getAi();
         // 未配置端点：保持原固定文本降级，行为不变
         if (ai == null || ai.getBaseUrl() == null || ai.getBaseUrl().isBlank()) {
             return FALLBACK_RESULT;

@@ -3,7 +3,7 @@ package com.ferry.devops.biz.integration.jenkins;
 import com.ferry.common.core.exception.UtilException;
 import com.ferry.common.core.utils.JsonUtil;
 import com.ferry.common.core.utils.StrUtil;
-import com.ferry.devops.biz.config.DevopsIntegrationProperties;
+import com.ferry.devops.biz.config.DevopsProperties;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -42,7 +42,7 @@ class JenkinsClientImpl implements JenkinsClient {
     private static final int QUEUE_POLLS = 5;
     private static final long QUEUE_POLL_INTERVAL_MS = 300L;
 
-    private final DevopsIntegrationProperties properties;
+    private final DevopsProperties properties;
 
     private volatile JenkinsHttpClient httpClient;
     private volatile String httpClientKey;
@@ -53,7 +53,7 @@ class JenkinsClientImpl implements JenkinsClient {
     @Override
     public void createJob(String jobName, String appCode, String script, boolean disabled,
                           String projectUrl, String projectDisplayName) {
-        DevopsIntegrationProperties.Jenkins cfg = properties.getJenkins();
+        DevopsProperties.Jenkins cfg = properties.getJenkins();
         if (cfg == null || StrUtil.isBlank(cfg.getBaseUrl())) {
             log.info("Jenkins createJob (mock): jobName={}, disabled={}", jobName, disabled);
             return;
@@ -98,7 +98,7 @@ class JenkinsClientImpl implements JenkinsClient {
     @Override
     public void updateJob(String jobName, String appCode, String script, boolean disabled,
                           String projectUrl, String projectDisplayName) {
-        DevopsIntegrationProperties.Jenkins cfg = properties.getJenkins();
+        DevopsProperties.Jenkins cfg = properties.getJenkins();
         if (cfg == null || StrUtil.isBlank(cfg.getBaseUrl())) {
             log.info("Jenkins updateJob (mock): jobName={}, disabled={}", jobName, disabled);
             return;
@@ -140,7 +140,7 @@ class JenkinsClientImpl implements JenkinsClient {
      */
     @Override
     public void deleteJob(String jobName) {
-        DevopsIntegrationProperties.Jenkins cfg = properties.getJenkins();
+        DevopsProperties.Jenkins cfg = properties.getJenkins();
         if (cfg == null || StrUtil.isBlank(cfg.getBaseUrl())) {
             log.info("Jenkins deleteJob (mock): jobName={}", jobName);
             return;
@@ -160,7 +160,7 @@ class JenkinsClientImpl implements JenkinsClient {
 
     @Override
     public JenkinsDispatchResult triggerBuild(Long runId, String snapshot, String jobName, BuildSource source) {
-        DevopsIntegrationProperties.Jenkins cfg = properties.getJenkins();
+        DevopsProperties.Jenkins cfg = properties.getJenkins();
         if (cfg == null || StrUtil.isBlank(cfg.getBaseUrl())) {
             // 降级：未配置 Jenkins 基址时保持模拟日志
             log.info("Jenkins trigger (mock): runId={}, jobName={}, branch={}, commitId={}",
@@ -188,7 +188,7 @@ class JenkinsClientImpl implements JenkinsClient {
 
     @Override
     public Long resolveQueueBuild(String jobName, Long queueId) {
-        DevopsIntegrationProperties.Jenkins cfg = properties.getJenkins();
+        DevopsProperties.Jenkins cfg = properties.getJenkins();
         if (cfg == null || StrUtil.isBlank(cfg.getBaseUrl()) || queueId == null) {
             return null;
         }
@@ -207,7 +207,7 @@ class JenkinsClientImpl implements JenkinsClient {
 
     @Override
     public JenkinsBuildStatus buildStatus(String jobName, Long buildNo) {
-        DevopsIntegrationProperties.Jenkins cfg = properties.getJenkins();
+        DevopsProperties.Jenkins cfg = properties.getJenkins();
         if (cfg == null || StrUtil.isBlank(cfg.getBaseUrl())) {
             throw new JenkinsDispatchException("Jenkins 未配置，无法查询构建状态", false);
         }
@@ -244,7 +244,7 @@ class JenkinsClientImpl implements JenkinsClient {
 
     @Override
     public Optional<String> fetchArtifact(String jobName, Long buildNo, String artifactPath) {
-        DevopsIntegrationProperties.Jenkins cfg = properties.getJenkins();
+        DevopsProperties.Jenkins cfg = properties.getJenkins();
         if (cfg == null || StrUtil.isBlank(cfg.getBaseUrl())) {
             log.info("Jenkins fetchArtifact (mock): jobName={}, buildNo={}, path={}",
                     jobName, buildNo, artifactPath);
@@ -281,7 +281,7 @@ class JenkinsClientImpl implements JenkinsClient {
 
     @Override
     public void abortBuild(String jobName, Long buildNo) {
-        DevopsIntegrationProperties.Jenkins cfg = properties.getJenkins();
+        DevopsProperties.Jenkins cfg = properties.getJenkins();
         if (cfg == null || StrUtil.isBlank(cfg.getBaseUrl())) {
             log.info("Jenkins abort (mock): jobName={}, buildNo={}", jobName, buildNo);
             return;
@@ -330,7 +330,7 @@ class JenkinsClientImpl implements JenkinsClient {
     }
 
     private Map<String, String> buildParams(String snapshot, BuildSource source,
-                                            DevopsIntegrationProperties.Jenkins cfg) {
+                                            DevopsProperties.Jenkins cfg) {
         Map<String, String> params = new LinkedHashMap<>();
         params.put("APP_CODE", source.appCode());
         params.put("BRANCH", source.branch());
@@ -343,7 +343,7 @@ class JenkinsClientImpl implements JenkinsClient {
         return params;
     }
 
-    private String buildPath(DevopsIntegrationProperties.Jenkins cfg, String jobName) {
+    private String buildPath(DevopsProperties.Jenkins cfg, String jobName) {
         String template = StrUtil.isBlank(cfg.getBuildPath()) ? DEFAULT_BUILD_PATH : cfg.getBuildPath().trim();
         String path = template.replace("{job}", jobName);
         return path.startsWith("/") ? path : "/" + path;
@@ -396,7 +396,7 @@ class JenkinsClientImpl implements JenkinsClient {
         return null;
     }
 
-    private JenkinsHttpClient httpClient(DevopsIntegrationProperties.Jenkins cfg) {
+    private JenkinsHttpClient httpClient(DevopsProperties.Jenkins cfg) {
         String key = cfg.getBaseUrl() + "|" + cfg.getUser() + "|" + cfg.getToken();
         JenkinsHttpClient current = httpClient;
         if (current != null && key.equals(httpClientKey)) {

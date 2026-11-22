@@ -9,7 +9,7 @@ import com.ferry.devops.api.entity.RunStageGate;
 import com.ferry.devops.api.entity.Run;
 import com.ferry.devops.api.entity.RunStage;
 import com.ferry.devops.api.enums.StageStatusEnum;
-import com.ferry.devops.biz.config.DevopsIntegrationProperties;
+import com.ferry.devops.biz.config.DevopsProperties;
 import com.ferry.devops.biz.gate.GateReportContract;
 import com.ferry.devops.biz.integration.jenkins.JenkinsClient;
 import com.ferry.devops.biz.mapper.AppMapper;
@@ -63,12 +63,12 @@ class RunStageGateEvaluatorTest {
     @Mock
     private JenkinsClient jenkinsClient;
 
-    private DevopsIntegrationProperties properties;
+    private DevopsProperties properties;
     private RunStageGateEvaluator service;
 
     @BeforeEach
     void setUp() {
-        properties = new DevopsIntegrationProperties();
+        properties = new DevopsProperties();
         properties.getGate().setEnabled(true);
         properties.getGate().setPullTimeoutSeconds(300);
         service = new RunStageGateEvaluator(runMapper, stageMapper, appMapper, gateResultMapper,

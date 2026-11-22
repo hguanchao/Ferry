@@ -8,7 +8,7 @@ import com.ferry.devops.api.entity.RunOperation;
 import com.ferry.devops.api.entity.RunStage;
 import com.ferry.devops.api.enums.RunStatusEnum;
 import com.ferry.devops.api.enums.StageStatusEnum;
-import com.ferry.devops.biz.config.DevopsIntegrationProperties;
+import com.ferry.devops.biz.config.DevopsProperties;
 import com.ferry.devops.biz.mapper.RunStageGateMapper;
 import com.ferry.devops.biz.mapper.RunMapper;
 import com.ferry.devops.biz.mapper.RunOperationMapper;
@@ -60,7 +60,7 @@ class RunStageServiceImplTest {
     @BeforeEach
     void setUp() {
         TableInfoHelper.initTableInfo(new MapperBuilderAssistant(new MybatisConfiguration(), ""), Run.class);
-        DevopsIntegrationProperties properties = new DevopsIntegrationProperties();
+        DevopsProperties properties = new DevopsProperties();
         properties.getGate().setEnabled(true);
         service = new RunStageServiceImpl(runMapper, stageMapper, taskMapper, operationMapper,
                 gateResultMapper, properties);

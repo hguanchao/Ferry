@@ -34,7 +34,7 @@ import com.ferry.devops.api.vo.AiFeedbackVO;
 import com.ferry.devops.api.vo.AiOutputVO;
 import com.ferry.devops.api.vo.AiQualityVO;
 import com.ferry.devops.api.vo.AppAiLevelVO;
-import com.ferry.devops.biz.config.DevopsIntegrationProperties;
+import com.ferry.devops.biz.config.DevopsProperties;
 import com.ferry.devops.biz.integration.ai.AiClient;
 import com.ferry.devops.biz.integration.ai.PromptBuilder;
 import com.ferry.devops.biz.mapper.AiEvalSampleMapper;
@@ -76,7 +76,7 @@ public class AiServiceImpl extends ServiceImpl<AiOutputMapper, AiOutput> impleme
     private final AppAiLevelMapper appAiLevelMapper;
     private final AiClient aiClient;
     private final PromptBuilder promptBuilder;
-    private final DevopsIntegrationProperties properties;
+    private final DevopsProperties properties;
     // 真实证据链依赖：四个入口据此从库里取证据，analyze 里逐条回查校验
     private final RunLogSegmentMapper runLogSegmentMapper;
     private final RunMapper runMapper;

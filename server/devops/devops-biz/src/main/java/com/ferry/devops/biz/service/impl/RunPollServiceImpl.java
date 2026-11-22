@@ -16,7 +16,7 @@ import com.ferry.devops.api.entity.RunStage;
 import com.ferry.devops.api.entity.RunStageTask;
 import com.ferry.devops.api.enums.RunStatusEnum;
 import com.ferry.devops.api.enums.StageStatusEnum;
-import com.ferry.devops.biz.config.DevopsIntegrationProperties;
+import com.ferry.devops.biz.config.DevopsProperties;
 import com.ferry.devops.biz.integration.jenkins.JenkinsBuildStatus;
 import com.ferry.devops.biz.integration.jenkins.JenkinsClient;
 import com.ferry.devops.biz.integration.jenkins.JenkinsDispatchException;
@@ -56,7 +56,7 @@ public class RunPollServiceImpl implements IRunPollService {
     private final AppMapper appMapper;
     private final JenkinsClient jenkinsClient;
     private final IRunStageService runStageService;
-    private final DevopsIntegrationProperties properties;
+    private final DevopsProperties properties;
 
     @Override
     public void pollActiveRuns() {

@@ -13,7 +13,7 @@ import org.springframework.context.annotation.Configuration;
 @Data
 @Configuration
 @ConfigurationProperties(prefix = "ferry.devops")
-public class DevopsIntegrationProperties {
+public class DevopsProperties {
 
     /** Jenkins 集成 */
     private Jenkins jenkins = new Jenkins();

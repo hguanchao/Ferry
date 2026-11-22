@@ -1,7 +1,7 @@
 package com.ferry.devops.biz.integration.deployer;
 
 import com.ferry.common.core.exception.ServiceException;
-import com.ferry.devops.biz.config.DevopsIntegrationProperties;
+import com.ferry.devops.biz.config.DevopsProperties;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -18,7 +18,7 @@ import org.springframework.stereotype.Component;
 @Component
 public class DockerDeployer extends AbstractDeployer {
 
-    public DockerDeployer(DevopsIntegrationProperties props) {
+    public DockerDeployer(DevopsProperties props) {
         super(props);
     }
 

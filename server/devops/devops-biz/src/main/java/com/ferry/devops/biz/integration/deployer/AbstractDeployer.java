@@ -2,7 +2,7 @@ package com.ferry.devops.biz.integration.deployer;
 
 import com.ferry.common.core.exception.ServiceException;
 import com.ferry.common.core.utils.JsonUtil;
-import com.ferry.devops.biz.config.DevopsIntegrationProperties;
+import com.ferry.devops.biz.config.DevopsProperties;
 import lombok.extern.slf4j.Slf4j;
 import tools.jackson.databind.JsonNode;
 
@@ -34,9 +34,9 @@ import java.util.concurrent.TimeUnit;
 @Slf4j
 public abstract class AbstractDeployer implements Deployer {
 
-    protected final DevopsIntegrationProperties props;
+    protected final DevopsProperties props;
 
-    protected AbstractDeployer(DevopsIntegrationProperties props) {
+    protected AbstractDeployer(DevopsProperties props) {
         this.props = props;
     }
 

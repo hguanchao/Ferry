@@ -1,7 +1,7 @@
 package com.ferry.devops.biz.integration.deployer;
 
 import com.ferry.common.core.exception.ServiceException;
-import com.ferry.devops.biz.config.DevopsIntegrationProperties;
+import com.ferry.devops.biz.config.DevopsProperties;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -25,7 +25,7 @@ import java.util.List;
 @Component
 public class SshDeployer extends AbstractDeployer {
 
-    public SshDeployer(DevopsIntegrationProperties props) {
+    public SshDeployer(DevopsProperties props) {
         super(props);
     }
 

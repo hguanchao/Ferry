@@ -17,7 +17,7 @@ import com.ferry.devops.api.entity.Run;
 import com.ferry.devops.api.entity.RunStage;
 import com.ferry.devops.api.enums.StageStatusEnum;
 import com.ferry.devops.api.enums.RunStatusEnum;
-import com.ferry.devops.biz.config.DevopsIntegrationProperties;
+import com.ferry.devops.biz.config.DevopsProperties;
 import com.ferry.devops.biz.gate.GateReportContract;
 import com.ferry.devops.biz.integration.jenkins.JenkinsClient;
 import com.ferry.devops.biz.mapper.AppMapper;
@@ -51,10 +51,10 @@ public class RunStageGateEvaluator {
     private final IRunStageGateService runStageGateService;
     private final IRunStageService runStageService;
     private final JenkinsClient jenkinsClient;
-    private final DevopsIntegrationProperties properties;
+    private final DevopsProperties properties;
 
     public void evaluatePending() {
-        DevopsIntegrationProperties.Gate cfg = properties.getGate();
+        DevopsProperties.Gate cfg = properties.getGate();
         int limit = cfg == null || cfg.getEvaluationLimit() == null
                 ? DEFAULT_EVALUATION_LIMIT : cfg.getEvaluationLimit();
         List<RunStage> stages = stageMapper.selectByStatusLimit(StageStatusEnum.PENDING_GATE.getCode(), limit);
@@ -312,7 +312,7 @@ public class RunStageGateEvaluator {
     }
 
     private boolean timedOut(RunStage stage) {
-        DevopsIntegrationProperties.Gate cfg = properties.getGate();
+        DevopsProperties.Gate cfg = properties.getGate();
         int timeout = cfg == null || cfg.getPullTimeoutSeconds() == null
                 ? DEFAULT_TIMEOUT_SECONDS : cfg.getPullTimeoutSeconds();
         Date anchor = stage.getEndTime();

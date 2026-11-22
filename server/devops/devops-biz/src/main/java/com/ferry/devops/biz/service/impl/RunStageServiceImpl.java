@@ -12,7 +12,7 @@ import com.ferry.devops.api.entity.RunStageTask;
 import com.ferry.devops.api.enums.DevopsStateMachine;
 import com.ferry.devops.api.enums.RunStatusEnum;
 import com.ferry.devops.api.enums.StageStatusEnum;
-import com.ferry.devops.biz.config.DevopsIntegrationProperties;
+import com.ferry.devops.biz.config.DevopsProperties;
 import com.ferry.devops.biz.mapper.RunStageGateMapper;
 import com.ferry.devops.biz.mapper.RunMapper;
 import com.ferry.devops.biz.mapper.RunOperationMapper;
@@ -43,7 +43,7 @@ public class RunStageServiceImpl implements IRunStageService {
     private final RunStageTaskMapper taskMapper;
     private final RunOperationMapper operationMapper;
     private final RunStageGateMapper gateResultMapper;
-    private final DevopsIntegrationProperties properties;
+    private final DevopsProperties properties;
 
     @Override
     @Transactional(rollbackFor = Exception.class)

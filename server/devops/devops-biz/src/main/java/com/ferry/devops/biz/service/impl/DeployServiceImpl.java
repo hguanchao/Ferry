@@ -30,7 +30,7 @@ import com.ferry.devops.api.vo.DeployRecordVO;
 import com.ferry.devops.api.vo.DeployStartVO;
 import com.ferry.devops.api.vo.HealthSampleVO;
 import com.ferry.devops.api.vo.PrecheckTokenVO;
-import com.ferry.devops.biz.config.DevopsIntegrationProperties;
+import com.ferry.devops.biz.config.DevopsProperties;
 import com.ferry.devops.biz.integration.deployer.Deployer;
 import com.ferry.devops.biz.integration.deployer.DeployerFactory;
 import com.ferry.devops.biz.mapper.DeployBatchMapper;
@@ -68,7 +68,7 @@ public class DeployServiceImpl extends ServiceImpl<DeployRecordMapper, DeployRec
     private final HealthSampleMapper healthSampleMapper;
     private final EnvironmentMapper environmentMapper;
     private final DeployerFactory deployerFactory;
-    private final DevopsIntegrationProperties props;
+    private final DevopsProperties props;
 
     /** 校验令牌有效期 5 分钟 */
     private static final long TOKEN_TTL_MS = 5 * 60 * 1000L;
