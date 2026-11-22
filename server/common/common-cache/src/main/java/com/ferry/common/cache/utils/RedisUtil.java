@@ -141,6 +141,27 @@ public class RedisUtil {
     }
 
     /**
+     * 仅当键不存在时写入并设置过期时间，异常时返回 null 以便调用方区分“重复”和“Redis 不可用”。
+     *
+     * @param key      键
+     * @param value    值
+     * @param time     过期时间，小于等于 0 表示不过期
+     * @param timeUnit 时间单位
+     * @return true=写入成功；false=键已存在；null=Redis 异常
+     */
+    public static Boolean trySetNx(@NonNull String key, Object value, long time, TimeUnit timeUnit) {
+        try {
+            if (time <= 0L) {
+                return redisTemplate.opsForValue().setIfAbsent(key, value);
+            }
+            return redisTemplate.opsForValue().setIfAbsent(key, value, time, timeUnit);
+        } catch (Exception e) {
+            log.error("Redis SETNX failed, key={}", key, e);
+            return null;
+        }
+    }
+
+    /**
      * 自增，键不存在时按 0 起始
      *
      * @param key   键

@@ -9,12 +9,12 @@ import org.springframework.stereotype.Component;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * Jenkins 构建状态轮询任务：状态同步的兜底对账通道（主通道为脚本内 webhook 回调）。
+ * Jenkins 构建状态轮询任务：状态同步的唯一通道。
  *
  * <p>按运行状态分频：
  *
  * <ul>
- *   <li>排队中/运行中：每 60 秒，兜底补正回调丢失的阶段/终态</li>
+ *   <li>排队中/运行中：每 60 秒，同步阶段与运行终态</li>
  *   <li>结果待确认：每 300 秒，等待触发结果收敛，无高频变化需求</li>
  * </ul>
  *

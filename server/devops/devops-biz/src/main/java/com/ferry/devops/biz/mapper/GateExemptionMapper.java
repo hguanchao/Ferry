@@ -22,13 +22,20 @@ public interface GateExemptionMapper extends BaseMapper<GateExemption> {
     /**
      * 查询单条结果的有效豁免。
      */
-    @Select("SELECT * FROM dev_gate_exemption WHERE gate_result_id = #{resultId} "
+    @Select("SELECT * FROM dev_gate_exemption WHERE run_stage_gate_id = #{runStageGateId} "
             + "AND status = 1 AND expire_at > NOW() ORDER BY create_time DESC LIMIT 1")
-    GateExemption activeByResult(@Param("resultId") Long resultId);
+    GateExemption activeByRunStageGate(@Param("runStageGateId") Long runStageGateId);
 
     /**
      * 撤销同结果上的旧豁免（重复申请仅保留最后一次）。
      */
-    @Update("UPDATE dev_gate_exemption SET status = 3 WHERE gate_result_id = #{resultId} AND status = 1")
-    int revokeActive(@Param("resultId") Long resultId);
+    @Update("UPDATE dev_gate_exemption SET status = 3 WHERE run_stage_gate_id = #{runStageGateId} AND status = 1")
+    int revokeActive(@Param("runStageGateId") Long runStageGateId);
+
+    /**
+     * 查询已到期但仍为生效状态的豁免。
+     */
+    @Select("SELECT * FROM dev_gate_exemption WHERE status = 1 AND expire_at <= NOW() "
+            + "ORDER BY expire_at LIMIT #{limit}")
+    List<GateExemption> selectExpiredActive(@Param("limit") int limit);
 }

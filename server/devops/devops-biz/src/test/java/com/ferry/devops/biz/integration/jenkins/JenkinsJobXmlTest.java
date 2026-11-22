@@ -22,15 +22,16 @@ class JenkinsJobXmlTest {
     private static final String SCRIPT_V1 = "pipeline {\n    agent any\n}";
 
     @Test
-    void 最小配置包含归属标记_十一个参数_禁用位_且不含STAGE_SPEC() {
+    void 最小配置包含归属标记_八个参数_禁用位_且不含回调参数与STAGE_SPEC() {
         String xml = JenkinsJobXml.buildMinimalJobXml(JOB, "order-service", SCRIPT_V1, true, null, null);
         assertTrue(xml.contains("Managed by Ferry: " + JOB));
         assertTrue(xml.contains("order-service"));
         assertTrue(xml.contains("<disabled>true</disabled>"));
-        assertEquals(11, xml.split("<hudson.model.StringParameterDefinition>", -1).length - 1);
+        assertEquals(8, xml.split("<hudson.model.StringParameterDefinition>", -1).length - 1);
         assertTrue(xml.contains("GIT_CREDENTIALS_ID"));
-        assertTrue(xml.contains("CALLBACK_URL"));
-        assertTrue(xml.contains("STAGE_MAP"));
+        assertFalse(xml.contains("CALLBACK_URL"));
+        assertFalse(xml.contains("STAGE_MAP"));
+        assertFalse(xml.contains("RUN_ID"));
         assertFalse(xml.contains("STAGE_SPEC"));
         // 未传仓库主页时不生成 GitHub 项目属性
         assertFalse(xml.contains("GitHubProjectProperty"));
@@ -105,21 +106,30 @@ class JenkinsJobXmlTest {
         String updated = JenkinsJobXml.applyFerryConfig(doc, "pipeline { agent any }", true, null, null);
         assertTrue(updated.contains("CUSTOM_PARAM"));
         assertTrue(updated.contains("<disabled>true</disabled>"));
-        // Ferry 的 11 个参数仍完整（11 + 1 自定义 = 12 处开标签）
-        assertEquals(12, updated.split("<hudson.model.StringParameterDefinition>", -1).length - 1);
+        // Ferry 的 8 个参数仍完整（8 + 1 自定义 = 9 处开标签）
+        assertEquals(9, updated.split("<hudson.model.StringParameterDefinition>", -1).length - 1);
     }
 
     @Test
-    void 同步清理遗留的STAGE_SPEC参数() {
+    void 同步清理遗留的STAGE_SPEC与回调参数() {
         String xml = JenkinsJobXml.buildMinimalJobXml(JOB, "order-service", SCRIPT_V1, false, null, null);
         String legacy = xml.replace("</parameterDefinitions>",
                 "<hudson.model.StringParameterDefinition><name>STAGE_SPEC</name>"
+                        + "<description/><defaultValue/><trim>false</trim></hudson.model.StringParameterDefinition>"
+                        + "<hudson.model.StringParameterDefinition><name>RUN_ID</name>"
+                        + "<description/><defaultValue/><trim>false</trim></hudson.model.StringParameterDefinition>"
+                        + "<hudson.model.StringParameterDefinition><name>CALLBACK_URL</name>"
+                        + "<description/><defaultValue/><trim>false</trim></hudson.model.StringParameterDefinition>"
+                        + "<hudson.model.StringParameterDefinition><name>STAGE_MAP</name>"
                         + "<description/><defaultValue/><trim>false</trim></hudson.model.StringParameterDefinition>"
                         + "</parameterDefinitions>");
         Document doc = JenkinsJobXml.loadManagedConfig(legacy, JOB);
         assertNotNull(doc);
         String updated = JenkinsJobXml.applyFerryConfig(doc, SCRIPT_V1, false, null, null);
         assertFalse(updated.contains("<name>STAGE_SPEC</name>"));
+        assertFalse(updated.contains("<name>RUN_ID</name>"));
+        assertFalse(updated.contains("<name>CALLBACK_URL</name>"));
+        assertFalse(updated.contains("<name>STAGE_MAP</name>"));
     }
 
     @Test

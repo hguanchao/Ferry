@@ -31,4 +31,5 @@ public interface SysConst {
     String AUTH_CACHE_PREFIX    = APPLICATION_AUTH_NAME + StrConst.COLON;
     String SYSTEM_CACHE_PREFIX  = APPLICATION_SYSTEM_NAME + StrConst.COLON;
     String DEVOPS_CACHE_PREFIX  = APPLICATION_DEVOPS_NAME + StrConst.COLON;
+    String IDEMPOTENT_CACHE_PREFIX = "ferry:idempotent:";
 }

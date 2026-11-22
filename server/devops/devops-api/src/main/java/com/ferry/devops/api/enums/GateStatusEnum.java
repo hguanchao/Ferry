@@ -7,11 +7,11 @@ import lombok.Getter;
 import java.util.Arrays;
 
 /**
- * 门禁结论
+ * 运行阶段门禁状态
  */
 @Getter
 @AllArgsConstructor
-public enum GateConclusionEnum {
+public enum GateStatusEnum {
     PASS(1, "通过"),
     FAIL(2, "不通过"),
     NOT_APPLICABLE(3, "不适用"),
@@ -21,7 +21,7 @@ public enum GateConclusionEnum {
     private final Integer code;
     private final String desc;
 
-    public static GateConclusionEnum of(Integer code) {
+    public static GateStatusEnum of(Integer code) {
         return Arrays.stream(values())
                 .filter(item -> ObjUtil.equals(item.getCode(), code))
                 .findFirst()

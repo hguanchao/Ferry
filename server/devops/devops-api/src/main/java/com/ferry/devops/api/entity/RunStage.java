@@ -1,7 +1,7 @@
 package com.ferry.devops.api.entity;
-import java.util.Date;
 
 import java.io.Serializable;
+import java.util.Date;
 
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
@@ -17,40 +17,31 @@ import lombok.EqualsAndHashCode;
 @EqualsAndHashCode(callSuper = true)
 public class RunStage extends BaseEntity implements Serializable {
 
-    /** 数据id */
+    /** 主键id */
     @TableId
     private Long id;
 
     /** 运行id */
     private Long runId;
 
-    /** 阶段类型 1–8 */
-    private Integer stageType;
+    /** 阶段类型 1=构建 2=单元测试 3=静态扫描 4=制品入库 5=部署非生产 6=集成测试 7=准入 8=生产发布 */
+    private Integer type;
 
-    /** 阶段名 */
-    private String stageName;
+    /** 阶段名称 */
+    private String name;
 
-    /** 顺序 */
-    private Integer seq;
-
-    /** 状态 1–9 */
+    /** 状态 1=未开始 2=进行中 3=成功 4=失败 5=阻塞 6=跳过 7=超时 8=已复用 9=已取消 10=待门禁 */
     private Integer status;
 
-    /** 阻塞原因 */
-    private Integer blockReason;
+    /** 运行结果信息(JSON) */
+    private String result;
 
-    /** 复用来源阶段 */
-    private Long reusedFromStageId;
-
-    /** Jenkins Job 标识 */
-    private String jenkinsJobId;
+    /** 排序号 */
+    private Integer sort;
 
     /** 开始时间 */
-    private java.util.Date startTime;
+    private Date startTime;
 
     /** 结束时间 */
-    private java.util.Date endTime;
-
-    /** 耗时毫秒 */
-    private Long duration;
+    private Date endTime;
 }

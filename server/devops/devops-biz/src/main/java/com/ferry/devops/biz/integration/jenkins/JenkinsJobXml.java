@@ -48,7 +48,6 @@ final class JenkinsJobXml {
 
     /** Ferry 参数定义（name, description, defaultValue），无 STAGE_SPEC——脚本已自包含 */
     private static final List<ParamDef> FERRY_PARAMS = List.of(
-            new ParamDef("RUN_ID", "Ferry 运行 ID", ""),
             new ParamDef("APP_CODE", "应用编码", ""),
             new ParamDef("BRANCH", "分支", ""),
             new ParamDef("COMMIT_ID", "提交 ID 或引用值", ""),
@@ -56,12 +55,10 @@ final class JenkinsJobXml {
             new ParamDef("REF_VALUE", "原始引用值", ""),
             new ParamDef("REPO_URL", "仓库 Git 地址", ""),
             new ParamDef("SNAPSHOT", "流水线版本快照", ""),
-            new ParamDef("GIT_CREDENTIALS_ID", "Jenkins 凭据 ID，可为空", ""),
-            new ParamDef("CALLBACK_URL", "Ferry 状态回调地址，空则不上报走轮询兜底", ""),
-            new ParamDef("STAGE_MAP", "CI 阶段类型到运行阶段ID映射，如 1:100,2:101", ""));
+            new ParamDef("GIT_CREDENTIALS_ID", "Jenkins 凭据 ID，可为空", ""));
 
-    /** 旧 STAGE_SPEC 协议参数名，同步时从托管 Job 中移除 */
-    private static final String LEGACY_PARAM_STAGE_SPEC = "STAGE_SPEC";
+    /** 旧协议/已废弃参数，同步时从托管 Job 中移除 */
+    private static final List<String> LEGACY_PARAMS = List.of("STAGE_SPEC", "RUN_ID", "CALLBACK_URL", "STAGE_MAP");
 
     private record ParamDef(String name, String description, String defaultValue) {
     }
@@ -179,7 +176,7 @@ final class JenkinsJobXml {
         NodeList stale = paramDefinitions.getElementsByTagName("name");
         for (int i = stale.getLength() - 1; i >= 0; i--) {
             Node nameNode = stale.item(i);
-            if (LEGACY_PARAM_STAGE_SPEC.equals(nameNode.getTextContent())) {
+            if (LEGACY_PARAMS.contains(nameNode.getTextContent())) {
                 Node param = nameNode.getParentNode();
                 if (param != null && param.getParentNode() != null) {
                     param.getParentNode().removeChild(param);

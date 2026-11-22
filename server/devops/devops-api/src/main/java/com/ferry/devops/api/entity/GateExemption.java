@@ -17,8 +17,8 @@ public class GateExemption implements Serializable {
     @TableId
     private Long id;
 
-    /** 结果id */
-    private Long gateResultId;
+    /** 运行阶段门禁结果id */
+    private Long runStageGateId;
 
     /** 运行id */
     private Long runId;

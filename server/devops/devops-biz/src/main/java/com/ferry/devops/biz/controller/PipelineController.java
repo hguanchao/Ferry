@@ -1,6 +1,7 @@
 package com.ferry.devops.biz.controller;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.ferry.common.cache.annotation.Idempotent;
 import com.ferry.common.core.http.R;
 import com.ferry.common.security.annotation.PreAuthorize;
 import com.ferry.devops.api.dto.PipelineDTO;
@@ -178,6 +179,7 @@ public class PipelineController {
 
     @PostMapping("/trigger")
     @PreAuthorize("devops:pipeline:trigger")
+    @Idempotent(key = "#body.appId + ':' + #body.pipelineId + ':' + (#body.commitId ?: '')", ttl = 60)
     @Operation(summary = "流水线-手动触发（幂等）")
     public R<TriggerResultVO> trigger(@RequestBody @Valid RunTriggerDTO body) {
         return R.data(runService.trigger(body));

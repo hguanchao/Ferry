@@ -18,5 +18,5 @@ public class RunDetailVO {
     private List<RunStageVO> stages;
 
     @Schema(description = "全部任务列表")
-    private List<RunTaskVO> tasks;
+    private List<RunStageTaskVO> tasks;
 }

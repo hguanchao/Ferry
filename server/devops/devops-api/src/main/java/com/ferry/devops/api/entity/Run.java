@@ -1,7 +1,7 @@
 package com.ferry.devops.api.entity;
-import java.util.Date;
 
 import java.io.Serializable;
+import java.util.Date;
 
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
@@ -17,82 +17,61 @@ import lombok.EqualsAndHashCode;
 @EqualsAndHashCode(callSuper = true)
 public class Run extends BaseEntity implements Serializable {
 
-    /** 数据id */
+    /** 主键id */
     @TableId
     private Long id;
-
-    /** 运行编号 RUN-yyyyMMdd-序号 */
-    private String runNo;
-
-    /** 流水线id */
-    private Long pipelineId;
-
-    /** 触发时流水线版本号 */
-    private Integer pipelineVersion;
 
     /** 应用id */
     private Long appId;
 
+    /** 流水线id */
+    private Long pipelineId;
+
+    /** 运行编号 RUN-yyyyMMdd-序号 */
+    private String code;
+
     /** 分支 */
     private String branch;
 
-    /** 提交 */
-    private String commitId;
-
-    /** 1 Commit 2 Tag/Ref */
+    /** 引用类型 1=Commit 2=Tag/Ref */
     private Integer refType;
 
-    /** 原始引用值 */
+    /** 引用值（触发输入或应用登记的默认值） */
     private String refValue;
 
-    /** 1 手动（历史值保留） */
+    /** 触发类型 1=手动 2=自动 */
     private Integer triggerType;
 
-    /** 触发人 */
+    /** 触发人id */
     private Long triggerUser;
 
     /** 触发说明 */
     private String triggerNote;
 
-    /** 1排队 2运行中 3阻塞 4成功 5失败 6超时 7已取消 8结果待确认 */
+    /** 状态 1=排队中 2=运行中 3=阻塞 4=成功 5=失败 6=超时 7=已取消 8=结果待确认 */
     private Integer status;
 
-    /** 1门禁不通过 2门禁数据获取失败 3人工暂停 */
-    private Integer blockReason;
+    /** 流水线版本号 */
+    private Integer pipelineVersion;
 
-    /** 预校验是否通过 */
-    private Integer isPrecheckPass;
+    /** Jenkins任务id */
+    private String jenkinsJobId;
 
-    /** 幂等键 */
-    private String idempotentKey;
-
-    /** 重跑自 */
-    private Long rerunFromRunId;
-
-    /** 复用自 */
-    private Long reusedRunId;
-
-    /** 产出制品 */
-    private Long artifactId;
-
-    /** Jenkins 构建号 */
+    /** Jenkins构建编号 */
     private Long jenkinsBuildNo;
 
-    /** Jenkins 队列项id（构建号尚未分配时轮询用） */
+    /** Jenkins队列项id */
     private Long jenkinsQueueId;
 
-    /** 实际构建的 Jenkins Job 名（旧数据为空，轮询时回退应用编码 Job） */
-    private String jobName;
+    /** 预检状态 1=正常 2=异常 */
+    private Integer preCheckStatus;
 
-    /** 结果待确认截止时间 */
-    private java.util.Date resultExpireTime;
+    /** 预检内容 */
+    private String preCheckContent;
 
     /** 开始时间 */
-    private java.util.Date startTime;
+    private Date startTime;
 
     /** 结束时间 */
-    private java.util.Date endTime;
-
-    /** 耗时毫秒 */
-    private Long duration;
+    private Date endTime;
 }

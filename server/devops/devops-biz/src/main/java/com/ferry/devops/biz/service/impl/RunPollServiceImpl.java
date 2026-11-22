@@ -1,12 +1,19 @@
 package com.ferry.devops.biz.service.impl;
 
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.Date;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.ferry.common.core.utils.ObjUtil;
 import com.ferry.common.core.utils.StrUtil;
 import com.ferry.devops.api.entity.App;
 import com.ferry.devops.api.entity.Run;
 import com.ferry.devops.api.entity.RunStage;
-import com.ferry.devops.api.entity.RunTask;
+import com.ferry.devops.api.entity.RunStageTask;
 import com.ferry.devops.api.enums.RunStatusEnum;
 import com.ferry.devops.api.enums.StageStatusEnum;
 import com.ferry.devops.biz.config.DevopsIntegrationProperties;
@@ -17,26 +24,18 @@ import com.ferry.devops.biz.integration.jenkins.JenkinsStageStatus;
 import com.ferry.devops.biz.mapper.AppMapper;
 import com.ferry.devops.biz.mapper.RunMapper;
 import com.ferry.devops.biz.mapper.RunStageMapper;
-import com.ferry.devops.biz.mapper.RunTaskMapper;
+import com.ferry.devops.biz.mapper.RunStageTaskMapper;
 import com.ferry.devops.biz.service.IRunPollService;
+import com.ferry.devops.biz.service.IRunStageService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-import java.util.Arrays;
-import java.util.Comparator;
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
-
 /**
- * 轮询 Jenkins 构建状态并同步运行/阶段：状态同步的兜底对账通道（主通道为脚本内 webhook 回调）。
+ * 轮询 Jenkins 构建状态并同步运行/阶段：状态同步的唯一通道。
  *
- * <p>按状态分频：活动运行（排队中/运行中）60 秒级、结果待确认 300 秒级；
- * 均只处理最近 24 小时内的运行。构建号未分配时先通过队列项解析。
- * 阶段状态来自 Pipeline Stage View 的 wfapi，插件不可用时降级为构建级状态；
- * 回调已写入的终态阶段在此保持幂等（终态不覆盖）。
+ * <p>单测/静态扫描阶段执行成功后先进入待门禁，由 RunStageGateEvaluator 拉取报告裁决；
+ * 轮询不会直接把这类阶段置成功。
  */
 @Slf4j
 @Service
@@ -45,6 +44,7 @@ public class RunPollServiceImpl implements IRunPollService {
 
     private static final int POLL_LIMIT = 50;
     private static final long LOOKBACK_MS = 24L * 60 * 60 * 1000;
+    private static final int CI_STAGE_TYPE_MAX = 4;
     private static final int TASK_STATUS_SUCCESS = 3;
     private static final int TASK_STATUS_FAILURE = 4;
     private static final int TASK_STATUS_SKIPPED = 6;
@@ -52,9 +52,10 @@ public class RunPollServiceImpl implements IRunPollService {
 
     private final RunMapper runMapper;
     private final RunStageMapper stageMapper;
-    private final RunTaskMapper taskMapper;
+    private final RunStageTaskMapper taskMapper;
     private final AppMapper appMapper;
     private final JenkinsClient jenkinsClient;
+    private final IRunStageService runStageService;
     private final DevopsIntegrationProperties properties;
 
     @Override
@@ -67,11 +68,6 @@ public class RunPollServiceImpl implements IRunPollService {
         pollRuns(RunStatusEnum.UNKNOWN);
     }
 
-    /**
-     * 按状态集合轮询运行并同步 Jenkins 状态。
-     *
-     * @param statuses 本次要轮询的运行状态
-     */
     private void pollRuns(RunStatusEnum... statuses) {
         if (properties.getJenkins() == null || StrUtil.isBlank(properties.getJenkins().getBaseUrl())) {
             return;
@@ -96,8 +92,8 @@ public class RunPollServiceImpl implements IRunPollService {
         if (app == null || StrUtil.isBlank(app.getCode())) {
             return;
         }
-        // Job 名取运行记录的实际值；旧数据（旧命名协议）回退应用编码 Job
-        String jobName = StrUtil.isNotBlank(run.getJobName()) ? run.getJobName() : app.getCode().trim();
+        String jobName = StrUtil.isNotBlank(run.getJenkinsJobId())
+                ? run.getJenkinsJobId() : app.getCode().trim();
         Long buildNo = run.getJenkinsBuildNo();
         if (buildNo == null) {
             if (run.getJenkinsQueueId() == null) {
@@ -127,19 +123,21 @@ public class RunPollServiceImpl implements IRunPollService {
             applyStageStatuses(stages, status.stages());
         }
         if (status.building()) {
-            boolean changed = false;
             if (ObjUtil.equals(run.getStatus(), RunStatusEnum.QUEUED.getCode())
                     || ObjUtil.equals(run.getStatus(), RunStatusEnum.UNKNOWN.getCode())) {
-                run.setStatus(RunStatusEnum.RUNNING.getCode());
-                changed = true;
-            }
-            if (run.getStartTime() == null && status.timestamp() != null && status.timestamp() > 0) {
-                run.setStartTime(new Date(status.timestamp()));
-                changed = true;
-            }
-            if (changed) {
-                runMapper.updateById(run);
-                log.info("run became running: runId={}, buildNo={}", run.getId(), status.buildNo());
+                Date start = run.getStartTime();
+                if (start == null && status.timestamp() != null && status.timestamp() > 0) {
+                    start = new Date(status.timestamp());
+                }
+                int updated = runMapper.update(null, Wrappers.<Run>lambdaUpdate()
+                        .eq(Run::getId, run.getId())
+                        .eq(Run::getStatus, run.getStatus())
+                        .set(Run::getStatus, RunStatusEnum.RUNNING.getCode())
+                        .set(Run::getStartTime, start)
+                        .set(Run::getUpdateTime, new Date()));
+                if (updated > 0) {
+                    log.info("run became running: runId={}, buildNo={}", run.getId(), status.buildNo());
+                }
             }
             return;
         }
@@ -160,30 +158,35 @@ public class RunPollServiceImpl implements IRunPollService {
         if (run.getStartTime() == null && status.timestamp() != null && status.timestamp() > 0) {
             run.setStartTime(new Date(status.timestamp()));
         }
-        run.setStatus(terminal.getCode());
-        run.setEndTime(endTime);
-        if (run.getStartTime() != null && endTime != null) {
-            run.setDuration(endTime.getTime() - run.getStartTime().getTime());
-        }
         if (terminal == RunStatusEnum.SUCCESS) {
             if (status.stages().isEmpty()) {
-                // Stage View 不可用：构建成功则视为全部 CI 阶段成功
-                markAllCiSuccess(stages, run, endTime);
+                markAllCiSucceeded(stages);
+            } else {
+                markPendingGateStages(stages);
             }
             markNotStartedSkipped(stages);
+            runStageService.refreshRunStatus(run.getId());
         } else {
-            // 只跳过未下发的部署/发布阶段；CI 阶段尽量保留 wfapi 结果
             markNonCiSkipped(stages);
+            int updated = runMapper.update(null, Wrappers.<Run>lambdaUpdate()
+                    .eq(Run::getId, run.getId())
+                    .eq(Run::getStatus, run.getStatus())
+                    .set(Run::getStatus, terminal.getCode())
+                    .set(Run::getEndTime, endTime)
+                    .set(Run::getUpdateTime, new Date()));
+            if (updated == 0) {
+                log.debug("run terminal status skipped, concurrent change: runId={}, expected={}",
+                        run.getId(), run.getStatus());
+            }
         }
-        runMapper.updateById(run);
         log.info("run status synced from Jenkins: runId={}, buildNo={}, status={}, result={}",
                 run.getId(), status.buildNo(), terminal, result);
     }
 
     private void applyStageStatuses(List<RunStage> stages, List<JenkinsStageStatus> jenkinsStages) {
         List<RunStage> ciStages = stages.stream()
-                .filter(stage -> stage.getStageType() != null && stage.getStageType() <= 4)
-                .sorted(Comparator.comparingInt(stage -> stage.getSeq() == null ? Integer.MAX_VALUE : stage.getSeq()))
+                .filter(stage -> stage.getType() != null && stage.getType() <= 4)
+                .sorted(Comparator.comparingInt(stage -> stage.getSort() == null ? Integer.MAX_VALUE : stage.getSort()))
                 .toList();
         List<JenkinsStageStatus> relevant = jenkinsStages.stream()
                 .filter(stage -> StrUtil.isNotBlank(stage.name()))
@@ -193,10 +196,12 @@ public class RunPollServiceImpl implements IRunPollService {
                 .collect(Collectors.toMap(JenkinsStageStatus::name, stage -> stage, (left, right) -> right));
         for (int i = 0; i < ciStages.size(); i++) {
             RunStage stage = ciStages.get(i);
-            if (ObjUtil.equals(stage.getStatus(), StageStatusEnum.REUSED.getCode())) {
+            if (StageStatusEnum.isTerminal(stage.getStatus())
+                    || ObjUtil.equals(stage.getStatus(), StageStatusEnum.PENDING_GATE.getCode())
+                    || ObjUtil.equals(stage.getStatus(), StageStatusEnum.BLOCKED.getCode())) {
                 continue;
             }
-            JenkinsStageStatus jenkinsStage = byName.get(stage.getStageName());
+            JenkinsStageStatus jenkinsStage = byName.get(stage.getName());
             if (jenkinsStage == null && i < relevant.size()) {
                 jenkinsStage = relevant.get(i);
             }
@@ -207,25 +212,26 @@ public class RunPollServiceImpl implements IRunPollService {
             if (stageStatus == null) {
                 continue;
             }
-            stage.setStatus(stageStatus.getCode());
-            if (jenkinsStage.startTimeMillis() != null && jenkinsStage.startTimeMillis() > 0) {
-                stage.setStartTime(new Date(jenkinsStage.startTimeMillis()));
-                if (stageStatus == StageStatusEnum.RUNNING) {
-                    stage.setEndTime(null);
-                    stage.setDuration(null);
-                } else if (jenkinsStage.durationMillis() != null && jenkinsStage.durationMillis() > 0) {
-                    stage.setEndTime(new Date(jenkinsStage.startTimeMillis() + jenkinsStage.durationMillis()));
-                    stage.setDuration(jenkinsStage.durationMillis());
+            switch (stageStatus) {
+                case RUNNING -> runStageService.onStageRunning(stage.getRunId(), stage.getId(), new Date());
+                case SUCCESS -> {
+                    runStageService.onStageSucceeded(stage.getRunId(), stage.getId(), new Date());
+                    syncTaskStatus(stage, StageStatusEnum.SUCCESS);
+                }
+                case FAILURE, TIMEOUT, CANCELLED -> {
+                    runStageService.onStageFailed(stage.getRunId(), stage.getId(), stageStatus, new Date());
+                    syncTaskStatus(stage, stageStatus);
+                }
+                case SKIPPED -> {
+                    runStageService.transitionStage(stage.getId(), StageStatusEnum.SKIPPED, new Date());
+                    syncTaskStatus(stage, StageStatusEnum.SKIPPED);
+                }
+                default -> {
                 }
             }
-            stageMapper.updateById(stage);
-            syncTaskStatus(stage, stageStatus);
         }
     }
 
-    /**
-     * 任务状态暂按阶段状态镜像：Jenkins 阶段级结果无法精确到任务，先保证页面状态一致。
-     */
     private void syncTaskStatus(RunStage stage, StageStatusEnum stageStatus) {
         Integer taskStatus = switch (stageStatus) {
             case SUCCESS -> TASK_STATUS_SUCCESS;
@@ -237,7 +243,7 @@ public class RunPollServiceImpl implements IRunPollService {
         if (taskStatus == null) {
             return;
         }
-        for (RunTask task : taskMapper.selectByStage(stage.getId())) {
+        for (RunStageTask task : taskMapper.selectByStage(stage.getId())) {
             if (!ObjUtil.equals(task.getStatus(), taskStatus)) {
                 task.setStatus(taskStatus);
                 taskMapper.updateById(task);
@@ -259,31 +265,40 @@ public class RunPollServiceImpl implements IRunPollService {
         };
     }
 
-    private void markAllCiSuccess(List<RunStage> stages, Run run, Date endTime) {
-        Date start = run.getStartTime() != null ? run.getStartTime() : endTime;
+    private void markAllCiSucceeded(List<RunStage> stages) {
         for (RunStage stage : stages) {
-            if (stage.getStageType() == null || stage.getStageType() > 4
-                    || ObjUtil.equals(stage.getStatus(), StageStatusEnum.REUSED.getCode())) {
+            if (stage.getType() == null || stage.getType() > 4) {
                 continue;
             }
-            stage.setStatus(StageStatusEnum.SUCCESS.getCode());
-            if (stage.getStartTime() == null && start != null) {
-                stage.setStartTime(start);
+            if (StageStatusEnum.isTerminal(stage.getStatus())) {
+                continue;
             }
-            stage.setEndTime(endTime);
-            if (stage.getStartTime() != null && endTime != null) {
-                stage.setDuration(endTime.getTime() - stage.getStartTime().getTime());
-            }
-            stageMapper.updateById(stage);
+            runStageService.onStageSucceeded(stage.getRunId(), stage.getId(), new Date());
             syncTaskStatus(stage, StageStatusEnum.SUCCESS);
+        }
+    }
+
+    /**
+     * wfapi 可用但构建整体成功时，确保尚未上报终态的 CI 门禁阶段进入待门禁。
+     */
+    private void markPendingGateStages(List<RunStage> stages) {
+        for (RunStage stage : stages) {
+            if (stage.getType() == null || stage.getType() > 4) {
+                continue;
+            }
+            if (ObjUtil.equals(stage.getStatus(), StageStatusEnum.RUNNING.getCode())
+                    || ObjUtil.equals(stage.getStatus(), StageStatusEnum.NOT_STARTED.getCode())) {
+                runStageService.onStageSucceeded(stage.getRunId(), stage.getId(), new Date());
+            }
         }
     }
 
     private void markNotStartedSkipped(List<RunStage> stages) {
         for (RunStage stage : stages) {
-            if (ObjUtil.equals(stage.getStatus(), StageStatusEnum.NOT_STARTED.getCode())) {
-                stage.setStatus(StageStatusEnum.SKIPPED.getCode());
-                stageMapper.updateById(stage);
+            // CI 阶段已由 markAllCiSucceeded / markPendingGateStages 处理，这里只跳过后置部署/发布阶段
+            if (stage.getType() != null && stage.getType() > CI_STAGE_TYPE_MAX
+                    && ObjUtil.equals(stage.getStatus(), StageStatusEnum.NOT_STARTED.getCode())) {
+                runStageService.transitionStage(stage.getId(), StageStatusEnum.SKIPPED, new Date());
                 syncTaskStatus(stage, StageStatusEnum.SKIPPED);
             }
         }
@@ -291,10 +306,9 @@ public class RunPollServiceImpl implements IRunPollService {
 
     private void markNonCiSkipped(List<RunStage> stages) {
         for (RunStage stage : stages) {
-            if (stage.getStageType() != null && stage.getStageType() > 4
+            if (stage.getType() != null && stage.getType() > 4
                     && ObjUtil.equals(stage.getStatus(), StageStatusEnum.NOT_STARTED.getCode())) {
-                stage.setStatus(StageStatusEnum.SKIPPED.getCode());
-                stageMapper.updateById(stage);
+                runStageService.transitionStage(stage.getId(), StageStatusEnum.SKIPPED, new Date());
                 syncTaskStatus(stage, StageStatusEnum.SKIPPED);
             }
         }

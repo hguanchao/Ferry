@@ -24,7 +24,7 @@ import com.ferry.devops.api.entity.ArtifactEnv;
 import com.ferry.devops.api.enums.ArtifactFormEnum;
 import com.ferry.devops.api.enums.DeployTypeEnum;
 import com.ferry.devops.api.enums.EnvCategoryEnum;
-import com.ferry.devops.api.enums.GateConclusionEnum;
+import com.ferry.devops.api.enums.GateStatusEnum;
 import com.ferry.devops.api.vo.ArtifactDetailVO;
 import com.ferry.devops.api.vo.ArtifactEnvVO;
 import com.ferry.devops.api.vo.ArtifactVO;
@@ -141,10 +141,10 @@ public class ArtifactServiceImpl extends ServiceImpl<ArtifactMapper, Artifact> i
 
         // 门禁：全部通过（1）或不适用（3）/已豁免（4）视为通过，失败/获取失败阻塞
         boolean gateOk = ObjUtil.isEmpty(artifact.getGateConclusion())
-                || ObjUtil.equals(artifact.getGateConclusion(), GateConclusionEnum.PASS.getCode())
-                || ObjUtil.equals(artifact.getGateConclusion(), GateConclusionEnum.NOT_APPLICABLE.getCode())
-                || ObjUtil.equals(artifact.getGateConclusion(), GateConclusionEnum.EXEMPTED.getCode());
-        vo.setHasExemption(ObjUtil.equals(artifact.getGateConclusion(), GateConclusionEnum.EXEMPTED.getCode()));
+                || ObjUtil.equals(artifact.getGateConclusion(), GateStatusEnum.PASS.getCode())
+                || ObjUtil.equals(artifact.getGateConclusion(), GateStatusEnum.NOT_APPLICABLE.getCode())
+                || ObjUtil.equals(artifact.getGateConclusion(), GateStatusEnum.EXEMPTED.getCode());
+        vo.setHasExemption(ObjUtil.equals(artifact.getGateConclusion(), GateStatusEnum.EXEMPTED.getCode()));
         items.add(item("门禁结论", gateOk, gateOk ? "通过" : "门禁未通过或数据获取失败，禁止晋级"));
 
         // 形态匹配

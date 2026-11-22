@@ -382,42 +382,35 @@ CREATE TABLE `dev_pipeline_stage_task`  (
 DROP TABLE IF EXISTS `dev_run`;
 CREATE TABLE `dev_run`  (
   `id` bigint NOT NULL COMMENT '主键id',
-  `run_no` varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '运行编号',
-  `pipeline_id` bigint NOT NULL COMMENT '流水线id',
-  `pipeline_version` int NOT NULL COMMENT '触发时流水线版本号',
-  `app_id` bigint NOT NULL COMMENT '应用id',
+  `code` varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '运行编号',
   `branch` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '分支',
-  `commit_id` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '提交或引用值（未接入仓库解析前存触发时生效值）',
-  `ref_type` tinyint NOT NULL DEFAULT 1 COMMENT '1 Commit 2 Tag/Ref',
-  `ref_value` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '生效引用值（触发输入或应用登记默认值）',
-  `trigger_type` tinyint NOT NULL DEFAULT 1 COMMENT '1 手动（历史值保留）',
-  `trigger_user` bigint NOT NULL COMMENT '触发人',
+  `ref_type` tinyint NOT NULL DEFAULT 1 COMMENT '引用类型 1=Commit 2=Tag/Ref',
+  `ref_value` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '引用值',
+  `trigger_type` tinyint NOT NULL DEFAULT 1 COMMENT '触发类型 1=手动 2=自动',
+  `trigger_user` bigint NOT NULL COMMENT '触发人id',
   `trigger_note` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '触发说明',
-  `status` tinyint NOT NULL DEFAULT 1 COMMENT '1 排队中 2 运行中 3 阻塞 4 成功 5 失败 6 超时 7 已取消 8 结果待确认',
-  `block_reason` tinyint NULL COMMENT '1 门禁不通过 2 门禁数据获取失败 3 人工暂停',
-  `is_precheck_pass` tinyint(1) NOT NULL DEFAULT 0 COMMENT '预校验是否通过',
-  `idempotent_key` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '幂等键',
-  `rerun_from_run_id` bigint NULL COMMENT '重跑自',
-  `reused_run_id` bigint NULL COMMENT '复用自',
-  `artifact_id` bigint NULL COMMENT '产出制品',
-  `jenkins_build_no` bigint NULL COMMENT 'Jenkins 构建号',
-  `jenkins_queue_id` bigint NULL COMMENT 'Jenkins 队列项id（构建号未分配时轮询用）',
-  `job_name` varchar(128) NULL COMMENT '实际构建的 Jenkins Job 名（旧数据为空，轮询时回退应用编码 Job）',
-  `result_expire_time` datetime(3) NULL COMMENT '结果待确认截止时间',
+  `status` tinyint NOT NULL DEFAULT 1 COMMENT '状态 1=排队中 2=运行中 3=阻塞 4=成功 5=失败 6=超时 7=已取消 8=结果待确认',
+  `app_id` bigint NOT NULL COMMENT '应用id',
+  `pipeline_id` bigint NOT NULL COMMENT '流水线id',
+  `pipeline_version` int NOT NULL COMMENT '流水线版本号',
+  `jenkins_job_id` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT 'Jenkins任务id',
+  `jenkins_build_no` bigint NULL COMMENT 'Jenkins构建编号',
+  `jenkins_queue_id` bigint NULL COMMENT 'Jenkins队列项id',
+  `pre_check_status` tinyint NULL DEFAULT 1 COMMENT '预检状态 1=正常 2=异常',
+  `pre_check_content` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '预检内容',
   `start_time` datetime(3) NULL COMMENT '开始时间',
   `end_time` datetime(3) NULL COMMENT '结束时间',
-  `duration` bigint NULL COMMENT '耗时毫秒',
-  `create_user` bigint NULL COMMENT '创建人',
+  `create_user` bigint NULL COMMENT '创建人id',
   `create_time` datetime(3) NULL COMMENT '创建时间',
-  `update_user` bigint NULL COMMENT '更新人',
+  `update_user` bigint NULL COMMENT '更新人id',
   `update_time` datetime(3) NULL COMMENT '更新时间',
-  `is_deleted` tinyint(1) NULL DEFAULT 0 COMMENT '是否删除 0：否 1：是',
+  `is_deleted` tinyint(1) NULL DEFAULT 0 COMMENT '是否删除 0=否 1=是',
   PRIMARY KEY (`id`) USING BTREE,
-  UNIQUE KEY `uk_run_no` (`run_no`) USING BTREE,
+  UNIQUE KEY `uk_code` (`code`) USING BTREE,
   KEY `idx_run_pipeline` (`pipeline_id`,`start_time`) USING BTREE,
   KEY `idx_run_app_status` (`app_id`,`status`) USING BTREE,
-  KEY `idx_run_job` (`jenkins_build_no`) USING BTREE,
-  KEY `idx_run_status_ctime` (`status`,`create_time`) USING BTREE
+  KEY `idx_run_status_ctime` (`status`,`create_time`) USING BTREE,
+  KEY `idx_run_source` (`app_id`,`pipeline_version`,`ref_value`,`status`) USING BTREE
 ) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '运行表' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
@@ -425,51 +418,51 @@ CREATE TABLE `dev_run`  (
 -- ----------------------------
 DROP TABLE IF EXISTS `dev_run_stage`;
 CREATE TABLE `dev_run_stage`  (
-  `id` bigint NOT NULL COMMENT '主键',
+  `id` bigint NOT NULL COMMENT '主键id',
+  `type` tinyint NOT NULL COMMENT '阶段类型 1=构建 2=单元测试 3=静态扫描 4=制品入库 5=部署非生产 6=集成测试 7=准入 8=生产发布',
+  `name` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '阶段名称',
+  `status` tinyint NOT NULL DEFAULT 1 COMMENT '状态 1=未开始 2=进行中 3=成功 4=失败 5=阻塞 6=跳过 7=超时 8=已复用 9=已取消 10=待门禁',
+  `result` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '运行结果信息',
   `run_id` bigint NOT NULL COMMENT '运行id',
-  `stage_type` tinyint NOT NULL COMMENT '1–8',
-  `stage_name` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '阶段名',
-  `seq` int NOT NULL COMMENT '顺序',
-  `status` tinyint NOT NULL DEFAULT 1 COMMENT '1–9',
-  `block_reason` tinyint NULL COMMENT '阻塞原因',
-  `reused_from_stage_id` bigint NULL COMMENT '复用来源阶段',
-  `jenkins_job_id` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT 'Jenkins Job 标识',
   `start_time` datetime(3) NULL COMMENT '开始时间',
   `end_time` datetime(3) NULL COMMENT '结束时间',
-  `duration` bigint NULL COMMENT '耗时毫秒',
-  `create_user` bigint NULL COMMENT '创建人',
+  `sort` int NOT NULL COMMENT '排序号',
+  `create_user` bigint NULL COMMENT '创建人id',
   `create_time` datetime(3) NULL COMMENT '创建时间',
-  `update_user` bigint NULL COMMENT '更新人',
+  `update_user` bigint NULL COMMENT '更新人id',
   `update_time` datetime(3) NULL COMMENT '更新时间',
-  `is_deleted` tinyint(1) NULL DEFAULT 0 COMMENT '是否删除 0：否 1：是',
+  `is_deleted` tinyint(1) NULL DEFAULT 0 COMMENT '是否删除 0=否 1=是',
   PRIMARY KEY (`id`) USING BTREE,
-  KEY `idx_stage_run` (`run_id`,`seq`) USING BTREE
+  KEY `idx_stage_run` (`run_id`,`sort`) USING BTREE,
+  KEY `idx_stage_status_end` (`status`,`end_time`) USING BTREE
 ) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '运行阶段表' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
--- Table structure for dev_run_task
+-- Table structure for dev_run_stage_task
 -- ----------------------------
-DROP TABLE IF EXISTS `dev_run_task`;
-CREATE TABLE `dev_run_task`  (
-  `id` bigint NOT NULL COMMENT '主键',
-  `run_id` bigint NOT NULL COMMENT '运行id',
-  `stage_id` bigint NOT NULL COMMENT '阶段id',
-  `name` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '任务名',
+DROP TABLE IF EXISTS `dev_run_stage_task`;
+CREATE TABLE `dev_run_stage_task`  (
+  `id` bigint NOT NULL COMMENT '主键id',
+  `name` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '任务名称',
   `executor` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '执行器',
-  `status` tinyint NOT NULL DEFAULT 1 COMMENT '状态',
-  `exit_code` int NULL COMMENT '退出码',
-  `duration` bigint NULL COMMENT '耗时',
-  `log_line_count` int NOT NULL DEFAULT 0 COMMENT '日志行数',
-  `is_truncated` tinyint(1) NOT NULL DEFAULT 0 COMMENT '是否截断',
-  `create_user` bigint NULL COMMENT '创建人',
+  `script_ref` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '源码脚本路径',
+  `script_content` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '自定义脚本内容',
+  `status` tinyint NOT NULL DEFAULT 1 COMMENT '状态 1=未开始 2=进行中 3=成功 4=失败 5=阻塞 6=跳过 7=超时 8=已复用 9=已取消；复用阶段状态码，实际写入1/3/4/6/9，不使用10=待门禁',
+  `result` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '运行结果信息',
+  `run_id` bigint NOT NULL COMMENT '运行id',
+  `run_stage_id` bigint NOT NULL COMMENT '运行阶段id',
+  `start_time` datetime(3) NULL COMMENT '开始时间',
+  `end_time` datetime(3) NULL COMMENT '结束时间',
+  `sort` int NOT NULL COMMENT '排序号',
+  `create_user` bigint NULL COMMENT '创建人id',
   `create_time` datetime(3) NULL COMMENT '创建时间',
-  `update_user` bigint NULL COMMENT '更新人',
+  `update_user` bigint NULL COMMENT '更新人id',
   `update_time` datetime(3) NULL COMMENT '更新时间',
-  `is_deleted` tinyint(1) NULL DEFAULT 0 COMMENT '是否删除 0：否 1：是',
+  `is_deleted` tinyint(1) NULL DEFAULT 0 COMMENT '是否删除 0=否 1=是',
   PRIMARY KEY (`id`) USING BTREE,
-  KEY `idx_task_stage` (`stage_id`) USING BTREE,
-  KEY `idx_task_run` (`run_id`) USING BTREE
-) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '运行任务表' ROW_FORMAT = DYNAMIC;
+  KEY `idx_stage_task_stage` (`run_stage_id`,`sort`) USING BTREE,
+  KEY `idx_stage_task_run` (`run_id`) USING BTREE
+) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '运行阶段任务表' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
 -- Table structure for dev_run_log_segment
@@ -541,21 +534,6 @@ CREATE TABLE `dev_run_operation`  (
 ) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '运行干预记录表' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
--- Table structure for dev_run_idempotency
--- ----------------------------
-DROP TABLE IF EXISTS `dev_run_idempotency`;
-CREATE TABLE `dev_run_idempotency`  (
-  `id` bigint NOT NULL COMMENT '主键',
-  `idempotent_key` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT 'sha256',
-  `app_id` bigint NOT NULL COMMENT '应用id',
-  `run_id` bigint NOT NULL COMMENT '运行id',
-  `state` tinyint NOT NULL DEFAULT 1 COMMENT '1 活动中 2 已成功 3 已失效',
-  `expire_time` datetime(3) NULL COMMENT '失效时间',
-  PRIMARY KEY (`id`) USING BTREE,
-  UNIQUE KEY `uk_idem_key` (`idempotent_key`) USING BTREE
-) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '触发幂等表' ROW_FORMAT = DYNAMIC;
-
--- ----------------------------
 -- Table structure for dev_gate_rule
 -- ----------------------------
 DROP TABLE IF EXISTS `dev_gate_rule`;
@@ -583,27 +561,31 @@ CREATE TABLE `dev_gate_rule`  (
 ) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '门禁规则表' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
--- Table structure for dev_gate_result
+-- Table structure for dev_run_stage_gate
 -- ----------------------------
-DROP TABLE IF EXISTS `dev_gate_result`;
-CREATE TABLE `dev_gate_result`  (
-  `id` bigint NOT NULL COMMENT '主键',
+DROP TABLE IF EXISTS `dev_run_stage_gate`;
+CREATE TABLE `dev_run_stage_gate`  (
+  `id` bigint NOT NULL COMMENT '主键id',
   `run_id` bigint NOT NULL COMMENT '运行id',
-  `stage_id` bigint NOT NULL COMMENT '阶段id',
+  `run_stage_id` bigint NOT NULL COMMENT '运行阶段id',
   `rule_id` bigint NULL COMMENT '规则id',
-  `rule_snapshot` varchar(2000) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '规则快照',
-  `current_value` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '当前值',
-  `threshold` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '阈值',
-  `conclusion` tinyint NOT NULL COMMENT '1 通过 2 不通过 3 不适用 4 已豁免 5 数据获取失败',
+  `rule_type` tinyint NOT NULL COMMENT '规则类型 1=单元测试通过率 2=行覆盖率 3=分支覆盖率 4=阻断级漏洞数 5=高危依赖漏洞数 6=许可证黑名单',
+  `rule_version` int NULL COMMENT '规则版本号',
+  `rule_snapshot` varchar(4000) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '规则快照(JSON)',
+  `current_value` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '当前值',
+  `threshold` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '阈值',
+  `status` tinyint NOT NULL COMMENT '状态 1=通过 2=不通过 3=不适用 4=已豁免 5=数据获取失败',
   `evidence` varchar(1000) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '证据链接',
-  `source` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '报告来源',
-  `schema_version` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT 'schema 版本',
-  `fetch_error` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '获取失败原因',
-  `create_time` datetime(3) NOT NULL COMMENT '判定时间',
+  `source` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '报告来源',
+  `schema_version` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '报告schema版本',
+  `fetch_error` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '原因说明 数据获取失败/不适用/豁免原因',
+  `create_time` datetime(3) NOT NULL COMMENT '创建时间',
+  `update_time` datetime(3) NULL COMMENT '更新时间',
   PRIMARY KEY (`id`) USING BTREE,
-  KEY `idx_gate_result_run` (`run_id`,`conclusion`) USING BTREE,
-  KEY `idx_gate_result_rule` (`rule_id`) USING BTREE
-) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '门禁结果表' ROW_FORMAT = DYNAMIC;
+  UNIQUE KEY `uk_run_stage_gate` (`run_stage_id`,`rule_type`) USING BTREE,
+  KEY `idx_run_stage_gate_run` (`run_id`,`status`) USING BTREE,
+  KEY `idx_run_stage_gate_rule` (`rule_id`) USING BTREE
+) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '运行阶段门禁结果表' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
 -- Table structure for dev_gate_exemption
@@ -611,7 +593,7 @@ CREATE TABLE `dev_gate_result`  (
 DROP TABLE IF EXISTS `dev_gate_exemption`;
 CREATE TABLE `dev_gate_exemption`  (
   `id` bigint NOT NULL COMMENT '主键',
-  `gate_result_id` bigint NOT NULL COMMENT '结果id',
+  `run_stage_gate_id` bigint NOT NULL COMMENT '运行阶段门禁结果id',
   `run_id` bigint NOT NULL COMMENT '运行id',
   `rule_id` bigint NOT NULL COMMENT '规则id',
   `reason` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '理由，不少于 20 字',
@@ -621,7 +603,7 @@ CREATE TABLE `dev_gate_exemption`  (
   `status` tinyint NOT NULL DEFAULT 1 COMMENT '1 生效 2 已到期 3 已撤销',
   `create_time` datetime(3) NOT NULL COMMENT '申请时间',
   PRIMARY KEY (`id`) USING BTREE,
-  KEY `idx_exempt_result` (`gate_result_id`) USING BTREE,
+  KEY `idx_exempt_result` (`run_stage_gate_id`) USING BTREE,
   KEY `idx_exempt_expire` (`status`,`expire_at`) USING BTREE
 ) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '门禁豁免表' ROW_FORMAT = DYNAMIC;
 

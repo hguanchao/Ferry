@@ -6,7 +6,7 @@ import { Activity, Clock3, Gauge, RotateCw, Timer, TrendingUp } from 'lucide-rea
 import PageHeader from '@/components/PageHeader'
 import { RoleTag } from '@/components/StatusTag'
 import { metricApi } from '@/api/devops'
-import type { MetricRow, StageStatRow } from '@/api/types-devops'
+import type { MetricRow, StageStat } from '@/api/types-devops'
 const STAGE_LABEL: Record<number, string> = { 1: '构建', 2: '单元测试', 3: '代码扫描', 4: '部署', 5: '门禁', 6: '审批' }
 
 /** 前端 CSV 下载 */
@@ -68,7 +68,7 @@ export default function DeliveryMetric() {
       render: (v: number) => <Tag color={v === 2 ? 'orange' : 'green'}>{v === 2 ? '数据不足' : '正常'}</Tag> },
   ]
 
-  const stageColumns: TableColumnsType<StageStatRow> = [
+  const stageColumns: TableColumnsType<StageStat> = [
     { title: '统计日', dataIndex: 'statDate', },
     { title: '应用ID', dataIndex: 'appId', },
     { title: '阶段', dataIndex: 'stageType',
@@ -140,7 +140,7 @@ export default function DeliveryMetric() {
           </span>
         </div>
         <div className="ferry-table-wrap">
-          <FerryTable<StageStatRow> rowKey="id" columns={stageColumns} dataSource={stageQuery.data?.records ?? []}
+          <FerryTable<StageStat> rowKey="id" columns={stageColumns} dataSource={stageQuery.data?.records ?? []}
             loading={stageQuery.isLoading || stageQuery.isFetching} scroll={{ x: 'max-content' }}
             pagination={{
               current: page.current, pageSize: page.size, total: stageQuery.data?.total ?? 0,

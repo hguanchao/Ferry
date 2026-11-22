@@ -7,7 +7,7 @@ import PageHeader from '@/components/PageHeader'
 import { RoleTag } from '@/components/StatusTag'
 import { gateApi, appApi } from '@/api/devops'
 import { post } from '@/api/client'
-import type { GateRuleRow } from '@/api/types-devops'
+import type { GateRule } from '@/api/types-devops'
 import { useAuthStore } from '@/stores/auth'
 import { showError } from '@/lib/notify'
 const SCOPE_LABEL: Record<number, string> = { 1: '组织默认', 2: '应用', 3: '分支' }
@@ -16,13 +16,13 @@ const RULE_LABEL: Record<number, string> = {
 }
 const DIRECTION_LABEL: Record<number, string> = { 1: '不低于', 2: '不高于' }
 
-export default function GateRule() {
+export default function GateRulePage() {
   const { message, modal } = App.useApp()
   const queryClient = useQueryClient()
   const can = useAuthStore((state) => state.can)
   const [form] = Form.useForm()
   const [open, setOpen] = useState(false)
-  const [editing, setEditing] = useState<GateRuleRow | null>(null)
+  const [editing, setEditing] = useState<GateRule | null>(null)
   const [scope, setScope] = useState('1')
   const [filters, setFilters] = useState<Record<string, unknown>>({ scopeType: 1 })
   const [page, setPage] = useState({ current: 1, size: 30 })
@@ -62,7 +62,7 @@ export default function GateRule() {
     onError: showError,
   })
 
-  const openEditor = (record: GateRuleRow | null) => {
+  const openEditor = (record: GateRule | null) => {
     setEditing(record)
     form.resetFields()
     if (record) {
@@ -73,7 +73,7 @@ export default function GateRule() {
     setOpen(true)
   }
 
-  const columns: TableColumnsType<GateRuleRow> = [
+  const columns: TableColumnsType<GateRule> = [
     { title: '作用域', dataIndex: 'scopeType',
       render: (v: number) => <Tag color={v === 3 ? 'purple' : v === 2 ? 'blue' : 'default'}>{SCOPE_LABEL[v] ?? v}</Tag>,
     },
@@ -157,7 +157,7 @@ export default function GateRule() {
           <Button icon={<RotateCw size={14} />} onClick={() => void queryClient.invalidateQueries({ queryKey: ['gate-rules'] })}>刷新</Button>
         </div>
         <div className="ferry-table-wrap">
-          <FerryTable<GateRuleRow> rowKey="id" columns={columns} dataSource={query.data?.records ?? []}
+          <FerryTable<GateRule> rowKey="id" columns={columns} dataSource={query.data?.records ?? []}
             loading={query.isFetching} scroll={{ x: 'max-content' }}
             pagination={{ current: page.current, pageSize: page.size, total: query.data?.total ?? 0,
               showSizeChanger: true, pageSizeOptions: ['30', '100', '200'],

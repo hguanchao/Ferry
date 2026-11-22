@@ -35,6 +35,11 @@ final class JenkinsHttpClient {
      */
     private static final Duration TIMEOUT = Duration.ofSeconds(5);
 
+    /**
+     * 归档产物可能较大，单独放宽超时
+     */
+    private static final Duration ARTIFACT_TIMEOUT = Duration.ofSeconds(30);
+
     private final HttpClient client;
     private final String baseUrl;
     private final String authorization;
@@ -56,6 +61,10 @@ final class JenkinsHttpClient {
 
     HttpResult get(String path) {
         return send("GET", path, null, null);
+    }
+
+    HttpResult getArtifact(String path) {
+        return send("GET", path, null, null, "*/*", ARTIFACT_TIMEOUT);
     }
 
     HttpResult postForm(String path, Map<String, String> params) {
@@ -84,6 +93,11 @@ final class JenkinsHttpClient {
     }
 
     private HttpResult send(String method, String path, String body, String contentType) {
+        return send(method, path, body, contentType, "application/json", TIMEOUT);
+    }
+
+    private HttpResult send(String method, String path, String body, String contentType,
+                            String accept, Duration timeout) {
         String url = baseUrl + path;
         URI uri;
         try {
@@ -92,8 +106,8 @@ final class JenkinsHttpClient {
             throw new JenkinsDispatchException("Jenkins 地址不合法：" + path, false, e);
         }
         HttpRequest.Builder builder = HttpRequest.newBuilder(uri)
-                .timeout(TIMEOUT)
-                .header("Accept", "application/json");
+                .timeout(timeout)
+                .header("Accept", accept);
         if (authorization != null) {
             builder.header("Authorization", authorization);
         }

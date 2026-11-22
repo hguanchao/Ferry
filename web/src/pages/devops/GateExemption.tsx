@@ -7,14 +7,14 @@ import PageHeader from '@/components/PageHeader'
 import { RoleTag } from '@/components/StatusTag'
 import { gateApi } from '@/api/devops'
 import { post } from '@/api/client'
-import type { GateExemptionRow } from '@/api/types-devops'
+import type { GateExemption } from '@/api/types-devops'
 import { useAuthStore } from '@/stores/auth'
 import { showError } from '@/lib/notify'
 const STATUS: Record<number, { label: string; color: string }> = {
   1: { label: '生效', color: 'green' }, 2: { label: '已到期', color: 'default' }, 3: { label: '已撤销', color: 'red' },
 }
 
-export default function GateExemption() {
+export default function GateExemptionPage() {
   const { message } = App.useApp()
   const queryClient = useQueryClient()
   const can = useAuthStore((state) => state.can)
@@ -33,9 +33,9 @@ export default function GateExemption() {
     onError: showError,
   })
 
-  const columns: TableColumnsType<GateExemptionRow> = [
+  const columns: TableColumnsType<GateExemption> = [
     { title: '豁免ID', dataIndex: 'id',  render: (v: string) => <span className="ferry-mono" style={{ fontSize: 12 }}>{v}</span> },
-    { title: '结果ID', dataIndex: 'gateResultId',  render: (v: string) => <span className="ferry-mono" style={{ fontSize: 12 }}>{v}</span> },
+    { title: '结果ID', dataIndex: 'runStageGateId',  render: (v: string) => <span className="ferry-mono" style={{ fontSize: 12 }}>{v}</span> },
     { title: '运行ID', dataIndex: 'runId',  render: (v: string) => <span className="ferry-mono" style={{ fontSize: 12 }}>{v}</span> },
     { title: '理由', dataIndex: 'reason', render: (v: string) => <span title={v}>{v?.slice(0, 40)}{v?.length > 40 ? '…' : ''}</span> },
     { title: '到期时间', dataIndex: 'expireAt', },
@@ -72,7 +72,7 @@ export default function GateExemption() {
             onClick={() => { setDraft({}); setFilters({}); setPage((p) => ({ ...p, current: 1 })) }}>重置</Button>
         </div>
         <div className="ferry-table-wrap">
-          <FerryTable<GateExemptionRow> rowKey="id" columns={columns} dataSource={query.data?.records ?? []}
+          <FerryTable<GateExemption> rowKey="id" columns={columns} dataSource={query.data?.records ?? []}
             loading={query.isFetching} scroll={{ x: 'max-content' }}
             pagination={{ current: page.current, pageSize: page.size, total: query.data?.total ?? 0,
               showSizeChanger: true, pageSizeOptions: ['30', '100', '200'],

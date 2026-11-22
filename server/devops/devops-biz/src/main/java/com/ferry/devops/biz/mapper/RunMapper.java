@@ -1,5 +1,7 @@
 package com.ferry.devops.biz.mapper;
+
 import java.util.Date;
+import java.util.List;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.ferry.devops.api.entity.Run;
@@ -7,23 +9,36 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 
-import java.util.List;
-
 @Mapper
 public interface RunMapper extends BaseMapper<Run> {
 
     /**
-     * 流水线在指定幂等键上是否已有活动运行（排队/运行/阻塞）
+     * 同一应用/引用/流水线版本是否已有活动运行（排队/运行/阻塞）
+     *
+     * @param appId           应用id
+     * @param refValue        生效引用值
+     * @param pipelineVersion 流水线版本号
+     * @return 最近的活动运行，无则 null
      */
-    @Select("SELECT * FROM dev_run WHERE is_deleted = 0 AND idempotent_key = #{key} "
+    @Select("SELECT * FROM dev_run WHERE is_deleted = 0 AND app_id = #{appId} "
+            + "AND ref_value = #{refValue} AND pipeline_version = #{pipelineVersion} "
             + "AND status IN (1,2,3) ORDER BY id DESC LIMIT 1")
-    Run selectActiveByIdemKey(@Param("key") String key);
+    Run selectActiveBySource(@Param("appId") Long appId, @Param("refValue") String refValue,
+                             @Param("pipelineVersion") Integer pipelineVersion);
 
     /**
-     * 流水线在指定幂等键上是否已有成功运行
+     * 同一应用/引用/流水线版本是否已有成功运行
+     *
+     * @param appId           应用id
+     * @param refValue        生效引用值
+     * @param pipelineVersion 流水线版本号
+     * @return 最近的成功运行，无则 null
      */
-    @Select("SELECT * FROM dev_run WHERE is_deleted = 0 AND idempotent_key = #{key} AND status = 4 ORDER BY id DESC LIMIT 1")
-    Run selectSuccessByIdemKey(@Param("key") String key);
+    @Select("SELECT * FROM dev_run WHERE is_deleted = 0 AND app_id = #{appId} "
+            + "AND ref_value = #{refValue} AND pipeline_version = #{pipelineVersion} "
+            + "AND status = 4 ORDER BY id DESC LIMIT 1")
+    Run selectSuccessBySource(@Param("appId") Long appId, @Param("refValue") String refValue,
+                              @Param("pipelineVersion") Integer pipelineVersion);
 
     /**
      * 同一流水线是否存在进行中的运行（排队/运行/阻塞）
@@ -36,12 +51,12 @@ public interface RunMapper extends BaseMapper<Run> {
      */
     @Select("SELECT COUNT(1) FROM dev_run WHERE is_deleted = 0 AND app_id = #{appId} "
             + "AND trigger_user = #{userId} AND create_time > #{since}")
-    long countByUserSince(@Param("appId") Long appId, @Param("userId") Long userId, @Param("since") java.util.Date since);
+    long countByUserSince(@Param("appId") Long appId, @Param("userId") Long userId, @Param("since") Date since);
 
     /**
      * 生成运行编号：RUN-yyyyMMdd-当日序号（四位）
      */
-    @Select("SELECT COUNT(1) + 1 FROM dev_run WHERE is_deleted = 0 AND run_no LIKE CONCAT('RUN-', #{day}, '-%')")
+    @Select("SELECT COUNT(1) + 1 FROM dev_run WHERE is_deleted = 0 AND code LIKE CONCAT('RUN-', #{day}, '-%')")
     long nextSeqOfDay(@Param("day") String day);
 
     /**

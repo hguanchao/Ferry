@@ -81,6 +81,16 @@ public interface JenkinsClient {
     JenkinsBuildStatus buildStatus(String jobName, Long buildNo);
 
     /**
+     * 读取 Jenkins 构建归档产物。
+     *
+     * @param jobName      Job 名
+     * @param buildNo      构建号
+     * @param artifactPath 归档相对路径，如 reports/ferry-gate-summary.json
+     * @return 文件内容；404 返回 empty，其他失败抛出异常
+     */
+    java.util.Optional<String> fetchArtifact(String jobName, Long buildNo, String artifactPath);
+
+    /**
      * 中止构建。
      *
      * @param jobName Job 名

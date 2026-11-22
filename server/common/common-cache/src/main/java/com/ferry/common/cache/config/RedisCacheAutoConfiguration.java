@@ -3,6 +3,8 @@ package com.ferry.common.cache.config;
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.PropertyAccessor;
+import com.ferry.common.cache.aspect.IdempotentAspect;
+import com.ferry.common.cache.config.props.IdempotentProperties;
 import com.ferry.common.cache.utils.LockUtil;
 import com.ferry.common.cache.utils.RedisUtil;
 import com.ferry.common.core.constant.IntConst;
@@ -51,10 +53,19 @@ import java.util.Objects;
  */
 @EnableCaching
 @Import({RedisUtil.class, LockUtil.class})
-@EnableConfigurationProperties({CacheProperties.class, DataRedisProperties.class})
+@EnableConfigurationProperties({CacheProperties.class, DataRedisProperties.class, IdempotentProperties.class})
 @ConditionalOnClass({RedisTemplate.class, RedisConnectionFactory.class})
 @AutoConfiguration(before = {DataRedisAutoConfiguration.class, CacheAutoConfiguration.class})
 public class RedisCacheAutoConfiguration {
+
+    /**
+     * 幂等切面：Redis SETNX + TTL，供 @Idempotent 使用。
+     */
+    @Bean
+    @ConditionalOnMissingBean(IdempotentAspect.class)
+    public IdempotentAspect idempotentAspect(IdempotentProperties properties) {
+        return new IdempotentAspect(properties);
+    }
 
     /**
      * redis模板配置

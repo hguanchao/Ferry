@@ -5,7 +5,7 @@ import com.ferry.common.core.http.R;
 import com.ferry.common.security.annotation.PreAuthorize;
 import com.ferry.devops.api.dto.query.GateExemptionQuery;
 import com.ferry.devops.api.vo.GateExemptionVO;
-import com.ferry.devops.biz.service.IGateResultService;
+import com.ferry.devops.biz.service.IGateExemptionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.AllArgsConstructor;
@@ -24,7 +24,7 @@ import org.springframework.web.bind.annotation.RestController;
 @Tag(name = "门禁豁免", description = "豁免记录查询")
 public class GateExemptionController {
 
-    private final IGateResultService service;
+    private final IGateExemptionService service;
 
     @PostMapping("/pageList")
     @PreAuthorize("devops:gateExemption:pageList")

@@ -3,14 +3,14 @@ import { get, post } from './client'
 import type { ApiPage } from './types'
 import type {
   ActionCatalogRow, ActionRecordRow, AiFeedbackRow, AiOutputRow, AppAiLevelRow,
-  AppOption, AppOverview, AppDependencyRow, AppRow, ArtifactRow, BaselineRow,
+  AppOption, AppOverview, AppDependencyRow, AppRow, ArtifactRow, GateBaseline,
   ChangeTicketRow, CleanPolicyRow, CleanTaskRow, ClosureRow, DeployBatchRow,
-  DeployRecordRow, DiffResult, EnvironmentRow, EnvConfigRow, GateExemptionRow,
-  GateResultRow, GateRuleRow, ImpactResult, MetricRow, NotifyChannelRow, NotifyTemplateRow,
+  DeployRecordRow, DiffResult, EnvironmentRow, EnvConfigRow, GateExemption,
+  RunStageGate, GateRule, ImpactResult, MetricRow, NotifyChannelRow, NotifyTemplateRow,
   OpenTokenRow, PipelineDefinition, PipelineDetail, PipelinePreview, PipelineRow, PipelineVersionRow, PrecheckResult,
   PrecheckResultVO, ReleaseDetail, ReleaseRecordRow, ReleaseRow, ReleaseStrategyRow,
-  RepoCommitOption, RiskResult, RollbackCandidate, RollbackRow, RunDetail, RunRow, StageStatRow, StoragePolicyRow,
-  TechDebtRow, TriggerRecordRow, TriggerResult, ValidateResult,
+  RepoCommitOption, RiskResult, RollbackCandidate, RollbackRow, RunDetail, Run, StageStat, StoragePolicyRow,
+  TechDebtRow, RunTrigger, TriggerResult, ValidateResult,
   WizardProgress,
 } from './types-devops'
 
@@ -77,15 +77,15 @@ export const pipelineApi = {
   triggerCommits: (appId: string, branch: string, limit = 10) =>
     get<RepoCommitOption[]>(`${B}/pipeline/trigger/commits`, { appId, branch, limit }, { silent: true }),
   trigger: (body: Record<string, unknown>, requestId: string) => post<TriggerResult>(`${B}/pipeline/trigger`, { ...body, requestId }),
-  triggerRecords: (appId: string, current = 1, size = 20) => get<ApiPage<TriggerRecordRow>>(`${B}/pipeline/trigger/records`, { appId, current, size }),
+  triggerRecords: (appId: string, current = 1, size = 20) => get<ApiPage<RunTrigger>>(`${B}/pipeline/trigger/records`, { appId, current, size }),
 }
 
 
 export const runApi = {
-  pageList: (body: Record<string, unknown>) => post<ApiPage<RunRow>>(`${B}/run/pageList`, body),
+  pageList: (body: Record<string, unknown>) => post<ApiPage<Run>>(`${B}/run/pageList`, body),
   detail: (id: string) => get<RunDetail>(`${B}/run/detail`, { id }),
   stages: (id: string) => get<Array<Record<string, unknown>>>(`${B}/run/stage/list`, { id }),
-  tasks: (stageId: string) => get<Array<Record<string, unknown>>>(`${B}/run/task/list`, { stageId }),
+  tasks: (runStageId: string) => get<Array<Record<string, unknown>>>(`${B}/run/task/list`, { runStageId }),
   log: (taskId: string) => get<Array<Record<string, unknown>>>(`${B}/run/log`, { taskId }),
   logSearch: (body: Record<string, unknown>) => post<Array<Record<string, unknown>>>(`${B}/run/log/search`, body),
   pause: (body: Record<string, unknown>) => post<string>(`${B}/run/pause`, body),
@@ -109,15 +109,15 @@ export const artifactApi = {
 }
 
 export const gateApi = {
-  rulePage: (body: Record<string, unknown>) => post<ApiPage<GateRuleRow>>(`${B}/gateRule/pageList`, body),
-  ruleDetail: (id: string) => get<GateRuleRow>(`${B}/gateRule/detail`, { id }),
+  rulePage: (body: Record<string, unknown>) => post<ApiPage<GateRule>>(`${B}/gateRule/pageList`, body),
+  ruleDetail: (id: string) => get<GateRule>(`${B}/gateRule/detail`, { id }),
   ruleSave: (body: Record<string, unknown>) => post<string>(`${B}/gateRule/save`, body),
   ruleDeleted: (ids: string[]) => post<string>(`${B}/gateRule/deleted`, ids),
   ruleEnable: (id: string) => post<string>(`${B}/gateRule/enable`, { id }),
-  resultList: (runId: string) => get<GateResultRow[]>(`${B}/gateResult/list`, { runId }),
-  exempt: (body: Record<string, unknown>) => post<string>(`${B}/gateResult/exempt`, body),
-  exemptionList: (body: Record<string, unknown>) => post<ApiPage<GateExemptionRow>>(`${B}/gateExemption/pageList`, body),
-  baselineDetail: (appId: string) => get<BaselineRow>(`${B}/gateBaseline/detail`, { appId }),
+  resultList: (runId: string) => get<RunStageGate[]>(`${B}/runStageGate/list`, { runId }),
+  exempt: (body: Record<string, unknown>) => post<string>(`${B}/runStageGate/exempt`, body),
+  exemptionList: (body: Record<string, unknown>) => post<ApiPage<GateExemption>>(`${B}/gateExemption/pageList`, body),
+  baselineDetail: (appId: string) => get<GateBaseline>(`${B}/gateBaseline/detail`, { appId }),
   baselineReset: (body: Record<string, unknown>) => post<string>(`${B}/gateBaseline/reset`, body),
   baselineApprove: (body: Record<string, unknown>) => post<string>(`${B}/gateBaseline/approve`, body),
   techDebtPage: (body: Record<string, unknown>) => post<ApiPage<TechDebtRow>>(`${B}/techDebt/pageList`, body),
@@ -192,7 +192,7 @@ export const aiApi = {
 export const metricApi = {
   dora: (body: Record<string, unknown>) => post<ApiPage<MetricRow>>(`${B}/metric/dora`, body),
   pipelineEfficiency: (body: Record<string, unknown>) => post<ApiPage<MetricRow>>(`${B}/metric/pipelineEfficiency`, body),
-  stageDuration: (body: Record<string, unknown>) => post<ApiPage<StageStatRow>>(`${B}/metric/stageDuration`, body),
+  stageDuration: (body: Record<string, unknown>) => post<ApiPage<StageStat>>(`${B}/metric/stageDuration`, body),
   overview: () => get<Record<string, unknown>>(`${B}/workbench/overview`),
 }
 export const systemExtApi = {

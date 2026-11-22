@@ -1,13 +1,18 @@
 package com.ferry.devops.biz.service.impl;
-import com.ferry.devops.api.vo.RunVO;
+
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Date;
+import java.util.List;
+import java.util.Map;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
-import com.baomidou.mybatisplus.core.toolkit.IdWorker;
-import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.ferry.common.core.constant.IntConst;
 import com.ferry.common.core.exception.ServiceException;
 import com.ferry.common.core.utils.BeanUtil;
-import com.ferry.common.core.utils.CryptoUtil;
 import com.ferry.common.core.utils.ObjUtil;
 import com.ferry.common.core.utils.StrUtil;
 import com.ferry.common.jdbc.base.ServiceImpl;
@@ -21,14 +26,12 @@ import com.ferry.devops.api.dto.query.RunQuery;
 import com.ferry.devops.api.entity.App;
 import com.ferry.devops.api.entity.Pipeline;
 import com.ferry.devops.api.entity.Run;
-import com.ferry.devops.api.entity.RunIdempotency;
 import com.ferry.devops.api.entity.RunLogSegment;
 import com.ferry.devops.api.entity.RunOperation;
 import com.ferry.devops.api.entity.RunPrecheck;
 import com.ferry.devops.api.entity.RunStage;
-import com.ferry.devops.api.entity.RunTask;
+import com.ferry.devops.api.entity.RunStageTask;
 import com.ferry.devops.api.entity.RunTrigger;
-import com.ferry.devops.api.enums.BlockReasonEnum;
 import com.ferry.devops.api.enums.DevopsStateMachine;
 import com.ferry.devops.api.enums.PipelineStatusEnum;
 import com.ferry.devops.api.enums.RunStatusEnum;
@@ -38,10 +41,10 @@ import com.ferry.devops.api.vo.PrecheckItemVO;
 import com.ferry.devops.api.vo.PrecheckResultVO;
 import com.ferry.devops.api.vo.RunDetailVO;
 import com.ferry.devops.api.vo.RunStageVO;
-import com.ferry.devops.api.vo.RunTaskVO;
+import com.ferry.devops.api.vo.RunStageTaskVO;
+import com.ferry.devops.api.vo.RunVO;
 import com.ferry.devops.api.vo.TriggerResultVO;
 import com.ferry.devops.api.vo.VersionVO;
-import com.ferry.devops.biz.config.DevopsIntegrationProperties;
 import com.ferry.devops.biz.integration.jenkins.BuildSource;
 import com.ferry.devops.biz.integration.jenkins.JenkinsClient;
 import com.ferry.devops.biz.integration.jenkins.JenkinsDispatchException;
@@ -49,19 +52,17 @@ import com.ferry.devops.biz.integration.jenkins.JenkinsDispatchResult;
 import com.ferry.devops.biz.integration.jenkins.JenkinsJobNames;
 import com.ferry.devops.biz.mapper.AppMapper;
 import com.ferry.devops.biz.mapper.PipelineMapper;
-import com.ferry.devops.biz.mapper.PipelineStageMapper;
-import com.ferry.devops.biz.mapper.PipelineStageTaskMapper;
-import com.ferry.devops.biz.mapper.RunIdempotencyMapper;
 import com.ferry.devops.biz.mapper.RunLogSegmentMapper;
 import com.ferry.devops.biz.mapper.RunMapper;
 import com.ferry.devops.biz.mapper.RunOperationMapper;
 import com.ferry.devops.biz.mapper.RunPrecheckMapper;
 import com.ferry.devops.biz.mapper.RunStageMapper;
-import com.ferry.devops.biz.mapper.RunTaskMapper;
+import com.ferry.devops.biz.mapper.RunStageTaskMapper;
 import com.ferry.devops.biz.mapper.RunTriggerMapper;
 import com.ferry.devops.biz.service.IPipelineService;
 import com.ferry.devops.biz.service.IPipelineStageService;
 import com.ferry.devops.biz.service.IRunService;
+import com.ferry.devops.biz.service.IRunStageService;
 import com.ferry.devops.biz.wrapper.RunWrapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -70,17 +71,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
-import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
-import java.util.regex.Pattern;
-import java.util.stream.Collectors;
-
 /**
- * 运行服务实现：五项预校验、幂等触发、阶段编排、日志脱敏分段、断点重跑、运行干预。
+ * 运行服务实现：五项预校验、触发、阶段编排、日志脱敏分段、断点重跑、运行干预。
  */
 @Slf4j
 @Service
@@ -90,33 +82,30 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
     private static final Pattern REF_PATTERN = Pattern.compile("^[^\\s~^:?*\\[\\\\]{1,100}$");
     private static final Pattern SECRET_PATTERN = Pattern.compile(
             "(?i)(password|passwd|token|secret|access[_-]?key|secret[_-]?key|api[_-]?key)\\s*[:=]\\s*\\S+");
-    private static final int IDEMPotent_WINDOW_SECONDS = 60;
     private static final int MAX_LOG_LINES = 100_000;
     private static final int SEGMENT_LINES = 500;
     private static final int DEFAULT_LOG_LIMIT = 2000;
+    private static final int PRE_CHECK_CONTENT_MAX = 500;
 
     private final RunMapper runMapper;
     private final PipelineMapper pipelineMapper;
-    private final PipelineStageMapper pipelineStageMapper;
-    private final PipelineStageTaskMapper pipelineTaskMapper;
     private final IPipelineStageService pipelineStageService;
     private final RunStageMapper stageMapper;
-    private final RunTaskMapper taskMapper;
+    private final RunStageTaskMapper taskMapper;
     private final RunLogSegmentMapper logMapper;
     private final RunPrecheckMapper precheckMapper;
     private final RunTriggerMapper triggerMapper;
     private final RunOperationMapper operationMapper;
-    private final RunIdempotencyMapper idempotencyMapper;
     private final JenkinsClient jenkinsClient;
     private final AppMapper appMapper;
     private final IPipelineService pipelineService;
-    private final DevopsIntegrationProperties properties;
+    private final IRunStageService runStageService;
 
     /**
      * 触发生效的代码源。
      *
      * @param branch        生效分支
-     * @param commitId      生效提交或引用值（未接入仓库解析前不做 SHA 归一）
+     * @param commitId      生效提交或引用值
      * @param refType       引用类型 1 Commit 2 Tag/Ref
      * @param branchFromApp 分支是否来自应用默认配置
      * @param commitFromApp 提交是否来自应用登记提交
@@ -141,17 +130,17 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
         RunDetailVO vo = new RunDetailVO();
         vo.setRun(wrapper.voWithExtras(Collections.singletonList(run)).get(0));
         List<RunStage> stages = stageMapper.selectByRun(id);
-        List<RunTask> tasks = taskMapper.selectByRun(id);
-        Map<Long, List<RunTask>> tasksByStage = tasks.stream()
-                .collect(Collectors.groupingBy(RunTask::getStageId));
+        List<RunStageTask> tasks = taskMapper.selectByRun(id);
+        Map<Long, List<RunStageTask>> tasksByStage = tasks.stream()
+                .collect(Collectors.groupingBy(RunStageTask::getRunStageId));
         List<RunStageVO> stageVos = stages.stream().map(s -> {
             RunStageVO sv = BeanUtil.copy(s, RunStageVO.class);
             sv.setTasks(tasksByStage.getOrDefault(s.getId(), Collections.emptyList()).stream()
-                    .map(t -> BeanUtil.copy(t, RunTaskVO.class)).collect(Collectors.toList()));
+                    .map(t -> BeanUtil.copy(t, RunStageTaskVO.class)).collect(Collectors.toList()));
             return sv;
         }).collect(Collectors.toList());
         vo.setStages(stageVos);
-        vo.setTasks(tasks.stream().map(t -> BeanUtil.copy(t, RunTaskVO.class)).collect(Collectors.toList()));
+        vo.setTasks(tasks.stream().map(t -> BeanUtil.copy(t, RunStageTaskVO.class)).collect(Collectors.toList()));
         return vo;
     }
 
@@ -162,9 +151,9 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
     }
 
     @Override
-    public List<RunTaskVO> tasks(Long stageId) {
-        return taskMapper.selectByStage(stageId).stream()
-                .map(t -> BeanUtil.copy(t, RunTaskVO.class)).collect(Collectors.toList());
+    public List<RunStageTaskVO> tasks(Long runStageId) {
+        return taskMapper.selectByStage(runStageId).stream()
+                .map(t -> BeanUtil.copy(t, RunStageTaskVO.class)).collect(Collectors.toList());
     }
 
     @Override
@@ -242,13 +231,6 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
             segment.setIsTruncated(truncated && end == total ? 1 : 0);
             logMapper.insert(segment);
         }
-        // 更新任务日志行数与截断标记
-        RunTask task = taskMapper.selectById(taskId);
-        if (task != null) {
-            task.setLogLineCount(total);
-            task.setIsTruncated(truncated ? 1 : 0);
-            taskMapper.updateById(task);
-        }
     }
 
     @Override
@@ -265,7 +247,7 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
                 new Date(System.currentTimeMillis() - 60_000L)) >= 5) {
             throw new ServiceException("操作过于频繁，请稍后再试");
         }
-        // 生效代码源只解析一次：预校验、运行落库、触发记录与幂等键共用，避免口径漂移
+        // 生效代码源只解析一次：预校验、运行落库、触发记录共用
         App app = appMapper.selectById(body.getAppId());
         ResolvedSource source = resolveSource(app, body);
         PrecheckResultVO precheck = doPrecheck(body, app, source);
@@ -276,7 +258,7 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
             vo.setMessage("预校验不通过：" + firstFailDetail(precheck));
             return vo;
         }
-        // 幂等命中
+        // 命中活动运行直接合并
         if (ObjUtil.isNotEmpty(precheck.getMergedRunId())) {
             writeTriggerRecord(body, source, 2, precheck.getMergedRunId(), null);
             TriggerResultVO vo = new TriggerResultVO();
@@ -285,39 +267,25 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
             vo.setMessage("命中幂等键，已合并到进行中的运行");
             return vo;
         }
-        // 幂等键
         Pipeline pipeline = pipelineMapper.selectById(body.getPipelineId());
-        String idemKey = idemKey(body.getAppId(), source.commitId(), pipeline.getVersion());
-        // 事务内创建运行 + 阶段 + 触发记录 + 幂等记录
         Run run = new Run();
-        run.setRunNo(generateRunNo());
+        run.setCode(generateCode());
+        run.setAppId(body.getAppId());
         run.setPipelineId(body.getPipelineId());
         run.setPipelineVersion(pipeline.getVersion());
-        run.setAppId(body.getAppId());
         run.setBranch(source.branch());
-        run.setCommitId(source.commitId());
         run.setRefType(source.refType());
         run.setRefValue(source.commitId());
         run.setTriggerType(IntConst.ONE);
         run.setTriggerUser(AuthUtil.getUserId());
         run.setTriggerNote(body.getNote());
         run.setStatus(RunStatusEnum.QUEUED.getCode());
-        run.setIsPrecheckPass(IntConst.ONE);
-        run.setIdempotentKey(idemKey);
+        run.setPreCheckStatus(IntConst.ONE);
+        run.setPreCheckContent(preCheckContent(precheck));
         save(run);
-        createStages(run.getId(), pipeline.getId(), pipeline.getVersion(), null);
+        createStages(run.getId(), pipeline.getId(), pipeline.getVersion());
         persistPrechecks(run.getId(), precheck.getItems());
         writeTriggerRecord(body, source, 1, run.getId(), null);
-        RunIdempotency idem = new RunIdempotency();
-        idem.setId(IdWorker.getId());
-        idem.setIdempotentKey(idemKey);
-        idem.setAppId(body.getAppId());
-        idem.setRunId(run.getId());
-        idem.setState(IntConst.ONE);
-        idem.setExpireTime(new Date(System.currentTimeMillis() + IDEMPotent_WINDOW_SECONDS * 1000L));
-        // 幂等键唯一：非活动运行结束后重复触发要刷新该行，而不是再次 INSERT
-        idempotencyMapper.upsert(idem);
-        // 事务提交后由 JobDispatchService 异步下发；最小实现记日志
         triggerJenkinsAfterCommit(run);
         TriggerResultVO vo = new TriggerResultVO();
         vo.setResult(TriggerResultEnum.CREATED.getCode());
@@ -334,10 +302,8 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
                 && !ObjUtil.equals(run.getStatus(), RunStatusEnum.QUEUED.getCode())) {
             throw new ServiceException("仅运行中或排队中的运行可暂停");
         }
-        // 排队中视同运行中进入阻塞边界，复用状态机 RUNNING→BLOCKED 校验
-        DevopsStateMachine.checkRun(RunStatusEnum.RUNNING.getCode(), RunStatusEnum.BLOCKED.getCode());
+        DevopsStateMachine.checkRun(run.getStatus(), RunStatusEnum.BLOCKED.getCode());
         run.setStatus(RunStatusEnum.BLOCKED.getCode());
-        run.setBlockReason(BlockReasonEnum.MANUAL_PAUSED.getCode());
         updateById(run);
         writeOperation(id, 1, reason);
         return true;
@@ -347,16 +313,17 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
     @Transactional(rollbackFor = Exception.class)
     public boolean resume(Long id) {
         Run run = requireRun(id);
-        if (!ObjUtil.equals(run.getStatus(), RunStatusEnum.BLOCKED.getCode())
-                || !ObjUtil.equals(run.getBlockReason(), BlockReasonEnum.MANUAL_PAUSED.getCode())) {
-            throw new ServiceException("仅人工暂停的运行可继续");
+        if (!ObjUtil.equals(run.getStatus(), RunStatusEnum.BLOCKED.getCode())) {
+            throw new ServiceException("仅阻塞的运行可继续");
         }
-        // 人工暂停恢复视同排队中→运行中，复用状态机校验
-        DevopsStateMachine.checkRun(RunStatusEnum.QUEUED.getCode(), RunStatusEnum.RUNNING.getCode());
+        if (!runStageService.canResumeManually(id)) {
+            throw new ServiceException("门禁未通过或存在待处理阶段，请先处理或申请豁免");
+        }
+        DevopsStateMachine.checkRun(run.getStatus(), RunStatusEnum.RUNNING.getCode());
         run.setStatus(RunStatusEnum.RUNNING.getCode());
-        run.setBlockReason(null);
         updateById(run);
         writeOperation(id, 2, null);
+        runStageService.refreshRunStatus(id);
         return true;
     }
 
@@ -370,9 +337,6 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
         DevopsStateMachine.checkRun(run.getStatus(), RunStatusEnum.CANCELLED.getCode());
         run.setStatus(RunStatusEnum.CANCELLED.getCode());
         run.setEndTime(new Date());
-        if (run.getStartTime() != null) {
-            run.setDuration(run.getEndTime().getTime() - run.getStartTime().getTime());
-        }
         updateById(run);
         writeOperation(id, 3, reason);
         if (run.getJenkinsBuildNo() != null) {
@@ -393,7 +357,6 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
         }
         return stages(id).stream().map(s -> {
             RunStageVO vo = BeanUtil.copy(s, RunStageVO.class);
-            // 成功且在失败阶段之前的阶段可复用
             boolean reusable = ObjUtil.equals(s.getStatus(), StageStatusEnum.SUCCESS.getCode());
             vo.setReusable(reusable);
             return vo;
@@ -410,8 +373,8 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
         }
         List<RunStage> oldStages = stageMapper.selectByRun(original.getId());
         // 复用范围：fromStageId 之前且成功的阶段；未指定则从首个失败阶段算起
-        int fromSeq = resolveFromSeq(oldStages, body.getFromStageId());
-        // 旧版本重跑先回退生成当前版本：复制运行时定义为新版本并同步 Job，避免新脚本跑旧阶段快照
+        int fromSort = resolveFromSort(oldStages, body.getFromStageId());
+        // 旧版本重跑先回退生成当前版本
         Pipeline pipeline = pipelineMapper.selectById(original.getPipelineId());
         if (pipeline == null) {
             throw new ServiceException("流水线不存在，无法重跑");
@@ -428,41 +391,39 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
         }
         // 新建运行（不覆盖原运行），固定到回退后的当前版本
         Run run = new Run();
-        run.setRunNo(generateRunNo());
+        run.setCode(generateCode());
+        run.setAppId(original.getAppId());
         run.setPipelineId(original.getPipelineId());
         run.setPipelineVersion(pipelineMapper.selectById(original.getPipelineId()).getVersion());
-        run.setAppId(original.getAppId());
         run.setBranch(original.getBranch());
-        run.setCommitId(original.getCommitId());
         run.setRefType(original.getRefType());
         run.setRefValue(original.getRefValue());
         run.setTriggerType(IntConst.ONE);
         run.setTriggerUser(AuthUtil.getUserId());
         run.setTriggerNote(body.getNote());
         run.setStatus(RunStatusEnum.QUEUED.getCode());
-        run.setIsPrecheckPass(IntConst.ONE);
-        // 重跑生成全新幂等键：列宽 varchar(64) 只装得下 64 位哈希，直接拼后缀必超长（曾致重跑 500）；
-        // 对原键+时间戳再哈希，保持格式统一且同源多次重跑互不冲突
-        run.setIdempotentKey(CryptoUtil.sha256Hex(original.getIdempotentKey() + "-R" + System.currentTimeMillis()));
-        run.setRerunFromRunId(original.getId());
+        run.setPreCheckStatus(IntConst.ONE);
+        run.setPreCheckContent("断点重跑");
         save(run);
-        // 阶段：复用成功阶段（status=8 已复用，写 reused_from_stage_id），其余未开始
+        // 阶段：复用成功阶段（status=8 已复用），其余未开始
+        int sort = 1;
         for (RunStage old : oldStages) {
             RunStage stage = new RunStage();
             stage.setRunId(run.getId());
-            stage.setStageType(old.getStageType());
-            stage.setStageName(old.getStageName());
-            stage.setSeq(old.getSeq());
-            if (old.getSeq() < fromSeq && ObjUtil.equals(old.getStatus(), StageStatusEnum.SUCCESS.getCode())) {
+            stage.setType(old.getType());
+            stage.setName(old.getName());
+            stage.setSort(sort++);
+            boolean reused = old.getSort() < fromSort
+                    && ObjUtil.equals(old.getStatus(), StageStatusEnum.SUCCESS.getCode());
+            if (reused) {
                 stage.setStatus(StageStatusEnum.REUSED.getCode());
-                stage.setReusedFromStageId(old.getId());
                 stage.setStartTime(old.getStartTime());
                 stage.setEndTime(old.getEndTime());
-                stage.setDuration(old.getDuration());
             } else {
                 stage.setStatus(StageStatusEnum.NOT_STARTED.getCode());
             }
             stageMapper.insert(stage);
+            createRerunTasks(run.getId(), stage.getId(), old.getId(), reused);
         }
         writeTriggerRecordFromRun(run, 1);
         triggerJenkinsAfterCommit(run);
@@ -477,16 +438,13 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
 
     /**
      * 五项预校验（仓库信息、分支、提交、定义匹配、幂等检查）。
-     *
-     * @param app    应用档案，可为 null（应用不存在时第 1 项直接不通过）
-     * @param source 生效代码源：入参优先，未填时已回退应用登记的默认分支/提交
      */
     private PrecheckResultVO doPrecheck(RunTriggerDTO body, App app, ResolvedSource source) {
         Long appId = body.getAppId();
         Long pipelineId = body.getPipelineId();
         List<PrecheckItemVO> items = new ArrayList<>();
 
-        // 1 仓库信息：校验应用管理登记的仓库信息完整
+        // 1 仓库信息
         PrecheckItemVO repoItem;
         if (app == null) {
             repoItem = item(1, false, "应用不存在");
@@ -497,7 +455,7 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
         }
         items.add(repoItem);
 
-        // 2 分支存在：触发时未指定则回退应用默认分支
+        // 2 分支存在
         String branchDetail;
         if (StrUtil.isBlank(source.branch())) {
             branchDetail = "分支不能为空，且应用未登记默认分支";
@@ -508,7 +466,7 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
         }
         items.add(item(2, StrUtil.isNotBlank(source.branch()), branchDetail));
 
-        // 3 提交可达：校验 7–40 位 hex 或合法 Git ref；未指定则回退应用登记的提交
+        // 3 提交可达
         boolean commitOk = isRef(source.refType(), source.commitId());
         String commitDetail;
         if (StrUtil.isBlank(source.commitId())) {
@@ -524,7 +482,7 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
         }
         items.add(item(3, commitOk, commitDetail));
 
-        // 4 定义匹配：流水线启用（含已同步语义）+ 存在当前版本 + 定义中无空阶段/空任务/空命令
+        // 4 定义匹配
         Pipeline pipeline = pipelineMapper.selectById(pipelineId);
         PipelineStatusEnum pipelineStatus = pipeline == null ? null : PipelineStatusEnum.of(pipeline.getStatus());
         boolean defOk = pipeline != null && PipelineStatusEnum.ENABLED == pipelineStatus
@@ -538,7 +496,6 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
                 case ENABLED -> "流水线无当前版本";
             };
         } else {
-            // 保存阶段允许空任务，运行时才拦截：给出明确提示让用户在画布补齐后再触发
             defDetail = checkRunnableDefinition(pipeline.getId(), pipeline.getVersion());
             if (defDetail == null) {
                 defDetail = "流水线已启用且脚本已同步";
@@ -547,24 +504,22 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
             }
         }
         items.add(item(4, defOk, defDetail));
-        // 5 幂等检查：按 60 秒键查活动/成功运行
-        String idemKey = idemKey(appId, source.commitId(),
-                pipeline == null ? null : pipeline.getVersion());
-        Run active = runMapper.selectActiveByIdemKey(idemKey);
-        Run success = active != null ? null : runMapper.selectSuccessByIdemKey(idemKey);
+
+        // 5 幂等检查：按应用+引用+流水线版本查活动/成功运行
+        Integer version = pipeline == null ? null : pipeline.getVersion();
+        Run active = runMapper.selectActiveBySource(appId, source.commitId(), version);
+        Run success = active != null ? null : runMapper.selectSuccessBySource(appId, source.commitId(), version);
         PrecheckItemVO idemItem = new PrecheckItemVO();
         idemItem.setType(5);
         if (active != null) {
             idemItem.setConclusion(3);
-            idemItem.setDetail("命中幂等键，将合并到运行 " + active.getId());
+            idemItem.setDetail("命中活动运行，将合并到运行 " + active.getId());
         } else if (success != null) {
-            // 同提交已有成功运行不再强制复用：手动触发语义回归"重新执行"，
-            // 制品复用交由制品管理页/发布域按需引用，这里仅提示不阻断
             idemItem.setConclusion(1);
             idemItem.setDetail("同提交存在成功运行 " + success.getId() + "，本次新建运行，其制品可在制品管理页复用");
         } else {
             idemItem.setConclusion(1);
-            idemItem.setDetail("未命中幂等键，将创建新运行");
+            idemItem.setDetail("未命中活动运行，将创建新运行");
         }
         items.add(idemItem);
 
@@ -590,9 +545,6 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
 
     /**
      * 解析本次触发的生效代码源：触发入参优先，未填写时回退应用登记的默认分支/提交。
-     *
-     * <p>生效值随运行落库并参与幂等键，保证页面预填值与 API 调用口径一致。
-     * TODO(repo-client): 接入代码平台 API 后在此把 Tag/Ref 解析为确定 SHA，并校验提交属于分支。
      */
     private ResolvedSource resolveSource(App app, RunTriggerDTO body) {
         String appBranch = app == null ? null : app.getRepoBranch();
@@ -619,39 +571,44 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
                 .map(PrecheckItemVO::getDetail).findFirst().orElse("预校验不通过");
     }
 
-    private String idemKey(Long appId, String commit, Integer version) {
-        return CryptoUtil.sha256Hex(appId + ":" + commit + ":" + version);
+    private String preCheckContent(PrecheckResultVO precheck) {
+        String content = precheck.getItems().stream()
+                .map(item -> item.getType() + ":" + item.getDetail())
+                .collect(Collectors.joining("；"));
+        return content.length() > PRE_CHECK_CONTENT_MAX
+                ? content.substring(0, PRE_CHECK_CONTENT_MAX) : content;
     }
 
     /**
-     * 按版本快照创建阶段（全部未开始）
+     * 按版本快照创建阶段与任务（全部未开始）。
      */
-    private void createStages(Long runId, Long pipelineId, Integer version, Integer fromSeq) {
+    private void createStages(Long runId, Long pipelineId, Integer version) {
         PipelineDefinitionDTO definition = pipelineStageService.loadDefinition(pipelineId, version);
         List<PipelineStageDTO> stages = definition.getStages();
         if (stages == null || stages.isEmpty()) {
             return;
         }
-        int seq = 1;
+        int sort = 1;
         for (PipelineStageDTO stage : stages) {
             RunStage entity = new RunStage();
             entity.setRunId(runId);
-            entity.setStageType(stage.getType());
-            entity.setStageName(stage.getName());
-            entity.setSeq(seq++);
+            entity.setType(stage.getType());
+            entity.setName(stage.getName());
+            entity.setSort(sort++);
             entity.setStatus(StageStatusEnum.NOT_STARTED.getCode());
             stageMapper.insert(entity);
-            // 任务
+            int taskSort = 1;
             if (stage.getTasks() != null) {
                 for (PipelineTaskDTO task : stage.getTasks()) {
-                    RunTask runTask = new RunTask();
+                    RunStageTask runTask = new RunStageTask();
                     runTask.setRunId(runId);
-                    runTask.setStageId(entity.getId());
+                    runTask.setRunStageId(entity.getId());
                     runTask.setName(task.getName());
                     runTask.setExecutor(task.getExecutor());
+                    runTask.setScriptRef(task.getScriptRef());
+                    runTask.setScriptContent(task.getScriptContent());
                     runTask.setStatus(1);
-                    runTask.setLogLineCount(0);
-                    runTask.setIsTruncated(0);
+                    runTask.setSort(taskSort++);
                     taskMapper.insert(runTask);
                 }
             }
@@ -659,12 +616,29 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
     }
 
     /**
-     * 运行前检查版本定义的完整性：存在不可执行的空阶段/空任务时返回提示，否则返回 null。
-     * 保存阶段放宽为空任务，仅在此处（触发运行）拦截并提示。
-     *
-     * @param pipelineId 流水线 id
-     * @param version    流水线当前版本号
-     * @return 不可运行的提示文本；定义可运行则为 null
+     * 断点重跑：按原阶段任务快照复制任务，保持任务顺序与脚本内容。
+     */
+    private void createRerunTasks(Long runId, Long runStageId, Long oldRunStageId, boolean reused) {
+        List<RunStageTask> oldTasks = taskMapper.selectByStage(oldRunStageId);
+        int sort = 1;
+        for (RunStageTask old : oldTasks) {
+            RunStageTask task = new RunStageTask();
+            task.setRunId(runId);
+            task.setRunStageId(runStageId);
+            task.setName(old.getName());
+            task.setExecutor(old.getExecutor());
+            task.setScriptRef(old.getScriptRef());
+            task.setScriptContent(old.getScriptContent());
+            task.setStatus(reused ? old.getStatus() : 1);
+            task.setStartTime(reused ? old.getStartTime() : null);
+            task.setEndTime(reused ? old.getEndTime() : null);
+            task.setSort(sort++);
+            taskMapper.insert(task);
+        }
+    }
+
+    /**
+     * 运行前检查版本定义的完整性。
      */
     private String checkRunnableDefinition(Long pipelineId, Integer version) {
         PipelineDefinitionDTO definition = pipelineStageService.loadDefinition(pipelineId, version);
@@ -677,7 +651,6 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
             if (stage.getTasks() == null || stage.getTasks().isEmpty()) {
                 return "第 " + seq + " 个阶段「" + stage.getName() + "」未添加任务，请先在画布中补充";
             }
-            // CI 阶段（1-4）须至少一个 jenkins 任务带可执行命令，否则生成的脚本为空命令
             if (stage.getType() != null && stage.getType() <= 4) {
                 boolean hasCommand = stage.getTasks().stream()
                         .filter(t -> t.getExecutor() == null || "jenkins".equalsIgnoreCase(t.getExecutor()))
@@ -693,7 +666,7 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
     }
 
     /**
-     * 事务提交后触发 Jenkins 构建：避免轮询早于运行记录提交。
+     * 事务提交后触发 Jenkins 构建。
      */
     private void triggerJenkinsAfterCommit(Run run) {
         if (TransactionSynchronizationManager.isSynchronizationActive()) {
@@ -703,7 +676,6 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
                     try {
                         triggerJenkinsBuild(run);
                     } catch (RuntimeException e) {
-                        // 事务已提交，不能因触发异常回滚运行记录；留日志由人工/兜底处理
                         log.error("Jenkins trigger failed after commit: runId={}", run.getId(), e);
                     }
                 }
@@ -714,11 +686,7 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
     }
 
     /**
-     * 触发一次完整 CI 构建。一次运行只产生一个 Jenkins build，Jenkinsfile 内部顺序执行多个 CI 阶段；
-     * 构建状态以脚本内 webhook 回调为主通道，{@code RunPollingScheduler} 降频轮询兜底对账。
-     *
-     * <p>明确失败（鉴权、Job 创建失败、4xx）直接置运行失败；可能已送达 Jenkins 的失败
-     * （超时、连接中断、5xx）置「结果待确认」，由轮询任务继续尝试补正。
+     * 触发一次完整 CI 构建。
      */
     private void triggerJenkinsBuild(Run run) {
         Run latest = runMapper.selectById(run.getId());
@@ -731,7 +699,6 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
             markRunFailed(latest);
             return;
         }
-        // 并发兜底：触发后若有并发保存推进版本或同步失败，Job 脚本与运行固定版本不一致，禁止旧脚本触发
         Pipeline pipeline = pipelineMapper.selectById(latest.getPipelineId());
         if (pipeline == null
                 || !ObjUtil.equals(pipeline.getStatus(), PipelineStatusEnum.ENABLED.getCode())
@@ -746,15 +713,13 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
         String appCode = app.getCode().trim();
         String jobName = JenkinsJobNames.appJobName(appCode);
         BuildSource source = new BuildSource(appCode, app.getRepoUrl(), latest.getBranch(),
-                latest.getCommitId(), latest.getRefType(), latest.getRefValue(),
-                buildCallbackUrl(), buildStageMap(latest.getId()));
+                latest.getRefValue(), latest.getRefType(), latest.getRefValue());
         try {
             JenkinsDispatchResult result = jenkinsClient.triggerBuild(latest.getId(),
                     "snapshot:" + latest.getPipelineVersion(), jobName, source);
             latest.setJenkinsBuildNo(result.buildNo());
             latest.setJenkinsQueueId(result.queueId());
-            // 记录实际构建的 Job 名，供轮询/中止使用；旧数据回退应用编码 Job
-            latest.setJobName(result.jobName());
+            latest.setJenkinsJobId(result.jobName());
             runMapper.updateById(latest);
             log.info("Jenkins build triggered: runId={}, jobName={}, queueId={}, buildNo={}",
                     latest.getId(), result.jobName(), result.queueId(), result.buildNo());
@@ -770,42 +735,15 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
     }
 
     /**
-     * 状态回调地址：来自集成配置 callback-url，空时脚本自动跳过回调走轮询兜底。
-     *
-     * @return 回调基址，可能为空串
-     */
-    private String buildCallbackUrl() {
-        DevopsIntegrationProperties.Jenkins cfg = properties.getJenkins();
-        return cfg == null || StrUtil.isBlank(cfg.getCallbackUrl()) ? "" : cfg.getCallbackUrl().trim();
-    }
-
-    /**
-     * CI 阶段类型到运行阶段ID映射（type:id,...），供脚本回调上报定位运行时阶段。
-     *
-     * <p>回调校验的是运行时 dev_run_stage.id（每次运行新生成），静态脚本无法预知，
-     * 只能在触发时随参数下发。部署/发布域阶段（type&gt;4）不在 Jenkins 执行，不进映射。
-     *
-     * @param runId 运行id
-     * @return 映射串，无 CI 阶段时为空串
-     */
-    private String buildStageMap(Long runId) {
-        return stageMapper.selectByRun(runId).stream()
-                .filter(stage -> stage.getStageType() != null && stage.getStageType() <= 4)
-                .map(stage -> stage.getStageType() + ":" + stage.getId())
-                .collect(Collectors.joining(","));
-    }
-
-    /**
-     * 运行实际构建的 Job 名：新运行记录于 run.job_name；旧数据回退应用编码 Job（旧命名协议）。
+     * 运行实际构建的 Job 名：优先运行记录的 jenkins_job_id，旧数据回退应用编码 Job。
      */
     private String resolveRunJobName(Run run) {
-        if (StrUtil.isNotBlank(run.getJobName())) {
-            return run.getJobName();
+        if (StrUtil.isNotBlank(run.getJenkinsJobId())) {
+            return run.getJenkinsJobId();
         }
         App app = appMapper.selectById(run.getAppId());
         return app == null || StrUtil.isBlank(app.getCode()) ? null : app.getCode().trim();
     }
-
 
     private void markRunFailed(Run run) {
         Run latest = runMapper.selectById(run.getId());
@@ -813,7 +751,6 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
             return;
         }
         latest.setStatus(RunStatusEnum.FAILURE.getCode());
-        // 构建从未开始，不伪造开始时间与耗时，只记录失败截止时间
         latest.setEndTime(new Date());
         runMapper.updateById(latest);
         for (RunStage stage : stageMapper.selectByRun(run.getId())) {
@@ -828,20 +765,18 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
         Run latest = runMapper.selectById(run.getId());
         if (latest != null && !ObjUtil.equals(latest.getStatus(), RunStatusEnum.UNKNOWN.getCode())) {
             latest.setStatus(RunStatusEnum.UNKNOWN.getCode());
-            // TODO(reconcile): 兜底扫描任务尚未接入，当前仅记录截止时间，等待回调或人工处理
-            latest.setResultExpireTime(new Date(System.currentTimeMillis() + 30L * 60 * 1000));
             runMapper.updateById(latest);
         }
     }
 
-    private int resolveFromSeq(List<RunStage> stages, Long fromStageId) {
+    private int resolveFromSort(List<RunStage> stages, Long fromStageId) {
         if (ObjUtil.isEmpty(fromStageId)) {
             return stages.stream()
                     .filter(s -> ObjUtil.equals(s.getStatus(), StageStatusEnum.FAILURE.getCode()))
-                    .map(RunStage::getSeq).findFirst().orElse(1);
+                    .map(RunStage::getSort).findFirst().orElse(1);
         }
         return stages.stream().filter(s -> ObjUtil.equals(s.getId(), fromStageId))
-                .map(RunStage::getSeq).findFirst().orElse(1);
+                .map(RunStage::getSort).findFirst().orElse(1);
     }
 
     private void persistPrechecks(Long runId, List<PrecheckItemVO> items) {
@@ -875,7 +810,7 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
         record.setAppId(run.getAppId());
         record.setPipelineId(run.getPipelineId());
         record.setBranch(run.getBranch());
-        record.setCommitId(run.getCommitId());
+        record.setCommitId(run.getRefValue());
         record.setTriggerUser(run.getTriggerUser());
         record.setResult(result);
         record.setRunId(run.getId());
@@ -891,7 +826,7 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
         operationMapper.insert(op);
     }
 
-    private String generateRunNo() {
+    private String generateCode() {
         String day = new SimpleDateFormat("yyyyMMdd").format(new Date());
         long seq = runMapper.nextSeqOfDay(day);
         return String.format("RUN-%s-%04d", day, seq);

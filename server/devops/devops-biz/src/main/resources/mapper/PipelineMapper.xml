@@ -31,7 +31,7 @@
         - statuses           存在指定运行状态的运行（1排队 2运行中 3阻塞 4成功 5失败 6超时 7已取消 8结果待确认）
         - metricRunning      存在排队/运行中的运行
         - metricFailedToday  当日存在失败的运行
-        - metricGateBlocked  存在被门禁阻塞的运行（block_reason 1门禁不通过 2门禁数据获取失败，不含人工暂停）
+        - metricGateBlocked  存在被门禁阻塞的运行（dev_run_stage_gate.status 2=不通过 5=数据获取失败，不含人工暂停）
         - metricPendingAdmission 存在仍卡在准入阶段的运行：运行未结束且准入阶段未通过（未开始/进行中/阻塞）
         - metricObserving    存在结果待确认（发布观察窗口）的运行
     -->
@@ -72,15 +72,16 @@
             </if>
             <if test="query.metricGateBlocked != null">
                 AND EXISTS (SELECT 1 FROM dev_run r
+                            JOIN dev_run_stage_gate g ON g.run_id = r.id
                             WHERE r.pipeline_id = p.id AND r.is_deleted = 0
-                              AND r.status = 3 AND r.block_reason IN (1, 2))
+                              AND r.status = 3 AND g.status IN (2, 5))
             </if>
             <if test="query.metricPendingAdmission != null">
                 AND EXISTS (SELECT 1 FROM dev_run r
                             JOIN dev_run_stage rs ON rs.run_id = r.id AND rs.is_deleted = 0
                             WHERE r.pipeline_id = p.id AND r.is_deleted = 0
                               AND r.status IN (1, 2, 3)
-                              AND rs.stage_type = 7 AND rs.status IN (1, 2, 5))
+                              AND rs.type = 7 AND rs.status IN (1, 2, 5))
             </if>
             <if test="query.metricObserving != null">
                 AND EXISTS (SELECT 1 FROM dev_run r

@@ -13,11 +13,14 @@ import tools.jackson.databind.JsonNode;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 /**
  * Jenkins 客户端实现。
@@ -166,7 +169,7 @@ class JenkinsClientImpl implements JenkinsClient {
         }
         JenkinsHttpClient http = httpClient(cfg);
         String path = buildPath(cfg, jobName);
-        Map<String, String> params = buildParams(runId, snapshot, source, cfg);
+        Map<String, String> params = buildParams(snapshot, source, cfg);
         JenkinsHttpClient.HttpResult response = http.postForm(path, params);
         if (response.status() == 404) {
             // Job 只由保存同步创建，触发路径不做自动重建
@@ -240,6 +243,43 @@ class JenkinsClientImpl implements JenkinsClient {
     }
 
     @Override
+    public Optional<String> fetchArtifact(String jobName, Long buildNo, String artifactPath) {
+        DevopsIntegrationProperties.Jenkins cfg = properties.getJenkins();
+        if (cfg == null || StrUtil.isBlank(cfg.getBaseUrl())) {
+            log.info("Jenkins fetchArtifact (mock): jobName={}, buildNo={}, path={}",
+                    jobName, buildNo, artifactPath);
+            return Optional.empty();
+        }
+        if (buildNo == null) {
+            return Optional.empty();
+        }
+        JenkinsHttpClient http = httpClient(cfg);
+        String path = "/job/" + encode(jobName) + "/" + buildNo + "/artifact/" + encodeArtifactPath(artifactPath);
+        JenkinsHttpClient.HttpResult response = http.getArtifact(path);
+        if (response.status() == 404) {
+            return Optional.empty();
+        }
+        if (!response.isOk()) {
+            throw new JenkinsDispatchException(
+                    "读取 Jenkins 归档失败：" + artifactPath + "，HTTP " + response.status(),
+                    isUncertain(response.status()));
+        }
+        return Optional.of(response.body());
+    }
+
+    /**
+     * 归档路径按 / 分段编码，保留目录层级。
+     */
+    private String encodeArtifactPath(String artifactPath) {
+        if (StrUtil.isBlank(artifactPath)) {
+            return "";
+        }
+        return Arrays.stream(artifactPath.split("/"))
+                .map(this::encode)
+                .collect(Collectors.joining("/"));
+    }
+
+    @Override
     public void abortBuild(String jobName, Long buildNo) {
         DevopsIntegrationProperties.Jenkins cfg = properties.getJenkins();
         if (cfg == null || StrUtil.isBlank(cfg.getBaseUrl())) {
@@ -289,10 +329,9 @@ class JenkinsClientImpl implements JenkinsClient {
         return stages;
     }
 
-    private Map<String, String> buildParams(Long runId, String snapshot, BuildSource source,
+    private Map<String, String> buildParams(String snapshot, BuildSource source,
                                             DevopsIntegrationProperties.Jenkins cfg) {
         Map<String, String> params = new LinkedHashMap<>();
-        params.put("RUN_ID", String.valueOf(runId));
         params.put("APP_CODE", source.appCode());
         params.put("BRANCH", source.branch());
         params.put("COMMIT_ID", source.commitId());
@@ -301,8 +340,6 @@ class JenkinsClientImpl implements JenkinsClient {
         params.put("REPO_URL", source.repoUrl());
         params.put("SNAPSHOT", snapshot);
         params.put("GIT_CREDENTIALS_ID", cfg.getGitCredentialsId());
-        params.put("CALLBACK_URL", source.callbackUrl() == null ? "" : source.callbackUrl());
-        params.put("STAGE_MAP", source.stageMap() == null ? "" : source.stageMap());
         return params;
     }
 
@@ -321,7 +358,7 @@ class JenkinsClientImpl implements JenkinsClient {
     }
 
     /**
-     * 短暂轮询队列项，能拿到构建号就回写；拿不到留给回调补齐。
+     * 短暂轮询队列项，能拿到构建号就回写；拿不到留给后续状态轮询补齐。
      */
     private Long pollBuildNo(JenkinsHttpClient http, Long queueId) {
         for (int attempt = 0; attempt < QUEUE_POLLS; attempt++) {

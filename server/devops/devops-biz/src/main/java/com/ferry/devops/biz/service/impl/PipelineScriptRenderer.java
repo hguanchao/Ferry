@@ -5,6 +5,7 @@ import com.ferry.devops.api.dto.PipelineDefinitionDTO;
 import com.ferry.devops.api.dto.PipelineStageDTO;
 import com.ferry.devops.api.dto.PipelineTaskDTO;
 import com.ferry.devops.api.vo.PipelinePreviewVO;
+import com.ferry.devops.biz.gate.GateReportContract;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -15,8 +16,7 @@ import java.util.List;
  * <p>配置页预览与 Job 同步共用 {@link #render(PipelineDefinitionDTO)}，保证“预览即所得”；
  * 渲染结果自包含（checkout 引用 Job 参数，阶段命令静态展开），不再使用 STAGE_SPEC 动态解释协议。
  *
- * <p>状态同步以脚本内 webhook 回调（{@code ferryNotify}）为主通道：CALLBACK_URL 为空时自动
- * 跳过，任何回调失败均不影响构建；{@code RunPollingScheduler} 降频轮询兜底对账。
+ * <p>状态与结果同步统一由 Ferry 轮询 Jenkins API、拉取归档产物完成，脚本不注入任何回调逻辑。
  */
 final class PipelineScriptRenderer {
 
@@ -25,9 +25,6 @@ final class PipelineScriptRenderer {
 
     /** 参与 Jenkins 执行的 CI 阶段类型上限：1构建 2单测 3静态扫描 4制品入库；5-8 属部署/审批域，不在本次迁入范围 */
     private static final int CI_STAGE_TYPE_MAX = 4;
-
-    /** 回调用 Jenkins 凭据名（Secret text，与 Ferry callback-secret 同值）；缺失时签名降级为空 */
-    private static final String CALLBACK_CREDENTIALS_ID = "ferry-callback-secret";
 
     private PipelineScriptRenderer() {
     }
@@ -48,7 +45,6 @@ final class PipelineScriptRenderer {
             script.append("}\n");
             return script.toString();
         }
-        appendNotifyFunction(script);
         script.append("pipeline {\n");
         script.append("    agent any\n");
         script.append("    stages {\n");
@@ -98,61 +94,7 @@ final class PipelineScriptRenderer {
         script.append("                        url: params.REPO_URL,\n");
         script.append("                        credentialsId: (params.GIT_CREDENTIALS_ID ?: '')]]])\n");
         script.append("            }\n");
-        script.append("            post {\n");
-        script.append("                // Checkout 非 Ferry 业务阶段，失败以 stageType=0 上报构建前置失败\n");
-        script.append("                failure { ferryNotify('0', 'FAILURE') }\n");
-        script.append("            }\n");
         script.append("        }\n");
-    }
-
-    /**
-     * 注入状态回传 Ferry 的辅助函数。
-     *
-     * <p>签名用 Jenkins 凭据（Secret text）承载密钥，凭据缺失时降级为空签名——
-     * Ferry 未配验签密钥时照常接收；任何环节失败只丢通知，绝不影响构建（curl 自带 || true）。
-     *
-     * <p>约定 stageType=0 表示构建前置失败（Checkout 等 Ferry 阶段之前的步骤）：
-     * 无对应运行阶段，直接以 0 为 stageId 上报，由 Ferry 收敛运行终态。
-     */
-    private static void appendNotifyFunction(StringBuilder script) {
-        script.append("// 状态回传 Ferry：CALLBACK_URL 为空自动跳过，任何失败不影响构建，轮询兜底对账\n");
-        script.append("def ferryNotify(String stageType, String status) {\n");
-        script.append("    if (!params.CALLBACK_URL) {\n");
-        script.append("        return\n");
-        script.append("    }\n");
-        script.append("    def stageId = '0'\n");
-        script.append("    if (stageType != '0') {\n");
-        script.append("        def item = (params.STAGE_MAP ?: '').tokenize(',').find { it.startsWith(stageType + ':') }\n");
-        script.append("        if (!item) {\n");
-        script.append("            return\n");
-        script.append("        }\n");
-        script.append("        stageId = item.substring(item.indexOf(':') + 1)\n");
-        script.append("    }\n");
-        script.append("    def sign = ''\n");
-        script.append("    try {\n");
-        script.append("        withCredentials([string(credentialsId: '").append(CALLBACK_CREDENTIALS_ID)
-                .append("', variable: 'FERRY_CB_SECRET')]) {\n");
-        script.append("            def canon = \"runId=${params.RUN_ID}&stageId=${stageId}&buildNo=${BUILD_NUMBER}&status=${status}\"\n");
-        script.append("            sign = sh(returnStdout: true, script: \"printf '%s' '${canon}'")
-                .append(" | openssl dgst -sha256 -hmac \\\"\\${FERRY_CB_SECRET}\\\" | awk '{print \\$NF}'\").trim()\n");
-        script.append("        }\n");
-        script.append("    } catch (err) {\n");
-        script.append("        sign = ''\n");
-        script.append("    }\n");
-        script.append("    sh \"curl -sS -m 5 -X POST '${params.CALLBACK_URL}' --data-urlencode 'runId=${params.RUN_ID}'")
-                .append(" --data-urlencode 'stageId=${stageId}' --data-urlencode 'buildNo=${BUILD_NUMBER}'")
-                .append(" --data-urlencode 'status=${status}' --data-urlencode 'signature=${sign}' || true\"\n");
-        script.append("}\n");
-    }
-
-    /** 注入阶段级 post 钩子：终态回传在 post 里触发，步骤失败也能上报 */
-    private static void appendStagePost(StringBuilder script, Integer stageType) {
-        String type = String.valueOf(stageType);
-        script.append("            post {\n");
-        script.append("                success { ferryNotify('").append(type).append("', 'SUCCESS') }\n");
-        script.append("                failure { ferryNotify('").append(type).append("', 'FAILURE') }\n");
-        script.append("                aborted { ferryNotify('").append(type).append("', 'CANCELLED') }\n");
-        script.append("            }\n");
     }
 
     private static void appendCiStage(StringBuilder script, PipelineStageDTO stage) {
@@ -166,8 +108,6 @@ final class PipelineScriptRenderer {
         script.append("                timeout(time: ").append(timeout).append(", unit: 'SECONDS')\n");
         script.append("            }\n");
         script.append("            steps {\n");
-        // 阶段起始回传：终态走 post 钩子，运行态只能由首个步骤上报
-        script.append("                ferryNotify('").append(stage.getType()).append("', 'RUNNING')\n");
         if (stage.getTasks() != null) {
             for (PipelineTaskDTO task : stage.getTasks()) {
                 if (task.getExecutor() != null && !"jenkins".equalsIgnoreCase(task.getExecutor())) {
@@ -175,6 +115,18 @@ final class PipelineScriptRenderer {
                 }
                 appendTask(script, task);
             }
+        }
+        if (stage.getType() == 2) {
+            script.append("                // 单测归一化报告：Ferry 拉取归档后做门禁判定\n");
+            script.append("                archiveArtifacts artifacts: '")
+                    .append(GateReportContract.UNIT_TEST_REPORT_PATH)
+                    .append("', allowEmptyArchive: true\n");
+        }
+        if (stage.getType() == 3) {
+            script.append("                // 静态扫描归一化报告：Ferry 拉取归档后做门禁判定\n");
+            script.append("                archiveArtifacts artifacts: '")
+                    .append(GateReportContract.SCAN_REPORT_PATH)
+                    .append("', allowEmptyArchive: true\n");
         }
         if (stage.getType() == 4 && stage.getOutputs() != null) {
             for (String output : stage.getOutputs()) {
@@ -184,7 +136,6 @@ final class PipelineScriptRenderer {
             }
         }
         script.append("            }\n");
-        appendStagePost(script, stage.getType());
         script.append("        }\n");
     }
 
@@ -234,6 +185,16 @@ final class PipelineScriptRenderer {
             }
             if (!hasJenkinsTask) {
                 warnings.add("阶段「" + stage.getName() + "」没有 Jenkins 任务");
+            }
+            if (stage.getType() == 2) {
+                warnings.add("单元测试阶段「" + stage.getName() + "」需产出 "
+                        + GateReportContract.UNIT_TEST_REPORT_PATH
+                        + "，否则门禁判数据获取失败；测试命令执行完成应退出 0，不达标写入报告");
+            }
+            if (stage.getType() == 3) {
+                warnings.add("静态扫描阶段「" + stage.getName() + "」需产出 "
+                        + GateReportContract.SCAN_REPORT_PATH
+                        + "，否则门禁判数据获取失败；扫描命令执行完成应退出 0，不达标写入报告");
             }
             if (stage.getType() == 4 && (stage.getOutputs() == null || stage.getOutputs().isEmpty())) {
                 warnings.add("制品入库阶段「" + stage.getName() + "」未配置产出物路径");

@@ -8,8 +8,7 @@ public interface IRunPollService {
     /**
      * 轮询活动运行（排队中/运行中）并同步 Jenkins 状态。
      *
-     * <p>兜底对账通道，调度频率 60 秒级；主通道为脚本内 webhook 回调，
-     * 轮询补正丢失的回调与整条构建的最终收敛。
+     * <p>状态同步的唯一通道，调度频率 60 秒级；构建级状态与阶段明细均从 Jenkins API 拉取。
      */
     void pollActiveRuns();
 

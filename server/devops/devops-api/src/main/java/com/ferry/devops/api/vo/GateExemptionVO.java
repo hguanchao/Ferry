@@ -16,8 +16,8 @@ public class GateExemptionVO {
     @Schema(description = "豁免id")
     private Long id;
 
-    @Schema(description = "结果id")
-    private Long gateResultId;
+    @Schema(description = "运行阶段门禁结果id")
+    private Long runStageGateId;
 
     @Schema(description = "运行id")
     private Long runId;

@@ -8,7 +8,7 @@ import { gateApi, appApi } from '@/api/devops'
 import { useAuthStore } from '@/stores/auth'
 import { showError } from '@/lib/notify'
 
-/** 后端 BaselineVO 的扩展字段（types-devops 的 BaselineRow 为精简契约） */
+/** 后端 BaselineVO 的扩展字段（types-devops 的 GateBaseline 为精简契约） */
 interface BaselineDetail {
   id: string
   appId: string
@@ -25,7 +25,7 @@ interface BaselineDetail {
   daysSinceReset?: number
 }
 
-export default function GateBaseline() {
+export default function GateBaselinePage() {
   const { message } = App.useApp()
   const queryClient = useQueryClient()
   const can = useAuthStore((state) => state.can)

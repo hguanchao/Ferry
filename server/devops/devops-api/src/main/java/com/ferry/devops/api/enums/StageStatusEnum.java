@@ -20,7 +20,8 @@ public enum StageStatusEnum {
     SKIPPED(6, "跳过"),
     TIMEOUT(7, "超时"),
     REUSED(8, "已复用"),
-    CANCELLED(9, "已取消");
+    CANCELLED(9, "已取消"),
+    PENDING_GATE(10, "待门禁");
 
     private final Integer code;
     private final String desc;
@@ -34,5 +35,20 @@ public enum StageStatusEnum {
 
     public static boolean contains(Integer code) {
         return of(code) != null;
+    }
+
+    /**
+     * 是否终态。待门禁不是终态，需要等门禁裁决后才能结束。
+     *
+     * @param code 状态码
+     * @return true=终态
+     */
+    public static boolean isTerminal(Integer code) {
+        return ObjUtil.equals(code, SUCCESS.getCode())
+                || ObjUtil.equals(code, FAILURE.getCode())
+                || ObjUtil.equals(code, SKIPPED.getCode())
+                || ObjUtil.equals(code, TIMEOUT.getCode())
+                || ObjUtil.equals(code, REUSED.getCode())
+                || ObjUtil.equals(code, CANCELLED.getCode());
     }
 }

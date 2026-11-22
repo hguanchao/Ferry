@@ -115,36 +115,39 @@ export interface DiffResult { left: string; right: string; lines: Array<{ type: 
 export interface PrecheckItem { type: number; conclusion: number; detail?: string }
 export interface PrecheckResult { items: PrecheckItem[]; canTrigger: boolean }
 export interface TriggerResult { result: string; runId?: ID; artifactDigest?: string; message: string }
-export interface TriggerRecordRow { id: ID; appId: ID; pipelineId: ID; branch: string; commitId: string; result: number; rejectReason?: string; createTime: string }
+export interface RunTrigger { id: ID; appId: ID; pipelineId: ID; branch: string; commitId: string; result: number; rejectReason?: string; createTime: string }
 
 /* ------------------------------ 运行 ------------------------------ */
-export interface RunRow {
+export interface Run {
   id: ID
-  runNo: string
+  code: string
   pipelineId: ID
   pipelineName?: string
   pipelineVersionNo?: number
   appId: ID
   appName?: string
   branch: string
-  commitId: string
-  status: number
-  blockReason?: number
+  refType?: number
+  refValue: string
   triggerUser: ID
-  artifactId?: ID
+  triggerNote?: string
+  status: number
+  preCheckStatus?: number
+  preCheckContent?: string
+  jenkinsJobId?: string
+  jenkinsBuildNo?: number
   startTime?: string
   endTime?: string
-  duration?: number
   createTime: string
 }
-export interface RunStageRow { id: ID; runId: ID; stageType: number; stageName: string; seq: number; status: number; startTime?: string; endTime?: string; duration?: number }
-export interface RunTaskRow { id: ID; stageId: ID; name: string; status: number; exitCode?: number; logLineCount: number; isTruncated: number }
-export interface LogSegmentRow { id: ID; taskId: ID; segmentNo: number; startLine: number; endLine: number; content: string; isTruncated: number }
+export interface RunStage { id: ID; runId: ID; type: number; name: string; status: number; result?: string; sort: number; startTime?: string; endTime?: string }
+export interface RunStageTask { id: ID; runId: ID; runStageId: ID; name: string; executor?: string; scriptRef?: string; status: number; result?: string; sort: number; startTime?: string; endTime?: string }
+export interface RunLogSegment { id: ID; taskId: ID; segmentNo: number; startLine: number; endLine: number; content: string; isTruncated: number }
 /** 运行详情：与后端 RunDetailVO 的 { run, stages, tasks } 嵌套结构一致 */
 export interface RunDetail {
-  run: RunRow
-  stages: RunStageRow[]
-  tasks: RunTaskRow[]
+  run: Run
+  stages: RunStage[]
+  tasks: RunStageTask[]
 }
 
 /* ------------------------------ 制品 ------------------------------ */
@@ -167,10 +170,27 @@ export interface CleanPolicyRow { id: ID; appId: ID; keepLatest: number; isKeepP
 export interface CleanTaskRow { id: ID; appId: ID; taskTime: string; pendingCount: number; deletedCount: number; status: number }
 
 /* ------------------------------ 门禁 ------------------------------ */
-export interface GateRuleRow { id: ID; scopeType: number; appId?: ID; ruleType: number; ruleName: string; threshold: string; isExemptAllowed: number; isEnabled: number; version: number }
-export interface GateResultRow { id: ID; runId: ID; stageId: ID; ruleId?: ID; ruleSnapshot: string; conclusion: number; currentValue?: string; threshold?: string; fetchError?: string; createTime: string }
-export interface GateExemptionRow { id: ID; gateResultId: ID; reason: string; expireAt: string; status: number; createTime: string }
-export interface BaselineRow { id: ID; appId: ID; tool: string; totalCount: number; isActive: number; createTime: string }
+export interface GateRule { id: ID; scopeType: number; appId?: ID; ruleType: number; ruleName: string; threshold: string; isExemptAllowed: number; isEnabled: number; version: number }
+export interface RunStageGate {
+  id: ID
+  runId: ID
+  runStageId: ID
+  ruleId?: ID
+  ruleType: number
+  ruleVersion?: number
+  ruleSnapshot: string
+  currentValue?: string
+  threshold?: string
+  status: number
+  evidence?: string
+  source?: string
+  schemaVersion?: string
+  fetchError?: string
+  createTime: string
+  updateTime?: string
+}
+export interface GateExemption { id: ID; runStageGateId: ID; reason: string; expireAt: string; status: number; createTime: string }
+export interface GateBaseline { id: ID; appId: ID; tool: string; totalCount: number; isActive: number; createTime: string }
 export interface TechDebtRow { id: ID; appId: ID; fingerprint: string; severity: number; status: number; file_path?: string; filePath?: string; assignee?: ID; firstSeen: string }
 
 /* ------------------------------ 部署 ------------------------------ */
@@ -224,7 +244,7 @@ export interface AppAiLevelRow { id: ID; appId: ID; level: number; grantedBy: ID
 
 /* ------------------------------ 度量与系统 ------------------------------ */
 export interface MetricRow { id: ID; statDate: string; appId: ID; deployFreq?: number; leadTimeP50?: number; changeFailRate?: string; mttrP50?: number; dataStatus: number }
-export interface StageStatRow { id: ID; statDate: string; appId: ID; stageType: number; p50?: number; p90?: number; failCount: number }
+export interface StageStat { id: ID; statDate: string; appId: ID; stageType: number; p50?: number; p90?: number; failCount: number }
 export interface NotifyChannelRow { id: ID; name: string; type: number; isEnabled: number }
 export interface NotifyTemplateRow { id: ID; code: string; event: string; content: string; isEnabled: number }
 export interface OpenTokenRow { id: ID; appId: ID; name: string; status: number; lastRotateTime?: string; createTime: string }

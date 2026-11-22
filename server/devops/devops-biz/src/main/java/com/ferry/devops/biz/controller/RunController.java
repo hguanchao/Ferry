@@ -1,6 +1,7 @@
 package com.ferry.devops.biz.controller;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.ferry.common.cache.annotation.Idempotent;
 import com.ferry.common.core.http.R;
 import com.ferry.common.security.annotation.PreAuthorize;
 import com.ferry.devops.api.dto.RunTriggerDTO;
@@ -8,7 +9,7 @@ import com.ferry.devops.api.dto.query.RunQuery;
 import com.ferry.devops.api.vo.PrecheckResultVO;
 import com.ferry.devops.api.vo.RunDetailVO;
 import com.ferry.devops.api.vo.RunStageVO;
-import com.ferry.devops.api.vo.RunTaskVO;
+import com.ferry.devops.api.vo.RunStageTaskVO;
 import com.ferry.devops.api.vo.RunVO;
 import com.ferry.devops.api.vo.TriggerResultVO;
 import com.ferry.devops.biz.service.IRunService;
@@ -57,8 +58,8 @@ public class RunController {
     @GetMapping("/task/list")
     @PreAuthorize("devops:run:detail")
     @Operation(summary = "运行-任务列表")
-    public R<List<RunTaskVO>> tasks(@RequestParam("stageId") Long stageId) {
-        return R.data(service.tasks(stageId));
+    public R<List<RunStageTaskVO>> tasks(@RequestParam("runStageId") Long runStageId) {
+        return R.data(service.tasks(runStageId));
     }
 
     @GetMapping("/log")
@@ -110,6 +111,7 @@ public class RunController {
 
     @PostMapping("/rerun")
     @PreAuthorize("devops:run:rerun")
+    @Idempotent(key = "'rerun:' + #body.id", ttl = 60)
     @Operation(summary = "运行-断点重跑（新建运行）")
     public R<TriggerResultVO> rerun(@RequestBody RunTriggerDTO body) {
         return R.data(service.rerun(body));

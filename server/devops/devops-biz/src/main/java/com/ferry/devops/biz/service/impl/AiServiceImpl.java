@@ -21,7 +21,7 @@ import com.ferry.devops.api.entity.AiFeedback;
 import com.ferry.devops.api.entity.AiOutput;
 import com.ferry.devops.api.entity.AppAiLevel;
 import com.ferry.devops.api.entity.Artifact;
-import com.ferry.devops.api.entity.GateResult;
+import com.ferry.devops.api.entity.RunStageGate;
 import com.ferry.devops.api.entity.ReleaseArtifact;
 import com.ferry.devops.api.entity.ReleaseCandidate;
 import com.ferry.devops.api.entity.Run;
@@ -43,7 +43,7 @@ import com.ferry.devops.biz.mapper.AiFeedbackMapper;
 import com.ferry.devops.biz.mapper.AiOutputMapper;
 import com.ferry.devops.biz.mapper.AppAiLevelMapper;
 import com.ferry.devops.biz.mapper.ArtifactMapper;
-import com.ferry.devops.biz.mapper.GateResultMapper;
+import com.ferry.devops.biz.mapper.RunStageGateMapper;
 import com.ferry.devops.biz.mapper.ReleaseArtifactMapper;
 import com.ferry.devops.biz.mapper.ReleaseCandidateMapper;
 import com.ferry.devops.biz.mapper.RunLogSegmentMapper;
@@ -83,7 +83,7 @@ public class AiServiceImpl extends ServiceImpl<AiOutputMapper, AiOutput> impleme
     private final ReleaseCandidateMapper releaseCandidateMapper;
     private final ReleaseArtifactMapper releaseArtifactMapper;
     private final ArtifactMapper artifactMapper;
-    private final GateResultMapper gateResultMapper;
+    private final RunStageGateMapper gateResultMapper;
 
     @Override
     public AiOutputVO attribution(Long runId) {
@@ -101,8 +101,8 @@ public class AiServiceImpl extends ServiceImpl<AiOutputMapper, AiOutput> impleme
         }
         // 2. 该运行的分支/提交作为变更证据
         Run run = runMapper.selectById(runId);
-        if (run != null && StrUtil.isNotBlank(run.getCommitId())) {
-            evidence.add("commit:" + run.getCommitId());
+        if (run != null && StrUtil.isNotBlank(run.getRefValue())) {
+            evidence.add("commit:" + run.getRefValue());
         }
         return analyze(AiOutputTypeEnum.FAILURE_ATTRIBUTION, String.valueOf(runId), null,
                 run == null ? null : run.getAppId(), null, runId, evidence);
@@ -148,10 +148,10 @@ public class AiServiceImpl extends ServiceImpl<AiOutputMapper, AiOutput> impleme
             }
         }
         if (!runIds.isEmpty()) {
-            List<GateResult> gates = gateResultMapper.selectList(
-                    Wrappers.<GateResult>lambdaQuery().in(GateResult::getRunId, runIds));
-            for (GateResult gate : gates) {
-                evidence.add("gate:" + gate.getId() + ":" + gateConclusionText(gate.getConclusion()));
+            List<RunStageGate> gates = gateResultMapper.selectList(
+                    Wrappers.<RunStageGate>lambdaQuery().in(RunStageGate::getRunId, runIds));
+            for (RunStageGate gate : gates) {
+                evidence.add("gate:" + gate.getId() + ":" + gateConclusionText(gate.getStatus()));
             }
         }
         return analyze(type, String.valueOf(rcId), null, null, rcId, null, evidence);
@@ -294,11 +294,11 @@ public class AiServiceImpl extends ServiceImpl<AiOutputMapper, AiOutput> impleme
                     return null;
                 }
                 long gateId = Long.parseLong(rest.substring(0, idx));
-                GateResult gate = gateResultMapper.selectById(gateId);
+                RunStageGate gate = gateResultMapper.selectById(gateId);
                 if (gate == null) {
                     return null;
                 }
-                StringBuilder snippet = new StringBuilder("门禁").append(gateConclusionText(gate.getConclusion()));
+                StringBuilder snippet = new StringBuilder("门禁").append(gateConclusionText(gate.getStatus()));
                 if (StrUtil.isNotBlank(gate.getCurrentValue())) {
                     snippet.append(" 当前值=").append(gate.getCurrentValue());
                 }

@@ -54,19 +54,13 @@ class PipelineScriptRendererTest {
         String script = PipelineScriptRenderer.render(definition);
         assertTrue(script.contains("pipeline {"));
         assertTrue(script.contains("agent any"));
-        // webhook 主通道：回传函数与阶段钩子必须注入（CALLBACK_URL 为空时运行时自动跳过）
-        assertTrue(script.contains("def ferryNotify(String stageType, String status)"));
-        assertTrue(script.contains("if (!params.CALLBACK_URL) {"));
-        assertTrue(script.contains("withCredentials([string(credentialsId: 'ferry-callback-secret'"));
-        assertTrue(script.contains("|| true"));
-        assertTrue(script.contains("ferryNotify('1', 'RUNNING')"));
-        assertTrue(script.contains("post {"));
-        assertTrue(script.contains("success { ferryNotify('1', 'SUCCESS') }"));
-        assertTrue(script.contains("failure { ferryNotify('1', 'FAILURE') }"));
-        assertTrue(script.contains("aborted { ferryNotify('1', 'CANCELLED') }"));
-        // Checkout 前置失败约定：stageType=0 上报，无阶段映射直接收敛运行终态
-        assertTrue(script.contains("failure { ferryNotify('0', 'FAILURE') }"));
-        assertTrue(script.contains("if (stageType != '0') {"));
+        // 纯轮询：脚本不注入任何回调函数、回调地址或阶段映射
+        assertFalse(script.contains("ferryNotify"));
+        assertFalse(script.contains("CALLBACK_URL"));
+        assertFalse(script.contains("STAGE_MAP"));
+        assertFalse(script.contains("RUN_ID"));
+        assertFalse(script.contains("withCredentials"));
+        assertFalse(script.contains("curl"));
         // 代码检出使用 Job 参数，运行时注入
         assertTrue(script.contains("stage('Checkout')"));
         assertTrue(script.contains("params.REPO_URL"));
@@ -155,8 +149,7 @@ class PipelineScriptRendererTest {
         assertEquals(0, count(script, '(') - count(script, ')'));
         assertEquals(0, count(script, '[') - count(script, ']'));
         assertEquals(0, count(script, '{') - count(script, '}'));
-        // 回传函数定义必须先于 pipeline 块出现
-        assertTrue(script.indexOf("def ferryNotify") < script.indexOf("pipeline {"));
+        assertFalse(script.contains("ferryNotify"));
     }
 
     private static long count(String s, char c) {
