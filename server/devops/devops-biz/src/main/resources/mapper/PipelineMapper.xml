@@ -18,6 +18,17 @@
         is_deleted
     </sql>
 
+    <select id="countActiveRun" resultType="long">
+        SELECT COUNT(1)
+        FROM dev_run
+        WHERE is_deleted = 0
+          AND status IN (1, 2, 3)
+          AND pipeline_id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
+
     <select id="selectPageList" resultType="com.ferry.devops.api.vo.PipelineVO">
         SELECT p.id                     AS id,
                p.app_id                 AS appId,

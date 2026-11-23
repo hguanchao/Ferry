@@ -25,9 +25,9 @@ public interface IPipelineService extends IService<Pipeline> {
 
     PipelineVO detail(Long id);
 
-    String save(PipelineDTO body);
+    boolean save(PipelineDTO body);
 
-    String deleted(List<Long> ids);
+    boolean deleted(List<Long> ids);
 
     boolean changeStatus(Long id, Integer status);
 

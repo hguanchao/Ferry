@@ -58,4 +58,14 @@ public interface IPipelineStageService extends IService<PipelineStage> {
      * @param pipelineId 流水线 id
      */
     void deleteByPipeline(Long pipelineId);
+
+    /**
+     * 保存一个版本的阶段与任务，不负责 Jenkins 同步。
+     *
+     * @param bodys 阶段定义列表，空列表直接返回
+     * @return 是否全部写入成功
+     */
+    boolean save(List<PipelineStageDTO> bodys);
+
+    boolean deleted(List<Long> pipelineIds);
 }

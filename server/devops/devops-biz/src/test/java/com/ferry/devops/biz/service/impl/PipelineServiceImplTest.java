@@ -22,6 +22,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -42,8 +43,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.argThat;
@@ -54,7 +55,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * 流水线服务测试：版本保存编排、定义响应、状态更新与同步失败文案。
+ * 流水线服务测试：保存编排（版本推进/同步/空定义）、定义响应与状态更新。
  */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -137,7 +138,7 @@ class PipelineServiceImplTest {
     }
 
     @Test
-    void 新建携带阶段定义_生成V1并提示新增成功() {
+    void 新建携带阶段定义_落库V0并同步() {
         PipelineDTO body = new PipelineDTO();
         body.setAppId(1L);
         body.setName("主干流水线");
@@ -147,101 +148,112 @@ class PipelineServiceImplTest {
             inv.getArgument(0, Pipeline.class).setId(PIPELINE_ID);
             return true;
         });
-        lenient().when(pipelineMapper.selectById(PIPELINE_ID)).thenAnswer(inv -> pipeline(0, PipelineStatusEnum.ENABLED));
-        lenient().when(pipelineMapper.update(isNull(), any())).thenReturn(1);
-        lenient().when(pipelineMapper.updateById(any(Pipeline.class))).thenReturn(1);
-        lenient().when(jobSyncService.sync(PIPELINE_ID))
-                .thenReturn(new PipelineJobSyncService.SyncOutcome(true, PipelineStatusEnum.ENABLED.getCode(), null));
 
-        String message = service.save(body);
+        assertTrue(service.save(body));
 
-        assertEquals("新增成功", message);
-        verify(pipelineStageService).saveDefinition(eq(PIPELINE_ID), eq(1),
-                argThat(definition -> definition.getStages().size() == 1));
+        ArgumentCaptor<List<PipelineStageDTO>> stagesCaptor = ArgumentCaptor.forClass(List.class);
+        verify(pipelineStageService).save(stagesCaptor.capture());
+        PipelineStageDTO savedStage = stagesCaptor.getValue().get(0);
+        assertEquals(PIPELINE_ID, savedStage.getPipelineId().longValue());
+        assertEquals(0, savedStage.getVersion());
+        assertEquals(1, savedStage.getSort());
         verify(jobSyncService).sync(PIPELINE_ID);
     }
 
     @Test
-    void 编辑显式提交空阶段_生成空版本清空旧脚本() {
+    void 新建未提交阶段_不落定义但仍同步() {
+        PipelineDTO body = new PipelineDTO();
+        body.setAppId(1L);
+        body.setName("主干流水线");
+        lenient().when(pipelineMapper.insertOrUpdate(any(Pipeline.class))).thenAnswer(inv -> {
+            inv.getArgument(0, Pipeline.class).setId(PIPELINE_ID);
+            return true;
+        });
+
+        assertTrue(service.save(body));
+
+        verify(pipelineStageService, never()).save(anyList());
+        verify(jobSyncService).sync(PIPELINE_ID);
+    }
+
+    @Test
+    void 编辑_版本递增并保存阶段() {
+        PipelineDTO body = new PipelineDTO();
+        body.setId(PIPELINE_ID);
+        body.setAppId(1L);
+        body.setName("主干流水线");
+        body.setStages(List.of(ciStage("打包")));
+        lenient().when(pipelineMapper.selectById(PIPELINE_ID)).thenAnswer(inv -> pipeline(2, PipelineStatusEnum.ENABLED));
+        lenient().when(pipelineMapper.insertOrUpdate(any(Pipeline.class))).thenReturn(true);
+
+        assertTrue(service.save(body));
+
+        ArgumentCaptor<Pipeline> pipelineCaptor = ArgumentCaptor.forClass(Pipeline.class);
+        verify(pipelineMapper).insertOrUpdate(pipelineCaptor.capture());
+        assertEquals(3, pipelineCaptor.getValue().getVersion());
+        ArgumentCaptor<List<PipelineStageDTO>> stagesCaptor = ArgumentCaptor.forClass(List.class);
+        verify(pipelineStageService).save(stagesCaptor.capture());
+        assertEquals(3, stagesCaptor.getValue().get(0).getVersion());
+        verify(jobSyncService).sync(PIPELINE_ID);
+    }
+
+    @Test
+    void 编辑提交空阶段_仍同步以禁用Job() {
         PipelineDTO body = new PipelineDTO();
         body.setId(PIPELINE_ID);
         body.setAppId(1L);
         body.setName("主干流水线");
         body.setStages(List.of());
         lenient().when(pipelineMapper.selectById(PIPELINE_ID)).thenAnswer(inv -> pipeline(2, PipelineStatusEnum.ENABLED));
-        lenient().when(pipelineMapper.updateById(any(Pipeline.class))).thenReturn(1);
-        lenient().when(pipelineStageService.loadDefinition(PIPELINE_ID, 2)).thenReturn(ciDefinition("打包"));
-        lenient().when(pipelineMapper.update(isNull(), any())).thenReturn(1);
-        lenient().when(jobSyncService.sync(PIPELINE_ID))
-                .thenReturn(new PipelineJobSyncService.SyncOutcome(true, PipelineStatusEnum.PENDING_CONFIG.getCode(), null));
+        lenient().when(pipelineMapper.insertOrUpdate(any(Pipeline.class))).thenReturn(true);
 
-        String message = service.save(body);
+        assertTrue(service.save(body));
 
-        assertEquals("修改成功", message);
-        verify(pipelineStageService).saveDefinition(eq(PIPELINE_ID), eq(3),
-                argThat(definition -> definition.getStages().isEmpty()));
-    }
-
-    @Test
-    void 编辑阶段内容未变更_不建新版本但仍执行同步() {
-        PipelineDTO body = new PipelineDTO();
-        body.setId(PIPELINE_ID);
-        body.setAppId(1L);
-        body.setName("主干流水线");
-        body.setStages(List.of(ciStage("打包")));
-        lenient().when(pipelineMapper.selectById(PIPELINE_ID)).thenAnswer(inv -> pipeline(2, PipelineStatusEnum.ENABLED));
-        lenient().when(pipelineMapper.updateById(any(Pipeline.class))).thenReturn(1);
-        lenient().when(pipelineStageService.loadDefinition(PIPELINE_ID, 2)).thenReturn(ciDefinition("打包"));
-        lenient().when(jobSyncService.sync(PIPELINE_ID))
-                .thenReturn(new PipelineJobSyncService.SyncOutcome(true, PipelineStatusEnum.ENABLED.getCode(), null));
-
-        String message = service.save(body);
-
-        assertEquals("修改成功", message);
-        verify(pipelineStageService, never()).saveDefinition(anyLong(), anyInt(), any());
+        ArgumentCaptor<Pipeline> pipelineCaptor = ArgumentCaptor.forClass(Pipeline.class);
+        verify(pipelineMapper).insertOrUpdate(pipelineCaptor.capture());
+        assertEquals(3, pipelineCaptor.getValue().getVersion());
+        verify(pipelineStageService, never()).save(anyList());
         verify(jobSyncService).sync(PIPELINE_ID);
     }
 
     @Test
-    void 编辑阶段内容变更_生成新版本并同步() {
+    void 编辑未提交阶段_按清空处理并同步() {
         PipelineDTO body = new PipelineDTO();
         body.setId(PIPELINE_ID);
         body.setAppId(1L);
         body.setName("主干流水线");
-        body.setStages(List.of(ciStage("打包")));
         lenient().when(pipelineMapper.selectById(PIPELINE_ID)).thenAnswer(inv -> pipeline(2, PipelineStatusEnum.ENABLED));
-        lenient().when(pipelineMapper.updateById(any(Pipeline.class))).thenReturn(1);
-        lenient().when(pipelineStageService.loadDefinition(PIPELINE_ID, 2)).thenReturn(ciDefinition("改名后的任务"));
-        lenient().when(pipelineMapper.update(isNull(), any())).thenReturn(1);
-        lenient().when(jobSyncService.sync(PIPELINE_ID))
-                .thenReturn(new PipelineJobSyncService.SyncOutcome(true, PipelineStatusEnum.ENABLED.getCode(), null));
+        lenient().when(pipelineMapper.insertOrUpdate(any(Pipeline.class))).thenReturn(true);
 
-        String message = service.save(body);
+        assertTrue(service.save(body));
 
-        assertEquals("修改成功", message);
-        verify(pipelineStageService).saveDefinition(eq(PIPELINE_ID), eq(3), any());
+        ArgumentCaptor<Pipeline> pipelineCaptor = ArgumentCaptor.forClass(Pipeline.class);
+        verify(pipelineMapper).insertOrUpdate(pipelineCaptor.capture());
+        assertEquals(3, pipelineCaptor.getValue().getVersion());
+        verify(pipelineStageService, never()).save(anyList());
+        verify(jobSyncService).sync(PIPELINE_ID);
     }
 
     @Test
-    void 同步失败_配置已保存并提示可重试() {
-        PipelineDTO body = new PipelineDTO();
-        body.setId(PIPELINE_ID);
-        body.setAppId(1L);
-        body.setName("主干流水线");
-        body.setStages(List.of(ciStage("打包")));
-        lenient().when(pipelineMapper.selectById(PIPELINE_ID)).thenAnswer(inv -> pipeline(2, PipelineStatusEnum.ENABLED));
-        lenient().when(pipelineMapper.updateById(any(Pipeline.class))).thenReturn(1);
-        lenient().when(pipelineStageService.loadDefinition(PIPELINE_ID, 2)).thenReturn(ciDefinition("改名后的任务"));
-        lenient().when(pipelineMapper.update(isNull(), any())).thenReturn(1);
-        lenient().when(jobSyncService.sync(PIPELINE_ID))
-                .thenReturn(new PipelineJobSyncService.SyncOutcome(false,
-                        PipelineStatusEnum.SYNC_FAILED.getCode(), "更新 Jenkins Job 失败：HTTP 403"));
+    void 批量删除_存在进行中运行_拒绝且不删除() {
+        when(pipelineMapper.countActiveRun(List.of(1L, 2L))).thenReturn(1L);
 
-        String message = service.save(body);
+        ServiceException exception = assertThrows(ServiceException.class,
+                () -> service.deleted(List.of(1L, 2L)));
 
-        assertTrue(message.contains("修改成功"));
-        assertTrue(message.contains("同步失败"));
-        assertTrue(message.contains("重试同步"));
+        assertTrue(exception.getMessage().contains("进行中的运行"));
+        verify(pipelineStageService, never()).deleted(anyList());
+    }
+
+    @Test
+    void 批量删除_无进行中运行_删除全部() {
+        when(pipelineMapper.countActiveRun(List.of(1L, 2L))).thenReturn(0L);
+        when(pipelineMapper.deleteByIds(List.of(1L, 2L))).thenReturn(2);
+
+        assertTrue(service.deleted(List.of(1L, 2L)));
+
+        verify(pipelineMapper).countActiveRun(List.of(1L, 2L));
+        verify(pipelineStageService).deleted(List.of(1L, 2L));
     }
 
     @Test

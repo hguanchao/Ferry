@@ -9,14 +9,18 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 
+import java.util.List;
+
 @Mapper
 public interface PipelineMapper extends BaseMapper<Pipeline> {
 
     /**
-     * 流水线是否存在进行中的运行
+     * 批量判断流水线是否存在进行中的运行（SQL 见 PipelineMapper.xml）。
+     *
+     * @param ids 流水线 id 列表，调用方需保证非空
+     * @return 进行中的运行数量
      */
-    @Select("SELECT COUNT(1) FROM dev_run WHERE is_deleted = 0 AND pipeline_id = #{pipelineId} AND status IN (1,2,3)")
-    long countActiveRun(@Param("pipelineId") Long pipelineId);
+    long countActiveRun(@Param("ids") List<Long> ids);
 
     /**
      * 应用是否启用（触发预校验：流水线启用状态由主表读取，此方法保留给应用状态检查）

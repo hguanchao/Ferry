@@ -1,11 +1,10 @@
 package com.ferry.devops.biz.service.impl;
 
 import com.ferry.common.core.exception.ServiceException;
-import com.ferry.devops.api.dto.PipelineDefinitionDTO;
-import com.ferry.devops.api.dto.PipelineStageDTO;
 import com.ferry.devops.api.dto.PipelineStageTaskDTO;
 import com.ferry.devops.api.entity.App;
 import com.ferry.devops.api.entity.Pipeline;
+import com.ferry.devops.api.entity.PipelineStage;
 import com.ferry.devops.api.enums.PipelineStatusEnum;
 import com.ferry.devops.api.model.JenkinsJob;
 import com.ferry.devops.biz.integration.jenkins.JenkinsClient;
@@ -13,8 +12,9 @@ import com.ferry.devops.biz.integration.jenkins.JenkinsDispatchException;
 import com.ferry.devops.biz.integration.jenkins.JenkinsJobNames;
 import com.ferry.devops.biz.mapper.AppMapper;
 import com.ferry.devops.biz.mapper.PipelineMapper;
+import com.ferry.devops.biz.mapper.PipelineStageMapper;
 import com.ferry.devops.biz.mapper.RunMapper;
-import com.ferry.devops.biz.service.IPipelineStageService;
+import com.ferry.devops.biz.service.IPipelineStageTaskService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -23,6 +23,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -41,13 +42,16 @@ import static org.mockito.Mockito.when;
 class PipelineJobSyncServiceTest {
 
     private static final long PIPELINE_ID = 701L;
+    private static final long STAGE_ID = 801L;
 
     @Mock
     private PipelineMapper pipelineMapper;
     @Mock
     private AppMapper appMapper;
     @Mock
-    private IPipelineStageService pipelineStageService;
+    private PipelineStageMapper pipelineStageMapper;
+    @Mock
+    private IPipelineStageTaskService pipelineStageTaskService;
     @Mock
     private RunMapper runMapper;
     @Mock
@@ -57,7 +61,8 @@ class PipelineJobSyncServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new PipelineJobSyncService(pipelineMapper, appMapper, pipelineStageService, runMapper, jenkinsClient);
+        service = new PipelineJobSyncService(pipelineMapper, appMapper, pipelineStageMapper,
+                pipelineStageTaskService, runMapper, jenkinsClient);
     }
 
     private Pipeline pipeline(int version, PipelineStatusEnum status) {
@@ -79,24 +84,24 @@ class PipelineJobSyncServiceTest {
         return app;
     }
 
-    private PipelineDefinitionDTO definitionWithCiStage() {
+    /** 构造包含一个构建阶段的定义数据 */
+    private void givenCiDefinition(int version) {
+        PipelineStage stage = new PipelineStage();
+        stage.setId(STAGE_ID);
+        stage.setType(1);
+        stage.setName("构建");
         PipelineStageTaskDTO task = new PipelineStageTaskDTO();
         task.setName("打包");
         task.setExecutor(1);
         task.setScriptContent("mvn -B package");
-        PipelineStageDTO stage = new PipelineStageDTO();
-        stage.setType(1);
-        stage.setName("构建");
-        stage.setTasks(List.of(task));
-        PipelineDefinitionDTO definition = new PipelineDefinitionDTO();
-        definition.setStages(List.of(stage));
-        return definition;
+        when(pipelineStageMapper.selectByPipelineVersion(PIPELINE_ID, version)).thenReturn(List.of(stage));
+        when(pipelineStageTaskService.mapTasksByStageIds(List.of(STAGE_ID)))
+                .thenReturn(Map.of(STAGE_ID, List.of(task)));
     }
 
-    private PipelineDefinitionDTO emptyDefinition() {
-        PipelineDefinitionDTO definition = new PipelineDefinitionDTO();
-        definition.setStages(List.of());
-        return definition;
+    /** 构造空定义 */
+    private void givenEmptyDefinition(int version) {
+        when(pipelineStageMapper.selectByPipelineVersion(PIPELINE_ID, version)).thenReturn(List.of());
     }
 
     /** 捕获 createJob 下发的 Job 配置 */
@@ -117,7 +122,7 @@ class PipelineJobSyncServiceTest {
     void 启用态同步成功_状态保持启用并下发正确Job名() {
         when(pipelineMapper.selectById(PIPELINE_ID)).thenReturn(pipeline(1, PipelineStatusEnum.ENABLED));
         when(appMapper.selectById(1L)).thenReturn(app());
-        when(pipelineStageService.loadDefinition(PIPELINE_ID, 1)).thenReturn(definitionWithCiStage());
+        givenCiDefinition(1);
         when(runMapper.countActiveByPipeline(PIPELINE_ID)).thenReturn(0L);
 
         PipelineJobSyncService.SyncOutcome outcome = service.sync(PIPELINE_ID);
@@ -143,7 +148,7 @@ class PipelineJobSyncServiceTest {
     void 空定义同步成功_落待配置且Job禁用() {
         when(pipelineMapper.selectById(PIPELINE_ID)).thenReturn(pipeline(0, PipelineStatusEnum.ENABLED));
         when(appMapper.selectById(1L)).thenReturn(app());
-        when(pipelineStageService.loadDefinition(PIPELINE_ID, 0)).thenReturn(emptyDefinition());
+        givenEmptyDefinition(0);
 
         PipelineJobSyncService.SyncOutcome outcome = service.sync(PIPELINE_ID);
 
@@ -159,7 +164,7 @@ class PipelineJobSyncServiceTest {
     void 停用流水线同步成功_保持停用且Job禁用() {
         when(pipelineMapper.selectById(PIPELINE_ID)).thenReturn(pipeline(2, PipelineStatusEnum.DISABLED));
         when(appMapper.selectById(1L)).thenReturn(app());
-        when(pipelineStageService.loadDefinition(PIPELINE_ID, 2)).thenReturn(definitionWithCiStage());
+        givenCiDefinition(2);
         when(runMapper.countActiveByPipeline(PIPELINE_ID)).thenReturn(0L);
 
         PipelineJobSyncService.SyncOutcome outcome = service.sync(PIPELINE_ID);
@@ -174,7 +179,7 @@ class PipelineJobSyncServiceTest {
     void 存在进行中构建时拒绝覆盖脚本_落同步失败且不下发Jenkins() {
         when(pipelineMapper.selectById(PIPELINE_ID)).thenReturn(pipeline(2, PipelineStatusEnum.ENABLED));
         when(appMapper.selectById(1L)).thenReturn(app());
-        when(pipelineStageService.loadDefinition(PIPELINE_ID, 2)).thenReturn(definitionWithCiStage());
+        givenCiDefinition(2);
         when(runMapper.countActiveByPipeline(PIPELINE_ID)).thenReturn(1L);
 
         PipelineJobSyncService.SyncOutcome outcome = service.sync(PIPELINE_ID);
@@ -191,7 +196,7 @@ class PipelineJobSyncServiceTest {
     void 空定义不受activeRun保护限制_允许清理为禁用空Job() {
         when(pipelineMapper.selectById(PIPELINE_ID)).thenReturn(pipeline(2, PipelineStatusEnum.ENABLED));
         when(appMapper.selectById(1L)).thenReturn(app());
-        when(pipelineStageService.loadDefinition(PIPELINE_ID, 2)).thenReturn(emptyDefinition());
+        givenEmptyDefinition(2);
 
         PipelineJobSyncService.SyncOutcome outcome = service.sync(PIPELINE_ID);
 
@@ -204,7 +209,7 @@ class PipelineJobSyncServiceTest {
     void Jenkins明确失败_落同步失败并回传原因() {
         when(pipelineMapper.selectById(PIPELINE_ID)).thenReturn(pipeline(1, PipelineStatusEnum.ENABLED));
         when(appMapper.selectById(1L)).thenReturn(app());
-        when(pipelineStageService.loadDefinition(PIPELINE_ID, 1)).thenReturn(definitionWithCiStage());
+        givenCiDefinition(1);
         when(runMapper.countActiveByPipeline(PIPELINE_ID)).thenReturn(0L);
         doThrow(new JenkinsDispatchException("更新 Jenkins Job 失败：HTTP 403", false))
                 .when(jenkinsClient).updateJob(any(JenkinsJob.class));
@@ -220,7 +225,7 @@ class PipelineJobSyncServiceTest {
     void Jenkins不确定失败_文案脱敏() {
         when(pipelineMapper.selectById(PIPELINE_ID)).thenReturn(pipeline(1, PipelineStatusEnum.ENABLED));
         when(appMapper.selectById(1L)).thenReturn(app());
-        when(pipelineStageService.loadDefinition(PIPELINE_ID, 1)).thenReturn(definitionWithCiStage());
+        givenCiDefinition(1);
         when(runMapper.countActiveByPipeline(PIPELINE_ID)).thenReturn(0L);
         doThrow(new JenkinsDispatchException("Jenkins 请求失败：/job/secret-host/x", true))
                 .when(jenkinsClient).updateJob(any(JenkinsJob.class));
@@ -236,7 +241,7 @@ class PipelineJobSyncServiceTest {
     void 停用流水线同步失败_保持停用安全态() {
         when(pipelineMapper.selectById(PIPELINE_ID)).thenReturn(pipeline(2, PipelineStatusEnum.DISABLED));
         when(appMapper.selectById(1L)).thenReturn(app());
-        when(pipelineStageService.loadDefinition(PIPELINE_ID, 2)).thenReturn(definitionWithCiStage());
+        givenCiDefinition(2);
         when(runMapper.countActiveByPipeline(PIPELINE_ID)).thenReturn(0L);
         doThrow(new JenkinsDispatchException("更新失败", false))
                 .when(jenkinsClient).updateJob(any(JenkinsJob.class));

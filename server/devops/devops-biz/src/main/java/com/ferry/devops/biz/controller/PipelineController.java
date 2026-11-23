@@ -64,14 +64,17 @@ public class PipelineController {
     @PreAuthorize("devops:pipeline:save")
     @Operation(summary = "流水线-新增或编辑（保存后同步 Jenkins Job）")
     public R<String> save(@RequestBody @Valid PipelineDTO body) {
-        return R.data(service.save(body));
+        boolean isSuccess = service.save(body);
+        String title = ObjUtil.isEmpty(body.getId()) ? "新增" : "编辑";
+        return isSuccess ? R.success(title + "成功") : R.fail(title + "失败");
     }
 
     @PostMapping("/deleted")
     @PreAuthorize("devops:pipeline:deleted")
     @Operation(summary = "流水线-删除")
     public R<String> deleted(@RequestBody List<Long> ids) {
-        return R.data(service.deleted(ids));
+        boolean isSuccess = service.deleted(ids);
+        return isSuccess ? R.success("删除成功") : R.fail("删除失败");
     }
 
     @PostMapping("/changeStatus")

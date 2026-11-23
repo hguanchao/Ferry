@@ -158,4 +158,5 @@ class PipelineStageServiceImplTest {
         assertTrue(service.list(new PipelineStageDTO()).isEmpty());
         verify(taskService, never()).list(ArgumentMatchers.<Wrapper<PipelineStageTask>>any());
     }
+
 }

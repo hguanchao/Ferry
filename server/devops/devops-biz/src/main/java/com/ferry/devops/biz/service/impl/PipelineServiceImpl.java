@@ -2,6 +2,7 @@ package com.ferry.devops.biz.service.impl;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.ferry.common.core.constant.IntConst;
 import com.ferry.common.core.exception.ServiceException;
 import com.ferry.common.core.utils.BeanUtil;
 import com.ferry.common.core.utils.CollUtil;
@@ -43,12 +44,12 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 /**
- * 流水线服务实现：定义落库到阶段/任务三表，保存后经由 {@link PipelineJobSyncService} 同步 Jenkins Job。
+ * 流水线服务实现：定义落库到阶段/任务三表，并编排 Jenkins Job 同步。
  *
- * <p>保存/回退/启停共用同一同步编排，数据库与 Jenkins 不宣称原子事务：
- * 同步失败时定义已落库（状态落为同步失败），可重试同步；触发侧凭状态拦截未同步脚本。
- * 版本变更检测用库内定义与提交定义的规范化 JSON 比对（无摘要列）；
- * 版本递增在事务模板内以 CAS 方式完成，配合分段锁串行化同流水线的并发保存
+ * <p>{@link #save} 在同一事务内完成定义落库与 Jenkins Job 同步；画布定义保存/回退同步执行并返回同步结果。
+ * 数据库与 Jenkins 不宣称原子事务：同步失败时定义已落库（状态落为同步失败），可重试同步；
+ * 触发侧凭状态拦截未同步脚本。画布定义的版本变更检测用库内定义与提交定义的规范化 JSON 比对
+ * （无摘要列）；版本递增在事务模板内以 CAS 方式完成，配合分段锁串行化同流水线的并发保存
  * （内存锁仅单实例有效，多实例部署依赖 CAS 冲突报错兜底）。
  */
 @Service
@@ -92,56 +93,54 @@ public class PipelineServiceImpl extends ServiceImpl<PipelineMapper, Pipeline> i
         return vo;
     }
 
-    /**
-     * 新增或编辑：元数据与阶段定义单一保存入口，保存后同步 Jenkins Job。
-     *
-     * <p>同步失败不回滚保存（配置已保存，状态落为同步失败），响应文案提示可重试。
-     */
     @Override
-    public String save(PipelineDTO body) {
-        boolean isNew = ObjUtil.isEmpty(body.getId());
-        if (isNew) {
-            // 应用与流水线 1:1：Jenkins Job 以应用编码命名，多流水线会互相覆盖脚本
-            long exists = count(Wrappers.<Pipeline>lambdaQuery().eq(Pipeline::getAppId, body.getAppId()));
-            if (exists > 0) {
-                throw new ServiceException("该应用已存在流水线，请直接编辑");
+    @Transactional(rollbackFor = Exception.class)
+    public boolean save(PipelineDTO body) {
+        Pipeline entity = BeanUtil.copy(body, Pipeline.class);
+        if (ObjUtil.isEmpty(body.getId())) {
+            long count = count(Wrappers.<Pipeline>lambdaQuery().eq(Pipeline::getAppId, body.getAppId()));
+            if (count > IntConst.ZERO) {
+                throw new ServiceException("该应用已存在流水线");
             }
+            entity.setVersion(IntConst.ZERO);
+        } else {
+            Pipeline pipeline = getById(body.getId());
+            if (pipeline == null) {
+                throw new ServiceException("流水线不存在");
+            }
+            entity.setVersion(pipeline.getVersion() + IntConst.ONE);
         }
-        Pipeline pipeline = isNew ? new Pipeline() : requirePipeline(body.getId());
-        pipeline.setAppId(body.getAppId());
-        pipeline.setName(body.getName());
-        if (isNew) {
-            pipeline.setStatus(body.getStatus() == null
-                    ? PipelineStatusEnum.ENABLED.getCode() : body.getStatus());
-            pipeline.setVersion(0);
-        } else if (ObjUtil.isNotEmpty(body.getStatus())) {
-            pipeline.setStatus(body.getStatus());
+        boolean isSuccess = saveOrUpdate(entity);
+        if (isSuccess) {
+            if (CollUtil.isNotEmpty(body.getStages())) {
+                List<PipelineStageDTO> stages = body.getStages();
+                int stageSort = IntConst.ONE;
+                for (PipelineStageDTO stage : stages) {
+                    stage.setPipelineId(entity.getId());
+                    stage.setVersion(entity.getVersion());
+                    stage.setSort(stageSort++);
+                }
+                pipelineStageService.save(stages);
+            }
+            jobSyncService.sync(entity.getId());
         }
-        saveOrUpdate(pipeline);
-        // 定义变更：显式提交 stages（空数组=清空旧脚本）；未提交（null）视为不修改定义
-        if (body.getStages() != null) {
-            persistDefinition(pipeline, body.getStages());
-        }
-        PipelineJobSyncService.SyncOutcome outcome = jobSyncService.sync(pipeline.getId());
-        return composeMessage(isNew ? "新增成功" : "修改成功", outcome);
+        return isSuccess;
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public String deleted(List<Long> ids) {
+    public boolean deleted(List<Long> ids) {
         if (CollUtil.isEmpty(ids)) {
             throw new ServiceException("请选择要删除的流水线");
         }
-        for (Long id : ids) {
-            if (baseMapper.countActiveRun(id) > 0) {
-                throw new ServiceException("流水线存在进行中的运行，不可删除");
-            }
+        if (baseMapper.countActiveRun(ids) > IntConst.ZERO) {
+            throw new ServiceException("流水线存在进行中的运行，不可删除");
         }
-        for (Long id : ids) {
-            pipelineStageService.deleteByPipeline(id);
+        boolean isSuccess = removeByIds(ids);
+        if (isSuccess) {
+            pipelineStageService.deleted(ids);
         }
-        removeByIds(ids);
-        return "删除成功";
+        return isSuccess;
     }
 
     @Override
@@ -332,13 +331,6 @@ public class PipelineServiceImpl extends ServiceImpl<PipelineMapper, Pipeline> i
         vo.setChangeNote(changeNote);
         vo.setStatus(outcome == null ? fallbackStatus : outcome.status());
         return vo;
-    }
-
-    private String composeMessage(String base, PipelineJobSyncService.SyncOutcome outcome) {
-        if (outcome.synced()) {
-            return base;
-        }
-        return base + "，但 Jenkins 同步失败：" + outcome.message() + "，可稍后重试同步";
     }
 
     /**

@@ -12,8 +12,9 @@ import com.ferry.devops.biz.integration.jenkins.JenkinsDispatchException;
 import com.ferry.devops.biz.integration.jenkins.JenkinsJobNames;
 import com.ferry.devops.biz.mapper.AppMapper;
 import com.ferry.devops.biz.mapper.PipelineMapper;
+import com.ferry.devops.biz.mapper.PipelineStageMapper;
 import com.ferry.devops.biz.mapper.RunMapper;
-import com.ferry.devops.biz.service.IPipelineStageService;
+import com.ferry.devops.biz.service.IPipelineStageTaskService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -32,7 +33,8 @@ public class PipelineJobSyncService {
 
     private final PipelineMapper pipelineMapper;
     private final AppMapper appMapper;
-    private final IPipelineStageService pipelineStageService;
+    private final PipelineStageMapper pipelineStageMapper;
+    private final IPipelineStageTaskService pipelineStageTaskService;
     private final RunMapper runMapper;
     private final JenkinsClient jenkinsClient;
 
@@ -67,8 +69,9 @@ public class PipelineJobSyncService {
         }
         String appCode = app.getCode().trim();
         String jobName = JenkinsJobNames.appJobName(appCode);
-        PipelineDefinitionDTO definition = pipelineStageService.loadDefinition(
-                pipelineId, pipeline.getVersion() == null ? 0 : pipeline.getVersion());
+        PipelineDefinitionDTO definition = PipelineDefinitionLoader.load(
+                pipelineStageMapper, pipelineStageTaskService, pipelineId,
+                pipeline.getVersion() == null ? 0 : pipeline.getVersion());
         boolean emptyDefinition = definition.getStages() == null || definition.getStages().isEmpty();
         String script = PipelineScriptRenderer.render(definition);
         Integer currentStatus = pipeline.getStatus();

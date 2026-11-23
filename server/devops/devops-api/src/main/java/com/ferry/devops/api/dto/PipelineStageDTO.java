@@ -14,30 +14,33 @@ import java.util.List;
 @Data
 public class PipelineStageDTO {
 
-    @Schema(description = "阶段类型 1–8，同一类型最多一个")
+    @Schema(name = "阶段类型", description = "1构建 2单测 3静态扫描 4制品入库 5部署非生产 6集成测试 7准入 8生产发布")
     @NotNull(message = "阶段类型不能为空")
     private Integer type;
 
-    @Schema(description = "阶段名")
+    @Schema(name = "阶段名称")
     @NotBlank(message = "阶段名不能为空")
     private String name;
 
-    @Schema(description = "构建工具，如 Maven/Node/Gradle")
+    @Schema(name = "构建工具", description = "Maven/Node/Gradle")
     @Size(max = 30, message = "构建工具长度不能超过 30")
     private String buildTool;
 
-    @Schema(description = "超时秒数 60–86400")
+    @Schema(name = "超时秒数")
     private Integer timeout;
 
-    @Schema(description = "任务列表，1–30 个")
-    private List<PipelineStageTaskDTO> tasks;
-
-    @Schema(description = "产出物声明，多个路径使用逗号分隔")
+    @Schema(name = "产出物")
     private String outputs;
 
-    @Schema(description = "流水线id")
+    @Schema(name = "流水线id")
     private Long pipelineId;
 
-    @Schema(description = "版本号")
+    @Schema(name = "版本号")
     private Integer version;
+
+    @Schema(name = "排序号")
+    private Integer sort;
+
+    @Schema(name = "任务列表")
+    private List<PipelineStageTaskDTO> tasks;
 }

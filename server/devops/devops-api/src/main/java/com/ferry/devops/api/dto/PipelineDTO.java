@@ -27,6 +27,6 @@ public class PipelineDTO {
     @Schema(description = "状态 0停用 1启用")
     private Integer status;
 
-    @Schema(description = "阶段列表（新建时作为初始版本定义）")
+    @Schema(description = "阶段列表；null 或空数组表示清空当前定义")
     private List<PipelineStageDTO> stages;
 }

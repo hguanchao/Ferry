@@ -11,20 +11,29 @@ import lombok.Data;
 @Data
 public class PipelineStageTaskDTO {
 
-    @Schema(description = "任务名")
+    @Schema(name = "任务名称")
     @NotBlank(message = "任务名不能为空")
     private String name;
 
-    @Schema(description = "执行器：1jenkins 2deployer 3gate 4release")
+    @Schema(name = "执行器", description = "1jenkins 2deployer 3gate 4release")
     private Integer executor;
 
-    @Schema(description = "脚本引用")
+    @Schema(name = "脚本引用")
     @Size(max = 200, message = "脚本引用长度不能超过 200")
     private String scriptRef;
 
-    @Schema(description = "自定义脚本内容")
+    @Schema(name = "自定义脚本内容")
     private String scriptContent;
 
-    @Schema(description = "脚本参数（JSON 字符串）")
+    @Schema(name = "脚本参数")
     private String scriptParams;
+
+    @Schema(name = "版本号")
+    private Integer version;
+
+    @Schema(name = "阶段id")
+    private Long stageId;
+
+    @Schema(name = "排序号")
+    private Integer sort;
 }

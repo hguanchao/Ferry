@@ -1,6 +1,7 @@
 package com.ferry.devops.biz.service.impl;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.ferry.common.core.constant.IntConst;
 import com.ferry.common.core.utils.BeanUtil;
 import com.ferry.common.core.utils.CollUtil;
 import com.ferry.common.core.utils.JsonUtil;
@@ -130,5 +131,44 @@ public class PipelineStageServiceImpl extends ServiceImpl<PipelineStageMapper, P
         List<Long> stageIds = stages.stream().map(PipelineStage::getId).collect(Collectors.toList());
         pipelineStageTaskService.deleteByStageIds(stageIds);
         removeByIds(stageIds);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public boolean save(List<PipelineStageDTO> bodys) {
+        if (CollUtil.isEmpty(bodys)) {
+            return true;
+        }
+        for (PipelineStageDTO body : bodys) {
+            PipelineStage entity = BeanUtil.copy(body, PipelineStage.class);
+            boolean isSuccess = save(entity);
+            if (isSuccess) {
+                int taskSort = IntConst.ZERO;
+                List<PipelineStageTaskDTO> tasks = body.getTasks();
+                for (PipelineStageTaskDTO task : tasks) {
+                    task.setStageId(entity.getId());
+                    task.setVersion(entity.getVersion());
+                    task.setSort(taskSort);
+                    taskSort++;
+                }
+                pipelineStageTaskService.saveBatch(BeanUtil.copy(tasks, PipelineStageTask.class));
+            }
+        }
+        return true;
+    }
+
+    @Override
+    public boolean deleted(List<Long> pipelineIds) {
+        if (CollUtil.isEmpty(pipelineIds)) {
+            return true;
+        }
+        List<Long> ids = listObjs(Wrappers.<PipelineStage>lambdaQuery().select(PipelineStage::getId)
+                .in(PipelineStage::getPipelineId, pipelineIds));
+        boolean isSuccess = removeByIds(ids);
+        if (isSuccess) {
+            pipelineStageTaskService.remove(Wrappers.<PipelineStageTask>lambdaQuery()
+                    .in(PipelineStageTask::getStageId, ids));
+        }
+        return isSuccess;
     }
 }
