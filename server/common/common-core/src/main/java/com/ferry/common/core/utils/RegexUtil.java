@@ -164,4 +164,21 @@ public final class RegexUtil {
         }
         return CACHE.computeIfAbsent(regex, Pattern::compile).matcher(value).matches();
     }
+
+    /**
+     * 按指定正则替换所有命中片段
+     *
+     * <p>用于脱敏等"匹配并改写"场景；替换串支持 {@code $1} 等分组引用。
+     *
+     * @param regex       正则表达式
+     * @param value       待处理文本
+     * @param replacement 替换串
+     * @return 替换结果；正则或文本为空时原样返回文本
+     */
+    public static String replaceAll(String regex, CharSequence value, String replacement) {
+        if (StrUtil.isBlank(regex) || StrUtil.isBlank(value)) {
+            return value == null ? null : value.toString();
+        }
+        return CACHE.computeIfAbsent(regex, Pattern::compile).matcher(value).replaceAll(replacement);
+    }
 }

@@ -6,7 +6,6 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
@@ -80,11 +79,13 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 @Service
 @RequiredArgsConstructor
 public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunService {
-    /** 提交 id：7-40 位十六进制（零散规则，统一定义在 RegexUtil 常量侧维护） */
+    /** 提交 id：7-40 位十六进制 */
     private static final String COMMIT_REGEX = "^[0-9a-fA-F]{7,40}$";
-    private static final Pattern REF_PATTERN = Pattern.compile("^[^\\s~^:?*\\[\\\\]{1,100}$");
-    private static final Pattern SECRET_PATTERN = Pattern.compile(
-            "(?i)(password|passwd|token|secret|access[_-]?key|secret[_-]?key|api[_-]?key)\\s*[:=]\\s*\\S+");
+    /** Git ref/tag：不含空白与 ~^:?*[\ 等非法字符，最长 100 */
+    private static final String REF_REGEX = "^[^\\s~^:?*\\[\\\\]{1,100}$";
+    /** 日志脱敏规则：password/token/secret/key 等键值对，保留键名、遮蔽值 */
+    private static final String SECRET_REGEX =
+            "(?i)(password|passwd|token|secret|access[_-]?key|secret[_-]?key|api[_-]?key)\\s*[:=]\\s*\\S+";
     private static final int MAX_LOG_LINES = 100_000;
     private static final int SEGMENT_LINES = 500;
     private static final int DEFAULT_LOG_LIMIT = 2000;
@@ -553,7 +554,7 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
             return false;
         }
         if (Integer.valueOf(2).equals(refType)) {
-            return REF_PATTERN.matcher(commit).matches();
+            return RegexUtil.matches(REF_REGEX, commit);
         }
         return RegexUtil.matches(COMMIT_REGEX, commit);
     }
@@ -860,6 +861,6 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
      * 日志入库前脱敏（credential/token/key 遮蔽）。
      */
     static String mask(String line) {
-        return SECRET_PATTERN.matcher(line).replaceAll("$1=******");
+        return RegexUtil.replaceAll(SECRET_REGEX, line, "$1=******");
     }
 }
