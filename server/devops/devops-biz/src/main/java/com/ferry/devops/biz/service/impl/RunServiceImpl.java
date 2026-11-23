@@ -44,6 +44,7 @@ import com.ferry.devops.api.vo.RunStageVO;
 import com.ferry.devops.api.vo.RunStageTaskVO;
 import com.ferry.devops.api.vo.RunVO;
 import com.ferry.devops.api.vo.TriggerResultVO;
+import com.ferry.devops.api.vo.TriggerRecordVO;
 import com.ferry.devops.api.vo.VersionVO;
 import com.ferry.devops.biz.integration.jenkins.BuildSource;
 import com.ferry.devops.biz.integration.jenkins.JenkinsClient;
@@ -435,6 +436,15 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
         vo.setRunId(run.getId());
         vo.setMessage("断点重跑已创建，前序成功阶段已复用");
         return vo;
+    }
+
+    @Override
+    public IPage<TriggerRecordVO> triggerRecords(Long appId, Long current, Long size) {
+        List<RunTrigger> records = triggerMapper.selectRecentByApp(appId);
+        IPage<TriggerRecordVO> result = new com.baomidou.mybatisplus.extension.plugins.pagination.Page<>(
+                current == null ? 1 : current, size == null ? 20 : size, records.size());
+        result.setRecords(records.stream().map(t -> BeanUtil.copy(t, TriggerRecordVO.class)).collect(Collectors.toList()));
+        return result;
     }
 
     // ==================== 内部实现 ====================

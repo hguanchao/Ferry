@@ -10,7 +10,7 @@ import {
 import PageHeader from '@/components/PageHeader'
 import PipelineCanvasEditor from '@/components/PipelineCanvasEditor'
 import { appApi, pipelineApi } from '@/api/devops'
-import type { AppOption, PipelinePreview, PipelineRow, PipelineStageDef, PrecheckResult, TriggerResult } from '@/api/types-devops'
+import type { AppOption, PipelinePreview, PipelineRow, PipelineStageDef, PipelineStageRow, PrecheckResult, TriggerResult } from '@/api/types-devops'
 import { useAuthStore } from '@/stores/auth'
 import { showError } from '@/lib/notify'
 import { useDebouncedValue } from '@/lib/debounce'
@@ -45,15 +45,24 @@ function buildDefinition(stages: PipelineStageDef[]): string {
   return JSON.stringify({ schemaVersion: 1, stages })
 }
 
-/** definition JSON -> stages，解析失败返回空 */
-function parseDefinition(json?: string): PipelineStageDef[] {
-  if (!json) return []
-  try {
-    const parsed = JSON.parse(json)
-    return Array.isArray(parsed?.stages) ? parsed.stages : []
-  } catch {
-    return []
-  }
+/** detail 返回的阶段(VO) -> 画布阶段定义：taskList 映射为 tasks */
+function stagesFromDetail(stages?: PipelineStageRow[]): PipelineStageDef[] {
+  return (stages ?? []).map((stage) => ({
+    type: stage.type,
+    name: stage.name,
+    buildTool: stage.buildTool,
+    timeout: stage.timeout,
+    outputs: stage.outputs,
+    pipelineId: stage.pipelineId,
+    version: stage.version,
+    tasks: (stage.taskList ?? []).map((task) => ({
+      name: task.name,
+      executor: task.executor,
+      scriptRef: task.scriptRef,
+      scriptContent: task.scriptContent,
+      scriptParams: task.scriptParams,
+    })),
+  }))
 }
 
 function newRequestId() {
@@ -119,9 +128,9 @@ export default function Pipeline() {
     retry: false,
   })
 
-  const definitionQuery = useQuery({
-    queryKey: ['pipeline-definition', editing?.id],
-    queryFn: () => pipelineApi.definition(editing!.id),
+  const detailQuery = useQuery({
+    queryKey: ['pipeline-detail', editing?.id],
+    queryFn: () => pipelineApi.detail(editing!.id),
     enabled: open && !!editing?.id,
     retry: false,
   })
@@ -277,13 +286,13 @@ export default function Pipeline() {
     setOpen(true)
   }
 
-  // 编辑时 definition 异步返回后回填画布阶段；用户已手动编辑过画布则不覆盖草稿
+  // 编辑时 detail 异步返回后回填画布阶段；用户已手动编辑过画布则不覆盖草稿
   useEffect(() => {
-    if (editing && definitionQuery.data?.json && !draftDirtyRef.current) {
-      const loaded = parseDefinition(definitionQuery.data.json)
+    if (editing && detailQuery.data && !draftDirtyRef.current) {
+      const loaded = stagesFromDetail(detailQuery.data.stages)
       if (loaded.length) setStages(loaded)
     }
-  }, [editing, definitionQuery.data])
+  }, [editing, detailQuery.data])
 
   const openTrigger = (record: PipelineRow | null) => {
     setTriggerRow(record)
@@ -348,7 +357,7 @@ export default function Pipeline() {
       title: '操作',
       render: (_: unknown, record) => (
         <div style={{ display: 'flex', gap: 2, flexWrap: 'nowrap', whiteSpace: 'nowrap' }}>
-          {can('devops:pipeline:trigger') && (
+          {can('devops:run:trigger') && (
             <Tooltip title="触发运行">
               <Button type="link" size="small" icon={<Play size={15} />} onClick={() => openTrigger(record)} />
             </Tooltip>
@@ -397,7 +406,7 @@ export default function Pipeline() {
         description="以应用维度查看流水线定义与运行情况，支持版本管理与手动触发"
         extra={
           <div style={{ display: 'flex', gap: 8 }}>
-            {can('devops:pipeline:trigger') && <Button type="primary" icon={<Play size={14} />} onClick={() => openTrigger(null)}>手动触发</Button>}
+            {can('devops:run:trigger') && <Button type="primary" icon={<Play size={14} />} onClick={() => openTrigger(null)}>手动触发</Button>}
             {can('devops:pipeline:save') && <Button icon={<Plus size={14} />} onClick={() => openEditor(null)}>新建流水线</Button>}
           </div>
         }
@@ -437,11 +446,11 @@ export default function Pipeline() {
         extra={
           <div style={{ display: 'flex', gap: 8 }}>
             <Button icon={<Code2 size={14} />} loading={previewMutation.isPending}
-              disabled={!!editing && definitionQuery.isFetching}
+              disabled={!!editing && detailQuery.isFetching}
               onClick={() => previewMutation.mutate()}>预览脚本</Button>
             <Button onClick={closeEditor}>取消</Button>
             <Button type="primary" loading={saveMutation.isPending}
-              disabled={!!editing && (definitionQuery.isPending || definitionQuery.isFetching)}
+              disabled={!!editing && (detailQuery.isPending || detailQuery.isFetching)}
               onClick={() => form.submit()}>保存</Button>
           </div>
         }>

@@ -16,19 +16,15 @@ import com.ferry.devops.api.dto.PipelineStageDTO;
 import com.ferry.devops.api.dto.query.PipelineQuery;
 import com.ferry.devops.api.entity.App;
 import com.ferry.devops.api.entity.Pipeline;
-import com.ferry.devops.api.entity.RunTrigger;
 import com.ferry.devops.api.enums.PipelineStatusEnum;
 import com.ferry.devops.api.vo.DiffVO;
-import com.ferry.devops.api.vo.PipelineDefinitionVO;
 import com.ferry.devops.api.vo.PipelinePreviewVO;
 import com.ferry.devops.api.vo.PipelineStageVO;
 import com.ferry.devops.api.vo.PipelineVO;
-import com.ferry.devops.api.vo.TriggerRecordVO;
 import com.ferry.devops.api.vo.ValidateResultVO;
 import com.ferry.devops.api.vo.VersionVO;
 import com.ferry.devops.biz.mapper.AppMapper;
 import com.ferry.devops.biz.mapper.PipelineMapper;
-import com.ferry.devops.biz.mapper.RunTriggerMapper;
 import com.ferry.devops.biz.service.IAppService;
 import com.ferry.devops.biz.service.IPipelineService;
 import com.ferry.devops.biz.service.IPipelineStageService;
@@ -59,7 +55,6 @@ public class PipelineServiceImpl extends ServiceImpl<PipelineMapper, Pipeline> i
     private final PipelineJobSyncService jobSyncService;
     private final IPipelineStageService pipelineStageService;
 
-    private final RunTriggerMapper triggerMapper;
     private final TransactionTemplate transactionTemplate;
 
     /** 同流水线版本递增的分段锁（单实例内存锁） */
@@ -164,21 +159,6 @@ public class PipelineServiceImpl extends ServiceImpl<PipelineMapper, Pipeline> i
     }
 
     @Override
-    public PipelineDefinitionVO definition(Long id, Long versionId) {
-        Pipeline pipeline = requirePipeline(id);
-        int version = versionId == null ? (pipeline.getVersion() == null ? 0 : pipeline.getVersion()) : versionId.intValue();
-        String json = pipelineStageService.loadDefinitionJson(id, version);
-        PipelineDefinitionVO vo = new PipelineDefinitionVO();
-        vo.setVersionNo(version);
-        vo.setJson(json);
-        PipelineStageDTO stageDTO = new PipelineStageDTO();
-        stageDTO.setPipelineId(id);
-        stageDTO.setVersion(version);
-        vo.setStages(pipelineStageService.list(stageDTO));
-        return vo;
-    }
-
-    @Override
     public ValidateResultVO validateDefinition(String definition, Integer mode) {
         return PipelineDefinitionCodec.validate(definition, mode);
     }
@@ -262,15 +242,6 @@ public class PipelineServiceImpl extends ServiceImpl<PipelineMapper, Pipeline> i
         boolean changed = persistDefinition(pipeline, dto.getStages() == null ? List.of() : dto.getStages());
         PipelineJobSyncService.SyncOutcome outcome = changed ? jobSyncService.sync(id) : null;
         return versionVo(id, changeNote, outcome, pipeline.getStatus());
-    }
-
-    @Override
-    public IPage<TriggerRecordVO> triggerRecords(Long appId, Long current, Long size) {
-        List<RunTrigger> records = triggerMapper.selectRecentByApp(appId);
-        IPage<TriggerRecordVO> result = new com.baomidou.mybatisplus.extension.plugins.pagination.Page<>(
-                current == null ? 1 : current, size == null ? 20 : size, records.size());
-        result.setRecords(records.stream().map(t -> BeanUtil.copy(t, TriggerRecordVO.class)).collect(Collectors.toList()));
-        return result;
     }
 
     // ==================== 内部实现 ====================

@@ -10,6 +10,7 @@ import com.ferry.devops.api.vo.RunDetailVO;
 import com.ferry.devops.api.vo.RunStageVO;
 import com.ferry.devops.api.vo.RunStageTaskVO;
 import com.ferry.devops.api.vo.TriggerResultVO;
+import com.ferry.devops.api.vo.TriggerRecordVO;
 import com.ferry.devops.api.vo.RunVO;
 
 import java.util.List;
@@ -51,4 +52,7 @@ public interface IRunService extends IService<Run> {
     List<RunStageVO> rerunPlan(Long id);
 
     TriggerResultVO rerun(RunTriggerDTO body);
+
+    /** 应用近期触发记录（分页） */
+    IPage<TriggerRecordVO> triggerRecords(Long appId, Long current, Long size);
 }

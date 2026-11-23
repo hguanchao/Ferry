@@ -10,11 +10,8 @@ import com.ferry.devops.api.dto.PipelineStageDTO;
 import com.ferry.devops.api.dto.PipelineStageTaskDTO;
 import com.ferry.devops.api.entity.Pipeline;
 import com.ferry.devops.api.enums.PipelineStatusEnum;
-import com.ferry.devops.api.vo.PipelineDefinitionVO;
-import com.ferry.devops.api.vo.PipelineStageVO;
 import com.ferry.devops.api.vo.VersionVO;
 import com.ferry.devops.biz.mapper.PipelineMapper;
-import com.ferry.devops.biz.mapper.RunTriggerMapper;
 import com.ferry.devops.biz.service.IAppService;
 import com.ferry.devops.biz.service.IPipelineStageService;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
@@ -38,7 +35,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -70,8 +66,6 @@ class PipelineServiceImplTest {
     @Mock
     private PipelineJobSyncService jobSyncService;
     @Mock
-    private RunTriggerMapper triggerMapper;
-    @Mock
     private IAppService appService;
 
     private PipelineServiceImpl service;
@@ -88,7 +82,7 @@ class PipelineServiceImplTest {
     void setUp() throws Exception {
         PlatformTransactionManager txManager = mock(PlatformTransactionManager.class);
         lenient().when(txManager.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
-        service = new PipelineServiceImpl(appService, jobSyncService, pipelineStageService, triggerMapper,
+        service = new PipelineServiceImpl(appService, jobSyncService, pipelineStageService,
                 new TransactionTemplate(txManager));
         injectBaseMapper();
     }
@@ -295,23 +289,6 @@ class PipelineServiceImplTest {
                         PipelineStatusEnum.SYNC_FAILED.getCode(), "更新 Jenkins Job 失败：HTTP 503"));
 
         assertEquals("同步失败：更新 Jenkins Job 失败：HTTP 503", service.sync(PIPELINE_ID));
-    }
-
-    @Test
-    void 查询历史定义_阶段响应复用阶段表查询结果() {
-        lenient().when(pipelineMapper.selectById(PIPELINE_ID)).thenReturn(pipeline(2, PipelineStatusEnum.ENABLED));
-        lenient().when(pipelineStageService.loadDefinitionJson(PIPELINE_ID, 1)).thenReturn("{\"stages\":[]}");
-        PipelineStageVO stage = new PipelineStageVO();
-        stage.setOutputs("target/*.jar,dist/**");
-        lenient().when(pipelineStageService.list(any(PipelineStageDTO.class))).thenReturn(List.of(stage));
-
-        PipelineDefinitionVO result = service.definition(PIPELINE_ID, 1L);
-
-        assertEquals(1, result.getVersionNo());
-        assertEquals("{\"stages\":[]}", result.getJson());
-        assertSame(stage, result.getStages().get(0));
-        verify(pipelineStageService).list(argThat((PipelineStageDTO query) ->
-                Long.valueOf(PIPELINE_ID).equals(query.getPipelineId()) && Integer.valueOf(1).equals(query.getVersion())));
     }
 
     @Test

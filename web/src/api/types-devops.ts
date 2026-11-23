@@ -83,7 +83,6 @@ export interface RepoCommitOption {
   authorName?: string
   committedAt?: string
 }
-export interface PipelineDefinition { json: string; yaml?: string; versionNo?: number; stages?: PipelineStageRow[] }
 export interface ValidateResult { valid: boolean; errors: Array<{ line: number; message: string }> }
 /** 流水线脚本预览：script 与 Job 同步脚本同源 */
 export interface PipelinePreview {

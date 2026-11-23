@@ -6,10 +6,8 @@ import com.ferry.devops.api.dto.PipelineDTO;
 import com.ferry.devops.api.dto.query.PipelineQuery;
 import com.ferry.devops.api.entity.Pipeline;
 import com.ferry.devops.api.vo.DiffVO;
-import com.ferry.devops.api.vo.PipelineDefinitionVO;
 import com.ferry.devops.api.vo.PipelinePreviewVO;
 import com.ferry.devops.api.vo.PipelineVO;
-import com.ferry.devops.api.vo.TriggerRecordVO;
 import com.ferry.devops.api.vo.ValidateResultVO;
 import com.ferry.devops.api.vo.VersionVO;
 
@@ -33,8 +31,6 @@ public interface IPipelineService extends IService<Pipeline> {
 
     String sync(Long id);
 
-    PipelineDefinitionVO definition(Long id, Long versionId);
-
     ValidateResultVO validateDefinition(String definition, Integer mode);
 
     PipelinePreviewVO previewDefinition(String definition, Integer mode);
@@ -46,6 +42,4 @@ public interface IPipelineService extends IService<Pipeline> {
     DiffVO versionDiff(Long leftId, Long rightId);
 
     VersionVO rollback(Long id, Long versionId, String changeNote);
-
-    IPage<TriggerRecordVO> triggerRecords(Long appId, Long current, Long size);
 }
