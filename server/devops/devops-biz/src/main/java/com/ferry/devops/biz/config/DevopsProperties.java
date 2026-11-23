@@ -21,9 +21,6 @@ public class DevopsProperties {
     /** 阶段门禁集成 */
     private Gate gate = new Gate();
 
-    /** 大模型集成 */
-    private Ai ai = new Ai();
-
     /** 部署执行器集成 */
     private Deploy deploy = new Deploy();
 
@@ -51,18 +48,6 @@ public class DevopsProperties {
         private Integer pullTimeoutSeconds = 300;
         /** 单轮最多评估的待门禁阶段数 */
         private Integer evaluationLimit = 20;
-    }
-
-    @Data
-    public static class Ai {
-        /** OpenAI 兼容端点（含 /v1），如 http://llm:8080/v1 或 https://api.openai.com/v1 */
-        private String baseUrl = "";
-        /** 模型名 */
-        private String model = "gpt-4o-mini";
-        /** API Key */
-        private String apiKey = "";
-        /** 超时秒数 */
-        private Integer timeoutSeconds = 30;
     }
 
     @Data
