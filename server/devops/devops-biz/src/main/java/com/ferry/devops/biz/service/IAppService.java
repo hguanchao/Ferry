@@ -21,12 +21,10 @@ public interface IAppService extends IService<App> {
     boolean save(AppDTO body);
 
     boolean deleted(List<Long> ids);
-    /** 内部接口：应用id到名称的映射 */
+
     Map<String, String> optionMap();
 
-    /** 供向导服务复用：校验编码唯一与格式 */
     void checkCode(String code, Long id);
 
-    /** 供向导服务复用：保存或更新应用档案 */
     boolean saveOrUpdateApp(App app);
 }
