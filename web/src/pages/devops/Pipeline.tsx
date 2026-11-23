@@ -4,8 +4,8 @@ import { useNavigate } from 'react-router-dom'
 import { App, Alert, AutoComplete, Button, Drawer, Form, Input, Modal, Select, Tag, Tooltip, type TableColumnsType } from 'antd'
 import FerryTable from '@/components/FerryTable'
 import {
-  CircleCheck, CirclePause, CirclePlay, Code2, OctagonAlert, Pencil, Play, Plus, RotateCw,
-  Search, Trash2, XCircle,
+  CirclePause, CirclePlay, Code2, Pencil, Play, Plus, RotateCw,
+  Search, Trash2,
 } from 'lucide-react'
 import PageHeader from '@/components/PageHeader'
 import PipelineCanvasEditor from '@/components/PipelineCanvasEditor'
@@ -55,14 +55,6 @@ function parseDefinition(json?: string): PipelineStageDef[] {
     return []
   }
 }
-
-const METRICS = [
-  { key: 'metricRunning', label: '运行中', icon: <RotateCw size={15} />, tone: 'primary' },
-  { key: 'metricFailedToday', label: '今日失败', icon: <XCircle size={15} />, tone: 'danger' },
-  { key: 'metricGateBlocked', label: '门禁阻塞', icon: <OctagonAlert size={15} />, tone: 'warning' },
-  { key: 'metricPendingAdmission', label: '待准入', icon: <CirclePause size={15} />, tone: 'warning' },
-  { key: 'metricObserving', label: '发布观察中', icon: <CircleCheck size={15} />, tone: 'success' },
-] as const
 
 function newRequestId() {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`
@@ -420,27 +412,6 @@ export default function Pipeline() {
         }
       />
 
-      <div className="ferry-stat-grid" style={{ gridTemplateColumns: 'repeat(5, minmax(0, 1fr))', marginBottom: 12 }}>
-        {METRICS.map((m) => {
-          const active = !!filters[m.key]
-          return (
-            <button
-              key={m.key}
-              type="button"
-              className="ferry-stat"
-              data-tone={m.tone}
-              data-active={active}
-              aria-pressed={active}
-              onClick={() => setFilters((prev) => ({ ...prev, [m.key]: prev[m.key] ? undefined : 1 }))}
-            >
-              <span className="ferry-stat__stripe" />
-              <span className="ferry-stat__label">{m.icon}{m.label}</span>
-              <span className="ferry-stat__hint">{active ? '已筛选 · 点击取消' : '点击筛选此类'}</span>
-            </button>
-          )
-        })}
-      </div>
-
       <div className="ferry-panel">
         <div className="ferry-toolbar">
           <Input prefix={<Search size={14} />} allowClear placeholder="流水线名称"
@@ -454,11 +425,6 @@ export default function Pipeline() {
             options={Object.entries(RUN_STATUS_LABEL).map(([k, v]) => ({ value: Number(k), label: v }))}
           />
           <div className="ferry-toolbar__spacer" />
-          {METRICS.filter((m) => filters[m.key]).map((m) => (
-            <Tag key={m.key} closable color="blue" onClose={() => setFilters((p) => ({ ...p, [m.key]: undefined }))}>
-              {m.label}
-            </Tag>
-          ))}
           <Button size="small" icon={<RotateCw size={14} />}
             onClick={() => setFilters({})}>重置</Button>
         </div>
