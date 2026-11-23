@@ -6,6 +6,7 @@ import com.ferry.devops.api.dto.PipelineDefinitionDTO;
 import com.ferry.devops.api.entity.App;
 import com.ferry.devops.api.entity.Pipeline;
 import com.ferry.devops.api.enums.PipelineStatusEnum;
+import com.ferry.devops.api.model.JenkinsJob;
 import com.ferry.devops.biz.integration.jenkins.JenkinsClient;
 import com.ferry.devops.biz.integration.jenkins.JenkinsDispatchException;
 import com.ferry.devops.biz.integration.jenkins.JenkinsJobNames;
@@ -76,11 +77,16 @@ public class PipelineJobSyncService {
                 throw new ServiceException("存在排队/运行/结果未确认的构建，暂不能覆盖可执行脚本，请稍后重试同步");
             }
             boolean disabled = emptyDefinition || PipelineStatusEnum.DISABLED.getCode().equals(currentStatus);
+            JenkinsJob job = new JenkinsJob();
+            job.setName(jobName);
+            job.setAppCode(appCode);
+            job.setScript(script);
+            job.setDisabled(disabled);
+            job.setRepoUrl(app.getRepoUrl());
+            job.setRepoName(app.getName());
             // 两段式：createJob 保证 Job 存在（已存在幂等跳过），updateJob 更新脚本与属性
-            jenkinsClient.createJob(jobName, appCode, script, disabled,
-                    app.getRepoUrl(), app.getName());
-            jenkinsClient.updateJob(jobName, appCode, script, disabled,
-                    app.getRepoUrl(), app.getName());
+            jenkinsClient.createJob(job);
+            jenkinsClient.updateJob(job);
         } catch (Exception e) {
             // 脱敏日志：仅 Job 名与失败原因文本，不输出 Jenkins 地址、凭据与响应体
             log.warn("Pipeline job sync failed: pipelineId={}, jobName={}, reason={}", pipelineId, jobName, e.getMessage());

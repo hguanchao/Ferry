@@ -3,6 +3,7 @@ package com.ferry.devops.biz.integration.jenkins;
 import com.ferry.common.core.exception.UtilException;
 import com.ferry.common.core.utils.JsonUtil;
 import com.ferry.common.core.utils.StrUtil;
+import com.ferry.devops.api.model.JenkinsJob;
 import com.ferry.devops.biz.config.DevopsProperties;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -51,11 +52,11 @@ class JenkinsClientImpl implements JenkinsClient {
      * 创建 Job（幂等）：先查 Job 是否存在，存在直接完成返回。
      */
     @Override
-    public void createJob(String jobName, String appCode, String script, boolean disabled,
-                          String projectUrl, String projectDisplayName) {
+    public void createJob(JenkinsJob job) {
+        String jobName = job.getName();
         DevopsProperties.Jenkins cfg = properties.getJenkins();
         if (cfg == null || StrUtil.isBlank(cfg.getBaseUrl())) {
-            log.info("Jenkins createJob (mock): jobName={}, disabled={}", jobName, disabled);
+            log.info("Jenkins createJob (mock): jobName={}, disabled={}", jobName, job.isDisabled());
             return;
         }
         JenkinsHttpClient http = httpClient(cfg);
@@ -73,12 +74,11 @@ class JenkinsClientImpl implements JenkinsClient {
         if (!cfg.isAutoCreateJob()) {
             throw new JenkinsDispatchException("Jenkins Job 不存在且未开启自动创建：" + jobName, false);
         }
-        String xml = JenkinsJobXml.buildMinimalJobXml(jobName, appCode, script, disabled,
-                projectUrl, projectDisplayName);
+        String xml = JenkinsJobXml.buildMinimalJobXml(job);
         JenkinsHttpClient.HttpResult created =
                 http.postXml("/createItem?name=" + encode(jobName), xml);
         if (created.isOk()) {
-            log.info("Jenkins job created: jobName={}, disabled={}", jobName, disabled);
+            log.info("Jenkins job created: jobName={}, disabled={}", jobName, job.isDisabled());
             return;
         }
         // 400/409：并发创建或同名冲突，回读确认存在即视为完成
@@ -96,11 +96,11 @@ class JenkinsClientImpl implements JenkinsClient {
      * 更新 Job 配置：先查 Job 是否存在，不存在抛出异常（创建走 {@link #createJob}）。
      */
     @Override
-    public void updateJob(String jobName, String appCode, String script, boolean disabled,
-                          String projectUrl, String projectDisplayName) {
+    public void updateJob(JenkinsJob job) {
+        String jobName = job.getName();
         DevopsProperties.Jenkins cfg = properties.getJenkins();
         if (cfg == null || StrUtil.isBlank(cfg.getBaseUrl())) {
-            log.info("Jenkins updateJob (mock): jobName={}, disabled={}", jobName, disabled);
+            log.info("Jenkins updateJob (mock): jobName={}, disabled={}", jobName, job.isDisabled());
             return;
         }
         JenkinsHttpClient http = httpClient(cfg);
@@ -119,14 +119,14 @@ class JenkinsClientImpl implements JenkinsClient {
         if (doc == null) {
             throw new JenkinsDispatchException("Jenkins Job 非 Ferry 管理，拒绝覆盖：" + jobName, false);
         }
-        String xml = JenkinsJobXml.applyFerryConfig(doc, script, disabled, projectUrl, projectDisplayName);
+        String xml = JenkinsJobXml.applyFerryConfig(doc, job);
         JenkinsHttpClient.HttpResult updated = http.postXml(configPath(jobName), xml);
         if (!updated.isOk()) {
             throw new JenkinsDispatchException(
                     "更新 Jenkins Job 失败：" + jobName + "，HTTP " + updated.status(),
                     isUncertain(updated.status()));
         }
-        log.info("Jenkins job updated: jobName={}, disabled={}", jobName, disabled);
+        log.info("Jenkins job updated: jobName={}, disabled={}", jobName, job.isDisabled());
     }
 
     /** Job 配置读取路径（构造 config.xml 地址） */

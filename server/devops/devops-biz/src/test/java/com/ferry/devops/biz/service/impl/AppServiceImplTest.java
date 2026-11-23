@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.ferry.common.core.exception.ServiceException;
 import com.ferry.devops.api.dto.AppDTO;
 import com.ferry.devops.api.entity.App;
+import com.ferry.devops.api.model.JenkinsJob;
 import com.ferry.devops.biz.integration.jenkins.JenkinsClient;
 import com.ferry.devops.biz.mapper.AppMapper;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
@@ -22,13 +23,11 @@ import java.lang.reflect.Field;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -94,10 +93,16 @@ class AppServiceImplTest {
 
         assertTrue(service.save(createBody()));
 
-        verify(jenkinsClient).createJob(eq("order-service"), eq("order-service"), anyString(), eq(true),
-                eq("https://github.com/yangzongzhuan/RuoYi"), eq("订单服务"));
+        ArgumentCaptor<JenkinsJob> jobCaptor = ArgumentCaptor.forClass(JenkinsJob.class);
+        verify(jenkinsClient).createJob(jobCaptor.capture());
+        JenkinsJob job = jobCaptor.getValue();
+        assertEquals("order-service", job.getName());
+        assertEquals("order-service", job.getAppCode());
+        assertEquals("https://github.com/yangzongzhuan/RuoYi", job.getRepoUrl());
+        assertEquals("订单服务", job.getRepoName());
+        assertTrue(job.isDisabled());
         // 新建分支只走 createJob 初始化空白 Job
-        verify(jenkinsClient, never()).updateJob(anyString(), anyString(), anyString(), anyBoolean(), any(), any());
+        verify(jenkinsClient, never()).updateJob(any(JenkinsJob.class));
     }
 
     @Test
@@ -124,9 +129,13 @@ class AppServiceImplTest {
         verify(appMapper).insertOrUpdate(appCaptor.capture());
         assertEquals("old-token", appCaptor.getValue().getRepoToken());
         // 编辑走 updateJob 刷新脚本与 GitHub 项目属性，不再重复创建
-        verify(jenkinsClient).updateJob(eq("order-service"), eq("order-service"), anyString(), eq(true),
-                eq("https://gitee.com/y_project/RuoYi"), eq("订单服务"));
-        verify(jenkinsClient, never()).createJob(anyString(), anyString(), anyString(), anyBoolean(), any(), any());
+        ArgumentCaptor<JenkinsJob> jobCaptor = ArgumentCaptor.forClass(JenkinsJob.class);
+        verify(jenkinsClient).updateJob(jobCaptor.capture());
+        JenkinsJob job = jobCaptor.getValue();
+        assertEquals("order-service", job.getName());
+        assertEquals("https://gitee.com/y_project/RuoYi", job.getRepoUrl());
+        assertEquals("订单服务", job.getRepoName());
+        verify(jenkinsClient, never()).createJob(any(JenkinsJob.class));
     }
 
     @Test
@@ -161,13 +170,13 @@ class AppServiceImplTest {
         when(appMapper.selectCount(any())).thenReturn(0L);
         when(appMapper.insertOrUpdate(any(App.class))).thenReturn(true);
         doThrow(new RuntimeException("jenkins down")).when(jenkinsClient)
-                .createJob(anyString(), anyString(), anyString(), anyBoolean(), any(), any());
+                .createJob(any(JenkinsJob.class));
 
         // Job 与应用同生命周期：联动失败异常上抛，事务整体回滚，应用不落库
         assertThrows(RuntimeException.class, () -> service.save(createBody()));
 
-        verify(jenkinsClient).createJob(anyString(), anyString(), anyString(), eq(true), any(), any());
-        verify(jenkinsClient, never()).updateJob(anyString(), anyString(), anyString(), anyBoolean(), any(), any());
+        verify(jenkinsClient).createJob(any(JenkinsJob.class));
+        verify(jenkinsClient, never()).updateJob(any(JenkinsJob.class));
     }
 
     @Test
@@ -196,9 +205,11 @@ class AppServiceImplTest {
 
         assertTrue(service.save(body));
 
-        verify(jenkinsClient).createJob(eq("order-service"), eq("order-service"), anyString(), eq(true),
-                isNull(), eq("订单服务"));
-        verify(jenkinsClient, never()).updateJob(anyString(), anyString(), anyString(), anyBoolean(), any(), any());
+        ArgumentCaptor<JenkinsJob> jobCaptor = ArgumentCaptor.forClass(JenkinsJob.class);
+        verify(jenkinsClient).createJob(jobCaptor.capture());
+        assertNull(jobCaptor.getValue().getRepoUrl());
+        assertEquals("订单服务", jobCaptor.getValue().getRepoName());
+        verify(jenkinsClient, never()).updateJob(any(JenkinsJob.class));
         // 空 url 下不生成 GitHub 项目属性（由 XML 层保证），这里只验证传参透传
         verify(jenkinsClient, never()).deleteJob(anyString());
     }

@@ -1,6 +1,7 @@
 package com.ferry.devops.biz.integration.jenkins;
 
 import com.ferry.common.core.utils.StrUtil;
+import com.ferry.devops.api.model.JenkinsJob;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
@@ -69,15 +70,10 @@ final class JenkinsJobXml {
     /**
      * 生成最小 Pipeline Job 配置。
      *
-     * @param jobName             Job 名（同时写入归属标记）
-     * @param appCode             应用编码（仅写入 description 便于人工辨认）
-     * @param script              完整声明式脚本
-     * @param disabled            是否禁用（待配置流水线为 true）
-     * @param projectUrl          代码仓库主页地址（写入 GitHub 项目属性，空则不生成该属性）
-     * @param projectDisplayName  仓库显示名称（GitHub 项目属性的显示名）
+     * @param job Job 配置：名称（同时写入归属标记）、应用编码（写入 description 便于人工辨认）、
+     *            完整声明式脚本、禁用位（待配置流水线为 true）、仓库地址与显示名（写入 GitHub 项目属性）
      */
-    static String buildMinimalJobXml(String jobName, String appCode, String script, boolean disabled,
-                                     String projectUrl, String projectDisplayName) {
+    static String buildMinimalJobXml(JenkinsJob job) {
         try {
             Document doc = secureFactory().newDocumentBuilder().newDocument();
             Element root = doc.createElement(ROOT_ELEMENT);
@@ -85,7 +81,7 @@ final class JenkinsJobXml {
             doc.appendChild(root);
 
             appendChild(root, "actions");
-            appendChild(root, "description", MANAGED_MARKER_PREFIX + jobName + "（应用 " + appCode + "）");
+            appendChild(root, "description", MANAGED_MARKER_PREFIX + job.getName() + "（应用 " + job.getAppCode() + "）");
             appendChild(root, "keepDependencies", "false");
 
             Element properties = appendChild(root, "properties");
@@ -102,15 +98,15 @@ final class JenkinsJobXml {
             appendChild(strategy, "numToKeep", "30");
             appendChild(strategy, "artifactDaysToKeep", "-1");
             appendChild(strategy, "artifactNumToKeep", "-1");
-            applyGitHubProperty(properties, projectUrl, projectDisplayName);
+            applyGitHubProperty(properties, job.getRepoUrl(), job.getRepoName());
 
             Element definition = appendChild(root, "definition");
             definition.setAttribute("class", "org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition");
             definition.setAttribute("plugin", "workflow-cps");
-            appendChild(definition, TAG_SCRIPT, script);
+            appendChild(definition, TAG_SCRIPT, job.getScript());
             appendChild(definition, "sandbox", "true");
 
-            appendChild(root, TAG_DISABLED, String.valueOf(disabled));
+            appendChild(root, TAG_DISABLED, String.valueOf(job.isDisabled()));
             return serialize(doc);
         } catch (Exception e) {
             throw new JenkinsDispatchException("生成 Jenkins Job 配置失败：" + e.getMessage(), false);
@@ -152,20 +148,19 @@ final class JenkinsJobXml {
      * 在已验证归属的配置上更新 Ferry 托管字段：脚本、禁用位、Ferry 参数（含清理遗留 STAGE_SPEC）、
      * GitHub 项目属性。其余节点（含人工追加的属性与自定义参数）原样保留。
      */
-    static String applyFerryConfig(Document doc, String script, boolean disabled,
-                                   String projectUrl, String projectDisplayName) {
+    static String applyFerryConfig(Document doc, JenkinsJob job) {
         Element root = doc.getDocumentElement();
         Element definition = firstChild(root, "definition");
         if (definition == null) {
             throw new JenkinsDispatchException("Jenkins Job 配置缺少脚本节点，拒绝更新", false);
         }
-        setText(firstChild(definition, TAG_SCRIPT), script);
+        setText(firstChild(definition, TAG_SCRIPT), job.getScript());
 
         Element disabledNode = firstChild(root, TAG_DISABLED);
         if (disabledNode == null) {
             disabledNode = appendChild(root, TAG_DISABLED);
         }
-        setText(disabledNode, String.valueOf(disabled));
+        setText(disabledNode, String.valueOf(job.isDisabled()));
 
         Element paramDefinitions = ensureParamDefinitions(root);
         for (ParamDef def : FERRY_PARAMS) {
@@ -183,7 +178,7 @@ final class JenkinsJobXml {
                 }
             }
         }
-        applyGitHubProperty(firstChild(root, "properties"), projectUrl, projectDisplayName);
+        applyGitHubProperty(firstChild(root, "properties"), job.getRepoUrl(), job.getRepoName());
         return serialize(doc);
     }
 

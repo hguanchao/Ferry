@@ -7,6 +7,7 @@ import com.ferry.devops.api.dto.PipelineTaskDTO;
 import com.ferry.devops.api.entity.App;
 import com.ferry.devops.api.entity.Pipeline;
 import com.ferry.devops.api.enums.PipelineStatusEnum;
+import com.ferry.devops.api.model.JenkinsJob;
 import com.ferry.devops.biz.integration.jenkins.JenkinsClient;
 import com.ferry.devops.biz.integration.jenkins.JenkinsDispatchException;
 import com.ferry.devops.biz.integration.jenkins.JenkinsJobNames;
@@ -28,13 +29,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyBoolean;
-import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -103,6 +99,20 @@ class PipelineJobSyncServiceTest {
         return definition;
     }
 
+    /** 捕获 createJob 下发的 Job 配置 */
+    private JenkinsJob captureCreatedJob() {
+        ArgumentCaptor<JenkinsJob> captor = ArgumentCaptor.forClass(JenkinsJob.class);
+        verify(jenkinsClient).createJob(captor.capture());
+        return captor.getValue();
+    }
+
+    /** 捕获 updateJob 下发的 Job 配置 */
+    private JenkinsJob captureUpdatedJob() {
+        ArgumentCaptor<JenkinsJob> captor = ArgumentCaptor.forClass(JenkinsJob.class);
+        verify(jenkinsClient).updateJob(captor.capture());
+        return captor.getValue();
+    }
+
     @Test
     void 启用态同步成功_状态保持启用并下发正确Job名() {
         when(pipelineMapper.selectById(PIPELINE_ID)).thenReturn(pipeline(1, PipelineStatusEnum.ENABLED));
@@ -115,12 +125,15 @@ class PipelineJobSyncServiceTest {
         assertTrue(outcome.synced());
         assertEquals(PipelineStatusEnum.ENABLED.getCode(), outcome.status());
         // Job 名 = 应用编码；GitHub 项目属性随应用档案下发
-        verify(jenkinsClient).createJob(eq(JenkinsJobNames.appJobName("order-service")),
-                eq("order-service"), anyString(), eq(false),
-                eq("https://github.com/yangzongzhuan/RuoYi"), eq("订单服务"));
-        verify(jenkinsClient).updateJob(eq(JenkinsJobNames.appJobName("order-service")),
-                eq("order-service"), anyString(), eq(false),
-                eq("https://github.com/yangzongzhuan/RuoYi"), eq("订单服务"));
+        JenkinsJob created = captureCreatedJob();
+        assertEquals(JenkinsJobNames.appJobName("order-service"), created.getName());
+        assertEquals("order-service", created.getAppCode());
+        assertFalse(created.isDisabled());
+        assertEquals("https://github.com/yangzongzhuan/RuoYi", created.getRepoUrl());
+        assertEquals("订单服务", created.getRepoName());
+        JenkinsJob updated = captureUpdatedJob();
+        assertEquals(JenkinsJobNames.appJobName("order-service"), updated.getName());
+        assertFalse(updated.isDisabled());
         ArgumentCaptor<Pipeline> captor = ArgumentCaptor.forClass(Pipeline.class);
         verify(pipelineMapper).updateById(captor.capture());
         assertEquals(PipelineStatusEnum.ENABLED.getCode(), captor.getValue().getStatus());
@@ -136,8 +149,10 @@ class PipelineJobSyncServiceTest {
 
         assertTrue(outcome.synced());
         assertEquals(PipelineStatusEnum.PENDING_CONFIG.getCode(), outcome.status());
-        verify(jenkinsClient).createJob(anyString(), eq("order-service"), anyString(), eq(true), any(), any());
-        verify(jenkinsClient).updateJob(anyString(), eq("order-service"), anyString(), eq(true), any(), any());
+        JenkinsJob created = captureCreatedJob();
+        assertEquals("order-service", created.getAppCode());
+        assertTrue(created.isDisabled());
+        assertTrue(captureUpdatedJob().isDisabled());
     }
 
     @Test
@@ -151,8 +166,8 @@ class PipelineJobSyncServiceTest {
 
         assertTrue(outcome.synced());
         assertEquals(PipelineStatusEnum.DISABLED.getCode(), outcome.status());
-        verify(jenkinsClient).createJob(anyString(), eq("order-service"), anyString(), eq(true), any(), any());
-        verify(jenkinsClient).updateJob(anyString(), eq("order-service"), anyString(), eq(true), any(), any());
+        assertTrue(captureCreatedJob().isDisabled());
+        assertTrue(captureUpdatedJob().isDisabled());
     }
 
     @Test
@@ -168,8 +183,8 @@ class PipelineJobSyncServiceTest {
         assertEquals(PipelineStatusEnum.SYNC_FAILED.getCode(), outcome.status());
         assertTrue(outcome.message().contains("暂不能覆盖可执行脚本"));
         assertTrue(outcome.message().contains("重试同步"));
-        verify(jenkinsClient, never()).createJob(anyString(), anyString(), anyString(), anyBoolean(), any(), any());
-        verify(jenkinsClient, never()).updateJob(anyString(), anyString(), anyString(), anyBoolean(), any(), any());
+        verify(jenkinsClient, never()).createJob(any(JenkinsJob.class));
+        verify(jenkinsClient, never()).updateJob(any(JenkinsJob.class));
     }
 
     @Test
@@ -181,8 +196,8 @@ class PipelineJobSyncServiceTest {
         PipelineJobSyncService.SyncOutcome outcome = service.sync(PIPELINE_ID);
 
         assertTrue(outcome.synced());
-        verify(jenkinsClient).createJob(anyString(), anyString(), anyString(), eq(true), any(), any());
-        verify(jenkinsClient).updateJob(anyString(), anyString(), anyString(), eq(true), any(), any());
+        assertTrue(captureCreatedJob().isDisabled());
+        assertTrue(captureUpdatedJob().isDisabled());
     }
 
     @Test
@@ -192,7 +207,7 @@ class PipelineJobSyncServiceTest {
         when(pipelineStageService.loadDefinition(PIPELINE_ID, 1)).thenReturn(definitionWithCiStage());
         when(runMapper.countActiveByPipeline(PIPELINE_ID)).thenReturn(0L);
         doThrow(new JenkinsDispatchException("更新 Jenkins Job 失败：HTTP 403", false))
-                .when(jenkinsClient).updateJob(anyString(), anyString(), anyString(), anyBoolean(), any(), any());
+                .when(jenkinsClient).updateJob(any(JenkinsJob.class));
 
         PipelineJobSyncService.SyncOutcome outcome = service.sync(PIPELINE_ID);
 
@@ -208,7 +223,7 @@ class PipelineJobSyncServiceTest {
         when(pipelineStageService.loadDefinition(PIPELINE_ID, 1)).thenReturn(definitionWithCiStage());
         when(runMapper.countActiveByPipeline(PIPELINE_ID)).thenReturn(0L);
         doThrow(new JenkinsDispatchException("Jenkins 请求失败：/job/secret-host/x", true))
-                .when(jenkinsClient).updateJob(anyString(), anyString(), anyString(), anyBoolean(), any(), any());
+                .when(jenkinsClient).updateJob(any(JenkinsJob.class));
 
         PipelineJobSyncService.SyncOutcome outcome = service.sync(PIPELINE_ID);
 
@@ -224,7 +239,7 @@ class PipelineJobSyncServiceTest {
         when(pipelineStageService.loadDefinition(PIPELINE_ID, 2)).thenReturn(definitionWithCiStage());
         when(runMapper.countActiveByPipeline(PIPELINE_ID)).thenReturn(0L);
         doThrow(new JenkinsDispatchException("更新失败", false))
-                .when(jenkinsClient).updateJob(anyString(), anyString(), anyString(), anyBoolean(), any(), any());
+                .when(jenkinsClient).updateJob(any(JenkinsJob.class));
 
         PipelineJobSyncService.SyncOutcome outcome = service.sync(PIPELINE_ID);
 
@@ -237,7 +252,7 @@ class PipelineJobSyncServiceTest {
         when(pipelineMapper.selectById(PIPELINE_ID)).thenReturn(pipeline(1, PipelineStatusEnum.ENABLED));
         when(appMapper.selectById(1L)).thenReturn(null);
         assertThrows(ServiceException.class, () -> service.sync(PIPELINE_ID));
-        verify(jenkinsClient, never()).createJob(anyString(), anyString(), anyString(), anyBoolean(), any(), any());
-        verify(jenkinsClient, never()).updateJob(anyString(), anyString(), anyString(), anyBoolean(), any(), any());
+        verify(jenkinsClient, never()).createJob(any(JenkinsJob.class));
+        verify(jenkinsClient, never()).updateJob(any(JenkinsJob.class));
     }
 }

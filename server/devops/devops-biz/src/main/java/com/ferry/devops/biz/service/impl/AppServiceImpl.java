@@ -14,6 +14,7 @@ import com.ferry.devops.api.dto.AppDTO;
 import com.ferry.devops.api.dto.PipelineDefinitionDTO;
 import com.ferry.devops.api.dto.query.AppQuery;
 import com.ferry.devops.api.entity.App;
+import com.ferry.devops.api.model.JenkinsJob;
 import com.ferry.devops.api.vo.AppOptionVO;
 import com.ferry.devops.api.vo.AppVO;
 import com.ferry.devops.biz.integration.jenkins.JenkinsClient;
@@ -65,16 +66,19 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements IAppS
         boolean isSuccess = saveOrUpdate(app);
         if (isSuccess) {
             // Job 与应用同生命周期：Jenkins 失败即整体回滚，应用不落库，用户重试
-            String jobName = JenkinsJobNames.appJobName(app.getCode());
-            String script = PipelineScriptRenderer.render(new PipelineDefinitionDTO());
+            JenkinsJob job = new JenkinsJob();
+            job.setName(JenkinsJobNames.appJobName(app.getCode()));
+            job.setAppCode(app.getCode().trim());
+            job.setScript(PipelineScriptRenderer.render(new PipelineDefinitionDTO()));
+            job.setDisabled(true);
+            job.setRepoUrl(app.getRepoUrl());
+            job.setRepoName(app.getName());
             if (ObjUtil.isNotEmpty(body.getId())) {
                 // 编辑：Job 已存在，刷新脚本与 GitHub 项目属性
-                jenkinsClient.updateJob(jobName, app.getCode().trim(), script, true,
-                        app.getRepoUrl(), app.getName());
+                jenkinsClient.updateJob(job);
             } else {
                 // 新建：初始化空白 Job
-                jenkinsClient.createJob(jobName, app.getCode().trim(), script, true,
-                        app.getRepoUrl(), app.getName());
+                jenkinsClient.createJob(job);
             }
         }
         return isSuccess;
