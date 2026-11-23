@@ -1,13 +1,15 @@
 package com.ferry.devops.biz.service.impl;
 
+import com.ferry.common.core.constant.IntConst;
 import com.ferry.common.core.utils.StrUtil;
 import com.ferry.devops.api.dto.PipelineDefinitionDTO;
 import com.ferry.devops.api.dto.PipelineStageDTO;
-import com.ferry.devops.api.dto.PipelineTaskDTO;
+import com.ferry.devops.api.dto.PipelineStageTaskDTO;
 import com.ferry.devops.api.vo.PipelinePreviewVO;
 import com.ferry.devops.biz.gate.GateReportContract;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -103,14 +105,14 @@ final class PipelineScriptRenderer {
             // buildTool 仅作提示注释，工具环境由执行节点提供，不在此安装/切换
             script.append("            // 构建工具: ").append(singleLine(stage.getBuildTool())).append("\n");
         }
-        int timeout = stage.getTimeoutSeconds() == null ? DEFAULT_STAGE_TIMEOUT_SECONDS : stage.getTimeoutSeconds();
+        int timeout = stage.getTimeout() == null ? DEFAULT_STAGE_TIMEOUT_SECONDS : stage.getTimeout();
         script.append("            options {\n");
         script.append("                timeout(time: ").append(timeout).append(", unit: 'SECONDS')\n");
         script.append("            }\n");
         script.append("            steps {\n");
         if (stage.getTasks() != null) {
-            for (PipelineTaskDTO task : stage.getTasks()) {
-                if (task.getExecutor() != null && !"jenkins".equalsIgnoreCase(task.getExecutor())) {
+            for (PipelineStageTaskDTO task : stage.getTasks()) {
+                if (task.getExecutor() != null && !IntConst.ONE.equals(task.getExecutor())) {
                     continue;
                 }
                 appendTask(script, task);
@@ -128,8 +130,8 @@ final class PipelineScriptRenderer {
                     .append(GateReportContract.SCAN_REPORT_PATH)
                     .append("', allowEmptyArchive: true\n");
         }
-        if (stage.getType() == 4 && stage.getOutputs() != null) {
-            for (String output : stage.getOutputs()) {
+        if (stage.getType() == 4) {
+            for (String output : splitOutputs(stage.getOutputs())) {
                 script.append("                archiveArtifacts artifacts: '")
                         .append(escapeSingleQuoted(output))
                         .append("', allowEmptyArchive: true\n");
@@ -139,7 +141,7 @@ final class PipelineScriptRenderer {
         script.append("        }\n");
     }
 
-    private static void appendTask(StringBuilder script, PipelineTaskDTO task) {
+    private static void appendTask(StringBuilder script, PipelineStageTaskDTO task) {
         script.append("                // 任务: ").append(singleLine(task.getName())).append("\n");
         if (StrUtil.isNotBlank(task.getScriptContent())) {
             script.append("                sh '''")
@@ -167,8 +169,8 @@ final class PipelineScriptRenderer {
         for (PipelineStageDTO stage : ciStages) {
             boolean hasJenkinsTask = false;
             if (stage.getTasks() != null) {
-                for (PipelineTaskDTO task : stage.getTasks()) {
-                    if (task.getExecutor() != null && !"jenkins".equalsIgnoreCase(task.getExecutor())) {
+                for (PipelineStageTaskDTO task : stage.getTasks()) {
+                    if (task.getExecutor() != null && !IntConst.ONE.equals(task.getExecutor())) {
                         continue;
                     }
                     hasJenkinsTask = true;
@@ -196,11 +198,21 @@ final class PipelineScriptRenderer {
                         + GateReportContract.SCAN_REPORT_PATH
                         + "，否则门禁判数据获取失败；扫描命令执行完成应退出 0，不达标写入报告");
             }
-            if (stage.getType() == 4 && (stage.getOutputs() == null || stage.getOutputs().isEmpty())) {
+            if (stage.getType() == 4 && splitOutputs(stage.getOutputs()).isEmpty()) {
                 warnings.add("制品入库阶段「" + stage.getName() + "」未配置产出物路径");
             }
         }
         return warnings;
+    }
+
+    private static List<String> splitOutputs(String outputs) {
+        if (StrUtil.isBlank(outputs)) {
+            return List.of();
+        }
+        return Arrays.stream(outputs.split(","))
+                .map(String::trim)
+                .filter(StrUtil::isNotBlank)
+                .toList();
     }
 
     /** Groovy 单引号字符串转义：反斜杠与单引号 */

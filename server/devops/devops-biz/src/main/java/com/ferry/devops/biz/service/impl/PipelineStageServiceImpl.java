@@ -1,12 +1,18 @@
 package com.ferry.devops.biz.service.impl;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.ferry.common.core.utils.BeanUtil;
+import com.ferry.common.core.utils.CollUtil;
 import com.ferry.common.core.utils.JsonUtil;
+import com.ferry.common.core.utils.ObjUtil;
 import com.ferry.common.jdbc.base.ServiceImpl;
 import com.ferry.devops.api.dto.PipelineDefinitionDTO;
 import com.ferry.devops.api.dto.PipelineStageDTO;
-import com.ferry.devops.api.dto.PipelineTaskDTO;
+import com.ferry.devops.api.dto.PipelineStageTaskDTO;
 import com.ferry.devops.api.entity.PipelineStage;
+import com.ferry.devops.api.entity.PipelineStageTask;
+import com.ferry.devops.api.vo.PipelineStageTaskVO;
+import com.ferry.devops.api.vo.PipelineStageVO;
 import com.ferry.devops.biz.mapper.PipelineStageMapper;
 import com.ferry.devops.biz.service.IPipelineStageService;
 import com.ferry.devops.biz.service.IPipelineStageTaskService;
@@ -15,8 +21,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -24,10 +32,35 @@ import java.util.stream.Collectors;
  */
 @Service
 @RequiredArgsConstructor
-public class PipelineStageServiceImpl extends ServiceImpl<PipelineStageMapper, PipelineStage>
-        implements IPipelineStageService {
-
+public class PipelineStageServiceImpl extends ServiceImpl<PipelineStageMapper, PipelineStage> implements IPipelineStageService {
     private final IPipelineStageTaskService pipelineStageTaskService;
+
+    @Override
+    public List<PipelineStageVO> list(PipelineStageDTO body) {
+        Long pipelineId = body.getPipelineId();
+        Integer version = body.getVersion();
+        List<PipelineStage> stageList = list(Wrappers.<PipelineStage>lambdaQuery()
+                .eq(ObjUtil.isNotEmpty(pipelineId), PipelineStage::getPipelineId, pipelineId)
+                .eq(ObjUtil.isNotEmpty(version), PipelineStage::getVersion, version)
+                .orderByAsc(PipelineStage::getSort));
+        if (CollUtil.isEmpty(stageList)) {
+            return Collections.emptyList();
+        }
+        List<PipelineStageVO> stageVOList = BeanUtil.copy(stageList, PipelineStageVO.class);
+        Set<Long> stageIds = stageVOList.stream().map(PipelineStageVO::getId).collect(Collectors.toSet());
+        List<PipelineStageTask> stageTaskList = pipelineStageTaskService.list(Wrappers.<PipelineStageTask>lambdaQuery()
+                .in(PipelineStageTask::getStageId, stageIds));
+        if (CollUtil.isNotEmpty(stageTaskList)) {
+            Map<Long, List<PipelineStageTaskVO>> stageTaskMap = stageTaskList.stream().collect(Collectors.groupingBy(
+                    PipelineStageTask::getStageId,
+                    Collectors.mapping(task -> BeanUtil.copy(task, PipelineStageTaskVO.class), Collectors.toList())
+            ));
+            for (PipelineStageVO stageVO : stageVOList) {
+                stageVO.setTaskList(stageTaskMap.get(stageVO.getId()));
+            }
+        }
+        return stageVOList;
+    }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -44,8 +77,8 @@ public class PipelineStageServiceImpl extends ServiceImpl<PipelineStageMapper, P
             entity.setType(stage.getType());
             entity.setName(stage.getName());
             entity.setBuildTool(stage.getBuildTool());
-            entity.setTimeout(stage.getTimeoutSeconds());
-            entity.setOutputs(stage.getOutputs() == null ? null : String.join(",", stage.getOutputs()));
+            entity.setTimeout(stage.getTimeout());
+            entity.setOutputs(stage.getOutputs());
             entity.setSort(sort++);
             save(entity);
             pipelineStageTaskService.saveTasks(entity.getId(), version, stage.getTasks());
@@ -59,19 +92,15 @@ public class PipelineStageServiceImpl extends ServiceImpl<PipelineStageMapper, P
         List<PipelineStageDTO> stageDtos = new ArrayList<>();
         if (!stages.isEmpty()) {
             List<Long> stageIds = stages.stream().map(PipelineStage::getId).toList();
-            Map<Long, List<PipelineTaskDTO>> tasksByStage =
+            Map<Long, List<PipelineStageTaskDTO>> tasksByStage =
                     pipelineStageTaskService.mapTasksByStageIds(stageIds);
             for (PipelineStage stage : stages) {
                 PipelineStageDTO stageDto = new PipelineStageDTO();
                 stageDto.setType(stage.getType());
                 stageDto.setName(stage.getName());
                 stageDto.setBuildTool(stage.getBuildTool());
-                stageDto.setTimeoutSeconds(stage.getTimeout());
-                if (stage.getOutputs() != null && !stage.getOutputs().isBlank()) {
-                    stageDto.setOutputs(List.of(stage.getOutputs().split(",")));
-                } else {
-                    stageDto.setOutputs(new ArrayList<>());
-                }
+                stageDto.setTimeout(stage.getTimeout());
+                stageDto.setOutputs(stage.getOutputs());
                 stageDto.setTasks(tasksByStage.getOrDefault(stage.getId(), List.of()));
                 stageDtos.add(stageDto);
             }

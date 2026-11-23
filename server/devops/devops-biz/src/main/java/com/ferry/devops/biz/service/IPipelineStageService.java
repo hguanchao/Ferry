@@ -4,7 +4,9 @@ import java.util.List;
 
 import com.ferry.common.jdbc.base.IService;
 import com.ferry.devops.api.dto.PipelineDefinitionDTO;
+import com.ferry.devops.api.dto.PipelineStageDTO;
 import com.ferry.devops.api.entity.PipelineStage;
+import com.ferry.devops.api.vo.PipelineStageVO;
 
 /**
  * 流水线阶段服务：负责流水线定义在阶段表与任务表中的存取。
@@ -12,6 +14,8 @@ import com.ferry.devops.api.entity.PipelineStage;
  * <p>阶段服务负责阶段行，任务行委托 {@link IPipelineStageTaskService} 处理。
  */
 public interface IPipelineStageService extends IService<PipelineStage> {
+
+   List<PipelineStageVO> list(PipelineStageDTO body);
 
     /**
      * 保存一个版本的定义：写入阶段及阶段下的任务。

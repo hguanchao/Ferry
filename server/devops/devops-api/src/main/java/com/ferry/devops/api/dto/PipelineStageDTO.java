@@ -27,11 +27,17 @@ public class PipelineStageDTO {
     private String buildTool;
 
     @Schema(description = "超时秒数 60–86400")
-    private Integer timeoutSeconds;
+    private Integer timeout;
 
     @Schema(description = "任务列表，1–30 个")
-    private List<PipelineTaskDTO> tasks;
+    private List<PipelineStageTaskDTO> tasks;
 
-    @Schema(description = "产出物声明")
-    private List<String> outputs;
+    @Schema(description = "产出物声明，多个路径使用逗号分隔")
+    private String outputs;
+
+    @Schema(description = "流水线id")
+    private Long pipelineId;
+
+    @Schema(description = "版本号")
+    private Integer version;
 }

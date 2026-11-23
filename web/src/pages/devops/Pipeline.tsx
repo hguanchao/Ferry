@@ -213,17 +213,8 @@ export default function Pipeline() {
     },
     onError: showError,
   })
-  const enableMutation = useMutation({
-    mutationFn: (body: Record<string, unknown>) => pipelineApi.enable(body),
-    onSuccess: (text) => {
-      if (text?.includes('同步失败')) message.warning(text)
-      else message.success(text || '操作成功')
-      invalidate()
-    },
-    onError: showError,
-  })
-  const disableMutation = useMutation({
-    mutationFn: (body: Record<string, unknown>) => pipelineApi.disable(body),
+  const changeStatusMutation = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: number }) => pipelineApi.changeStatus(id, status),
     onSuccess: (text) => {
       if (text?.includes('同步失败')) message.warning(text)
       else message.success(text || '操作成功')
@@ -367,16 +358,16 @@ export default function Pipeline() {
               <Button type="link" size="small" icon={<Pencil size={15} />} onClick={() => openEditor(record)} />
             </Tooltip>
           )}
-          {can('devops:pipeline:enable') && record.status === 0 && (
+          {can('devops:pipeline:changeStatus') && record.status === 0 && (
             <Tooltip title="启用">
               <Button type="link" size="small" icon={<CirclePlay size={15} />}
-                onClick={() => enableMutation.mutate({ id: record.id })} />
+                onClick={() => changeStatusMutation.mutate({ id: record.id, status: 1 })} />
             </Tooltip>
           )}
-          {can('devops:pipeline:disable') && record.status === 1 && (
+          {can('devops:pipeline:changeStatus') && record.status === 1 && (
             <Tooltip title="停用">
               <Button type="link" size="small" icon={<CirclePause size={15} />}
-                onClick={() => disableMutation.mutate({ id: record.id })} />
+                onClick={() => changeStatusMutation.mutate({ id: record.id, status: 0 })} />
             </Tooltip>
           )}
           {can('devops:pipeline:save') && record.status === 3 && (

@@ -20,7 +20,7 @@ import com.ferry.common.jdbc.provider.Page;
 import com.ferry.common.security.utils.AuthUtil;
 import com.ferry.devops.api.dto.PipelineDefinitionDTO;
 import com.ferry.devops.api.dto.PipelineStageDTO;
-import com.ferry.devops.api.dto.PipelineTaskDTO;
+import com.ferry.devops.api.dto.PipelineStageTaskDTO;
 import com.ferry.devops.api.dto.RunTriggerDTO;
 import com.ferry.devops.api.dto.query.RunQuery;
 import com.ferry.devops.api.entity.App;
@@ -86,6 +86,9 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
     private static final int SEGMENT_LINES = 500;
     private static final int DEFAULT_LOG_LIMIT = 2000;
     private static final int PRE_CHECK_CONTENT_MAX = 500;
+    // 运行任务表的 executor 是 varchar，仅在创建运行快照时转换定义表的数字码。
+    private static final Map<Integer, String> EXECUTOR_NAMES = Map.of(
+            1, "jenkins", 2, "deployer", 3, "gate", 4, "release");
 
     private final RunMapper runMapper;
     private final PipelineMapper pipelineMapper;
@@ -599,12 +602,13 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
             stageMapper.insert(entity);
             int taskSort = 1;
             if (stage.getTasks() != null) {
-                for (PipelineTaskDTO task : stage.getTasks()) {
+                for (PipelineStageTaskDTO task : stage.getTasks()) {
                     RunStageTask runTask = new RunStageTask();
                     runTask.setRunId(runId);
                     runTask.setRunStageId(entity.getId());
                     runTask.setName(task.getName());
-                    runTask.setExecutor(task.getExecutor());
+                    Integer executor = task.getExecutor() == null ? IntConst.ONE : task.getExecutor();
+                    runTask.setExecutor(EXECUTOR_NAMES.getOrDefault(executor, "jenkins"));
                     runTask.setScriptRef(task.getScriptRef());
                     runTask.setScriptContent(task.getScriptContent());
                     runTask.setStatus(1);
@@ -653,7 +657,7 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
             }
             if (stage.getType() != null && stage.getType() <= 4) {
                 boolean hasCommand = stage.getTasks().stream()
-                        .filter(t -> t.getExecutor() == null || "jenkins".equalsIgnoreCase(t.getExecutor()))
+                        .filter(t -> t.getExecutor() == null || IntConst.ONE.equals(t.getExecutor()))
                         .anyMatch(t -> StrUtil.isNotBlank(t.getScriptContent())
                                 || StrUtil.isNotBlank(t.getScriptRef()));
                 if (!hasCommand) {

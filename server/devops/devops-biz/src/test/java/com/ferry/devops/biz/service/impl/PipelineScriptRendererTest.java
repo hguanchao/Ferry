@@ -2,7 +2,7 @@ package com.ferry.devops.biz.service.impl;
 
 import com.ferry.devops.api.dto.PipelineDefinitionDTO;
 import com.ferry.devops.api.dto.PipelineStageDTO;
-import com.ferry.devops.api.dto.PipelineTaskDTO;
+import com.ferry.devops.api.dto.PipelineStageTaskDTO;
 import com.ferry.devops.api.vo.PipelinePreviewVO;
 import org.junit.jupiter.api.Test;
 
@@ -18,8 +18,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class PipelineScriptRendererTest {
 
-    private PipelineTaskDTO task(String name, String executor, String scriptRef, String scriptContent) {
-        PipelineTaskDTO task = new PipelineTaskDTO();
+    private PipelineStageTaskDTO task(String name, Integer executor, String scriptRef, String scriptContent) {
+        PipelineStageTaskDTO task = new PipelineStageTaskDTO();
         task.setName(name);
         task.setExecutor(executor);
         task.setScriptRef(scriptRef);
@@ -27,13 +27,13 @@ class PipelineScriptRendererTest {
         return task;
     }
 
-    private PipelineStageDTO stage(int type, String name, String buildTool, Integer timeoutSeconds,
-                                   List<PipelineTaskDTO> tasks, List<String> outputs) {
+    private PipelineStageDTO stage(int type, String name, String buildTool, Integer timeout,
+                                   List<PipelineStageTaskDTO> tasks, String outputs) {
         PipelineStageDTO stage = new PipelineStageDTO();
         stage.setType(type);
         stage.setName(name);
         stage.setBuildTool(buildTool);
-        stage.setTimeoutSeconds(timeoutSeconds);
+        stage.setTimeout(timeout);
         stage.setTasks(tasks);
         stage.setOutputs(outputs);
         return stage;
@@ -48,9 +48,9 @@ class PipelineScriptRendererTest {
     @Test
     void 渲染完整pipeline包含检出与CI阶段_非jenkins任务与非CI阶段不进脚本() {
         PipelineDefinitionDTO definition = definition(
-                stage(1, "构建", "Maven", 600, List.of(task("打包", "jenkins", null, "mvn -B package")), null),
-                stage(2, "单元测试", null, null, List.of(task("单测", "jenkins", null, "mvn test")), null),
-                stage(5, "部署非生产", null, null, List.of(task("部署", "deployer", null, "deploy.sh")), null));
+                stage(1, "构建", "Maven", 600, List.of(task("打包", 1, null, "mvn -B package")), null),
+                stage(2, "单元测试", null, null, List.of(task("单测", 1, null, "mvn test")), null),
+                stage(5, "部署非生产", null, null, List.of(task("部署", 2, null, "deploy.sh")), null));
         String script = PipelineScriptRenderer.render(definition);
         assertTrue(script.contains("pipeline {"));
         assertTrue(script.contains("agent any"));
@@ -82,18 +82,18 @@ class PipelineScriptRendererTest {
     @Test
     void 命令中的单引号与反斜杠被转义且多行命令原样保留() {
         PipelineDefinitionDTO definition = definition(
-                stage(1, "构建", null, null, List.of(task("打包", "jenkins", null, "echo 'a\\b'")), null));
+                stage(1, "构建", null, null, List.of(task("打包", 1, null, "echo 'a\\b'")), null));
         String script = PipelineScriptRenderer.render(definition);
         assertTrue(script.contains("sh '''echo \\'a\\\\b\\'''"));
         PipelineDefinitionDTO multi = definition(
-                stage(1, "构建", null, null, List.of(task("打包", "jenkins", null, "set -e\nmvn package")), null));
+                stage(1, "构建", null, null, List.of(task("打包", 1, null, "set -e\nmvn package")), null));
         assertTrue(PipelineScriptRenderer.render(multi).contains("sh '''set -e\nmvn package'''"));
     }
 
     @Test
     void 任务名注释压成单行防止换行注入() {
         PipelineDefinitionDTO definition = definition(
-                stage(1, "构建", null, null, List.of(task("x\nsh '''evil'''", "jenkins", null, "echo hi")), null));
+                stage(1, "构建", null, null, List.of(task("x\nsh '''evil'''", 1, null, "echo hi")), null));
         String script = PipelineScriptRenderer.render(definition);
         assertTrue(script.contains("// 任务: x sh '''evil'''"));
         assertFalse(script.contains("// 任务: x\n"));
@@ -102,10 +102,36 @@ class PipelineScriptRendererTest {
     @Test
     void 制品入库阶段输出archiveArtifacts_buildTool仅作为注释() {
         PipelineDefinitionDTO definition = definition(
-                stage(4, "制品入库", "Maven", null, List.of(task("归档", "jenkins", null, "ls target")), List.of("target/*.jar")));
+                stage(4, "制品入库", "Maven", null, List.of(task("归档", 1, null, "ls target")), "target/*.jar"));
         String script = PipelineScriptRenderer.render(definition);
         assertTrue(script.contains("archiveArtifacts artifacts: 'target/*.jar', allowEmptyArchive: true"));
         assertTrue(script.contains("// 构建工具: Maven"));
+    }
+
+    @Test
+    void 产出物逗号分隔_逐项归档并忽略空路径() {
+        PipelineDefinitionDTO definition = definition(
+                stage(4, "制品入库", null, null, List.of(task("归档", 1, null, "ls target")),
+                        " target/*.jar, , dist/**, "));
+
+        String script = PipelineScriptRenderer.render(definition);
+
+        assertTrue(script.contains("archiveArtifacts artifacts: 'target/*.jar', allowEmptyArchive: true"));
+        assertTrue(script.contains("archiveArtifacts artifacts: 'dist/**', allowEmptyArchive: true"));
+        assertFalse(script.contains("archiveArtifacts artifacts: ''"));
+        assertFalse(PipelineScriptRenderer.preview(definition).getWarnings().stream()
+                .anyMatch(warning -> warning.contains("未配置产出物")));
+    }
+
+    @Test
+    void 产出物为空或只有分隔符_不归档且提示未配置() {
+        for (String outputs : new String[]{null, "", " , , "}) {
+            PipelinePreviewVO preview = PipelineScriptRenderer.preview(definition(
+                    stage(4, "制品入库", null, null, List.of(task("归档", 1, null, "ls target")), outputs)));
+
+            assertFalse(preview.getScript().contains("archiveArtifacts artifacts:"));
+            assertTrue(preview.getWarnings().stream().anyMatch(warning -> warning.contains("未配置产出物")));
+        }
     }
 
     @Test
@@ -121,8 +147,8 @@ class PipelineScriptRendererTest {
     void 预览脚本与同步脚本同源_仅附加告警() {
         PipelineDefinitionDTO definition = definition(
                 stage(1, "构建", null, null,
-                        List.of(task("打包", "jenkins", null, "mvn package"),
-                                task("空任务", "jenkins", null, null)),
+                        List.of(task("打包", 1, null, "mvn package"),
+                                task("空任务", 1, null, null)),
                         null));
         PipelinePreviewVO vo = PipelineScriptRenderer.preview(definition);
         assertEquals(PipelineScriptRenderer.render(definition), vo.getScript());
@@ -133,7 +159,7 @@ class PipelineScriptRendererTest {
     @Test
     void scriptRef任务生成提示注释并告警() {
         PipelineDefinitionDTO definition = definition(
-                stage(1, "构建", null, null, List.of(task("打包", "jenkins", "script/build.sh", null)), null));
+                stage(1, "构建", null, null, List.of(task("打包", 1, "script/build.sh", null)), null));
         PipelinePreviewVO vo = PipelineScriptRenderer.preview(definition);
         assertTrue(vo.getScript().contains("// 仅配置 scriptRef: script/build.sh"));
         assertTrue(vo.getWarnings().stream().anyMatch(w -> w.contains("只配置了 scriptRef")));
@@ -142,8 +168,8 @@ class PipelineScriptRendererTest {
     @Test
     void 渲染脚本整体括号配平_防止注入块引入语法回归() {
         PipelineDefinitionDTO definition = definition(
-                stage(1, "构建", "Maven", null, List.of(task("打包", "jenkins", null, "mvn -B package")), null),
-                stage(2, "单元测试", null, null, List.of(task("单测", "jenkins", null, "mvn test")), null));
+                stage(1, "构建", "Maven", null, List.of(task("打包", 1, null, "mvn -B package")), null),
+                stage(2, "单元测试", null, null, List.of(task("单测", 1, null, "mvn test")), null));
         String script = PipelineScriptRenderer.render(definition);
         // 括号守恒是脚本可编译的必要条件；此前 Checkout 曾因少一个 ] 导致整段脚本编译失败
         assertEquals(0, count(script, '(') - count(script, ')'));

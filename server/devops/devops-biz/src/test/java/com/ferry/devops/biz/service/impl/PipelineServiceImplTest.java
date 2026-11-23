@@ -3,16 +3,19 @@ package com.ferry.devops.biz.service.impl;
 import com.baomidou.mybatisplus.core.MybatisConfiguration;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.ferry.common.core.exception.ServiceException;
-import com.ferry.common.core.utils.JsonUtil;import com.ferry.devops.api.dto.PipelineDTO;
+import com.ferry.common.core.utils.JsonUtil;
+import com.ferry.devops.api.dto.PipelineDTO;
 import com.ferry.devops.api.dto.PipelineDefinitionDTO;
 import com.ferry.devops.api.dto.PipelineStageDTO;
-import com.ferry.devops.api.dto.PipelineTaskDTO;
+import com.ferry.devops.api.dto.PipelineStageTaskDTO;
 import com.ferry.devops.api.entity.Pipeline;
 import com.ferry.devops.api.enums.PipelineStatusEnum;
+import com.ferry.devops.api.vo.PipelineDefinitionVO;
+import com.ferry.devops.api.vo.PipelineStageVO;
 import com.ferry.devops.api.vo.VersionVO;
-import com.ferry.devops.biz.mapper.AppMapper;
 import com.ferry.devops.biz.mapper.PipelineMapper;
 import com.ferry.devops.biz.mapper.RunTriggerMapper;
+import com.ferry.devops.biz.service.IAppService;
 import com.ferry.devops.biz.service.IPipelineStageService;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
 import org.junit.jupiter.api.BeforeAll;
@@ -33,6 +36,8 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -49,7 +54,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * 流水线保存编排测试：新建建 V1、显式清空、内容未变更不建版本、启用约束与同步失败文案。
+ * 流水线服务测试：版本保存编排、定义响应、状态更新与同步失败文案。
  */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -66,7 +71,7 @@ class PipelineServiceImplTest {
     @Mock
     private RunTriggerMapper triggerMapper;
     @Mock
-    private AppMapper appMapper;
+    private IAppService appService;
 
     private PipelineServiceImpl service;
 
@@ -82,7 +87,7 @@ class PipelineServiceImplTest {
     void setUp() throws Exception {
         PlatformTransactionManager txManager = mock(PlatformTransactionManager.class);
         lenient().when(txManager.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
-        service = new PipelineServiceImpl(triggerMapper, pipelineStageService, appMapper, jobSyncService,
+        service = new PipelineServiceImpl(appService, jobSyncService, pipelineStageService, triggerMapper,
                 new TransactionTemplate(txManager));
         injectBaseMapper();
     }
@@ -114,9 +119,9 @@ class PipelineServiceImplTest {
     }
 
     private PipelineStageDTO ciStage(String taskName) {
-        PipelineTaskDTO task = new PipelineTaskDTO();
+        PipelineStageTaskDTO task = new PipelineStageTaskDTO();
         task.setName(taskName);
-        task.setExecutor("jenkins");
+        task.setExecutor(1);
         task.setScriptContent("mvn -B package");
         PipelineStageDTO stage = new PipelineStageDTO();
         stage.setType(1);
@@ -128,12 +133,6 @@ class PipelineServiceImplTest {
     private PipelineDefinitionDTO ciDefinition(String taskName) {
         PipelineDefinitionDTO definition = new PipelineDefinitionDTO();
         definition.setStages(List.of(ciStage(taskName)));
-        return definition;
-    }
-
-    private PipelineDefinitionDTO emptyDefinition() {
-        PipelineDefinitionDTO definition = new PipelineDefinitionDTO();
-        definition.setStages(List.of());
         return definition;
     }
 
@@ -246,28 +245,34 @@ class PipelineServiceImplTest {
     }
 
     @Test
-    void 启用未配置定义的流水线_直接拒绝() {
-        lenient().when(pipelineMapper.selectById(PIPELINE_ID)).thenAnswer(inv -> pipeline(1, PipelineStatusEnum.PENDING_CONFIG));
-        lenient().when(pipelineStageService.loadDefinition(PIPELINE_ID, 1)).thenReturn(emptyDefinition());
+    void 启用流水线_更新成功返回true() {
+        lenient().when(pipelineMapper.update(isNull(), any())).thenReturn(1);
 
-        ServiceException exception = assertThrows(ServiceException.class, () -> service.enable(PIPELINE_ID));
-
-        assertTrue(exception.getMessage().contains("定义未配置"));
+        assertTrue(service.changeStatus(PIPELINE_ID, PipelineStatusEnum.ENABLED.getCode()));
+        verify(jobSyncService, never()).sync(anyLong());
     }
 
     @Test
-    void 启用已配置流水线_同步失败时返回提示() {
-        lenient().when(pipelineMapper.selectById(PIPELINE_ID)).thenAnswer(inv -> pipeline(1, PipelineStatusEnum.DISABLED));
-        lenient().when(pipelineMapper.updateById(any(Pipeline.class))).thenReturn(1);
-        lenient().when(pipelineStageService.loadDefinition(PIPELINE_ID, 1)).thenReturn(ciDefinition("打包"));
-        lenient().when(jobSyncService.sync(PIPELINE_ID))
-                .thenReturn(new PipelineJobSyncService.SyncOutcome(false,
-                        PipelineStatusEnum.SYNC_FAILED.getCode(), "Jenkins 连接异常，结果待确认"));
+    void 变更状态未命中记录_返回false() {
+        assertFalse(service.changeStatus(PIPELINE_ID, PipelineStatusEnum.ENABLED.getCode()));
+    }
 
-        String message = service.enable(PIPELINE_ID);
+    @Test
+    void 停用流水线_更新成功返回true() {
+        lenient().when(pipelineMapper.update(isNull(), any())).thenReturn(1);
 
-        assertTrue(message.contains("启用成功"));
-        assertTrue(message.contains("同步失败"));
+        assertTrue(service.changeStatus(PIPELINE_ID, PipelineStatusEnum.DISABLED.getCode()));
+        verify(jobSyncService, never()).sync(anyLong());
+    }
+
+    @Test
+    void 不支持的目标状态_拒绝且不读取流水线() {
+        ServiceException exception = assertThrows(ServiceException.class,
+                () -> service.changeStatus(PIPELINE_ID, PipelineStatusEnum.SYNC_FAILED.getCode()));
+
+        assertTrue(exception.getMessage().contains("仅支持启用或停用"));
+        verify(pipelineMapper, never()).selectById(anyLong());
+        verify(jobSyncService, never()).sync(anyLong());
     }
 
     @Test
@@ -278,6 +283,23 @@ class PipelineServiceImplTest {
                         PipelineStatusEnum.SYNC_FAILED.getCode(), "更新 Jenkins Job 失败：HTTP 503"));
 
         assertEquals("同步失败：更新 Jenkins Job 失败：HTTP 503", service.sync(PIPELINE_ID));
+    }
+
+    @Test
+    void 查询历史定义_阶段响应复用阶段表查询结果() {
+        lenient().when(pipelineMapper.selectById(PIPELINE_ID)).thenReturn(pipeline(2, PipelineStatusEnum.ENABLED));
+        lenient().when(pipelineStageService.loadDefinitionJson(PIPELINE_ID, 1)).thenReturn("{\"stages\":[]}");
+        PipelineStageVO stage = new PipelineStageVO();
+        stage.setOutputs("target/*.jar,dist/**");
+        lenient().when(pipelineStageService.list(any(PipelineStageDTO.class))).thenReturn(List.of(stage));
+
+        PipelineDefinitionVO result = service.definition(PIPELINE_ID, 1L);
+
+        assertEquals(1, result.getVersionNo());
+        assertEquals("{\"stages\":[]}", result.getJson());
+        assertSame(stage, result.getStages().get(0));
+        verify(pipelineStageService).list(argThat((PipelineStageDTO query) ->
+                Long.valueOf(PIPELINE_ID).equals(query.getPipelineId()) && Integer.valueOf(1).equals(query.getVersion())));
     }
 
     @Test

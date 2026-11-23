@@ -83,7 +83,7 @@ export interface RepoCommitOption {
   authorName?: string
   committedAt?: string
 }
-export interface PipelineDefinition { json: string; yaml?: string; versionNo?: number }
+export interface PipelineDefinition { json: string; yaml?: string; versionNo?: number; stages?: PipelineStageRow[] }
 export interface ValidateResult { valid: boolean; errors: Array<{ line: number; message: string }> }
 /** 流水线脚本预览：script 与 Job 同步脚本同源 */
 export interface PipelinePreview {
@@ -95,21 +95,38 @@ export interface PipelineStageDef {
   type: number
   name: string
   buildTool?: string
-  timeoutSeconds?: number
+  timeout?: number
   tasks: PipelineTaskDef[]
-  outputs?: string[]
+  outputs?: string
+  pipelineId?: ID
+  version?: number
 }
-/** 流水线任务定义：与后端 PipelineTaskDTO 对应 */
+/** 流水线任务定义：与后端 PipelineStageTaskDTO 对应 */
 export interface PipelineTaskDef {
   name: string
-  executor: string
+  executor: number
   scriptRef?: string
   scriptContent?: string
-  params?: Record<string, unknown>
+  scriptParams?: string
+}
+/** 阶段响应：与后端 PipelineStageVO 及阶段表字段对应 */
+export interface PipelineStageRow extends Omit<PipelineStageDef, 'tasks'> {
+  id: ID
+  pipelineId: ID
+  version: number
+  sort: number
+  taskList?: PipelineStageTaskRow[]
+}
+/** 阶段任务响应：与后端 PipelineStageTaskVO 及任务表字段对应 */
+export interface PipelineStageTaskRow extends PipelineTaskDef {
+  id: ID
+  stageId: ID
+  version: number
+  sort: number
 }
 /** 流水线详情：复用列表字段，附带当前版本阶段/任务定义 */
 export interface PipelineDetail extends PipelineRow {
-  stages?: PipelineStageDef[]
+  stages?: PipelineStageRow[]
 }
 export interface DiffResult { left: string; right: string; lines: Array<{ type: string; leftNo?: number; rightNo?: number; text: string }> }
 export interface PrecheckItem { type: number; conclusion: number; detail?: string }

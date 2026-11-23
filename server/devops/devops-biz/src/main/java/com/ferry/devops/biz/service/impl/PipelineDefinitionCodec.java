@@ -1,5 +1,6 @@
 package com.ferry.devops.biz.service.impl;
 
+import com.ferry.common.core.constant.IntConst;
 import com.ferry.common.core.exception.ServiceException;
 import com.ferry.common.core.utils.JsonUtil;
 import com.ferry.common.core.utils.StrUtil;
@@ -88,18 +89,18 @@ final class PipelineDefinitionCodec {
                 } else if (!types.add(stage.getType())) {
                     errors.add(error(line, "阶段类型不能重复"));
                 }
-                if (stage.getTimeoutSeconds() != null
-                        && (stage.getTimeoutSeconds() < 60 || stage.getTimeoutSeconds() > 86400)) {
+                if (stage.getTimeout() != null
+                        && (stage.getTimeout() < 60 || stage.getTimeout() > 86400)) {
                     errors.add(error(line, "超时须在 60–86400 秒之间"));
                 }
-                List<com.ferry.devops.api.dto.PipelineTaskDTO> tasks = stage.getTasks();
+                List<com.ferry.devops.api.dto.PipelineStageTaskDTO> tasks = stage.getTasks();
                 int taskCount = tasks == null ? 0 : tasks.size();
                 if (taskCount > 30) {
                     errors.add(error(line, "单阶段任务数量不能超过 30"));
                 } else if (taskCount > 0 && stage.getType() != null && stage.getType() <= 4) {
-                    boolean hasJenkins = tasks.stream().anyMatch(t -> "jenkins".equalsIgnoreCase(t.getExecutor()));
+                    boolean hasJenkins = tasks.stream().anyMatch(t -> IntConst.ONE.equals(t.getExecutor()));
                     if (!hasJenkins) {
-                        errors.add(error(line, "前四类阶段须包含至少一个 executor=jenkins 的任务"));
+                        errors.add(error(line, "前四类阶段须包含至少一个 executor=1（Jenkins） 的任务"));
                     }
                 }
                 line++;

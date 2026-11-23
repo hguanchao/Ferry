@@ -30,10 +30,10 @@ const STAGE_COLORS: Record<number, string> = {
 }
 
 export const EXECUTORS = [
-  { value: 'jenkins', label: 'Jenkins' },
-  { value: 'deployer', label: '部署器' },
-  { value: 'gate', label: '门禁' },
-  { value: 'release', label: '发布' },
+  { value: 1, label: 'Jenkins' },
+  { value: 2, label: '部署器' },
+  { value: 3, label: '门禁' },
+  { value: 4, label: '发布' },
 ] as const
 
 /** 构建工具：仅作为阶段属性展示与后续 Agent/镜像选择依据，实际命令由任务脚本内容决定 */
@@ -45,7 +45,7 @@ export const BUILD_TOOLS = [
 ] as const
 
 const STAGE_LABEL = Object.fromEntries(STAGE_TYPES.map((s) => [s.value, s.label])) as Record<number, string>
-const EXECUTOR_LABEL = Object.fromEntries(EXECUTORS.map((e) => [e.value, e.label])) as Record<string, string>
+const EXECUTOR_LABEL = Object.fromEntries(EXECUTORS.map((e) => [e.value, e.label])) as Record<number, string>
 
 const CARD_W = 208
 const CARD_H = 96
@@ -150,9 +150,9 @@ export default function PipelineCanvasEditor({ value, onChange }: PipelineCanvas
       type,
       name: STAGE_LABEL[type],
       buildTool: '',
-      timeoutSeconds: 1800,
+      timeout: 1800,
       tasks: [],
-      outputs: [],
+      outputs: '',
     }
     update([...stages, stage])
     setSelection({ kind: 'stage', index: stages.length })
@@ -165,7 +165,7 @@ export default function PipelineCanvasEditor({ value, onChange }: PipelineCanvas
 
   const addTask = (stageIndex: number) => {
     const next = stages.map((s, i) => i === stageIndex
-      ? { ...s, tasks: [...(s.tasks ?? []), { name: '新任务', executor: 'jenkins', scriptRef: 'script' }] }
+      ? { ...s, tasks: [...(s.tasks ?? []), { name: '新任务', executor: 1, scriptRef: 'script' }] }
       : s)
     update(next)
     setSelection({ kind: 'task', stage: stageIndex, task: (stages[stageIndex].tasks ?? []).length })
@@ -438,7 +438,7 @@ export default function PipelineCanvasEditor({ value, onChange }: PipelineCanvas
                     </div>
                     <div className="ferry-canvas__card-name">{col.stage.name || '未命名阶段'}</div>
                     <div className="ferry-canvas__card-meta">
-                      <span className="ferry-canvas__meta-item">{col.stage.timeoutSeconds ?? 1800}s</span>
+                      <span className="ferry-canvas__meta-item">{col.stage.timeout ?? 1800}s</span>
                       <span className="ferry-canvas__meta-item">{col.stage.tasks?.length ?? 0} 任务</span>
                     </div>
                     <Button type="text" size="small" danger className="ferry-canvas__card-del"
@@ -531,15 +531,13 @@ export default function PipelineCanvasEditor({ value, onChange }: PipelineCanvas
               </label>
               <label className="ferry-canvas__field">
                 <span>超时（秒，60–86400）</span>
-                <InputNumber min={60} max={86400} style={{ width: '100%' }} value={selectedStage.timeoutSeconds ?? 1800}
-                  onChange={(v) => patchStage(selection.index, { timeoutSeconds: v ?? 1800 })} />
+                <InputNumber min={60} max={86400} style={{ width: '100%' }} value={selectedStage.timeout ?? 1800}
+                  onChange={(v) => patchStage(selection.index, { timeout: v ?? 1800 })} />
               </label>
               <label className="ferry-canvas__field">
                 <span>产出物（逗号分隔）</span>
-                <Input value={(selectedStage.outputs ?? []).join(',')} placeholder="例如 target/*.jar, dist/**"
-                  onChange={(e) => patchStage(selection.index, {
-                    outputs: e.target.value.split(',').map((s) => s.trim()).filter(Boolean),
-                  })} />
+                <Input value={selectedStage.outputs ?? ''} placeholder="例如 target/*.jar, dist/**"
+                  onChange={(e) => patchStage(selection.index, { outputs: e.target.value })} />
               </label>
             </div>
           )}

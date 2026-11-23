@@ -12,7 +12,6 @@ import com.ferry.common.jdbc.provider.Page;
 import com.ferry.devops.api.dto.PipelineDTO;
 import com.ferry.devops.api.dto.PipelineDefinitionDTO;
 import com.ferry.devops.api.dto.PipelineStageDTO;
-import com.ferry.devops.api.dto.PipelineTaskDTO;
 import com.ferry.devops.api.dto.query.PipelineQuery;
 import com.ferry.devops.api.entity.App;
 import com.ferry.devops.api.entity.Pipeline;
@@ -22,7 +21,6 @@ import com.ferry.devops.api.vo.DiffVO;
 import com.ferry.devops.api.vo.PipelineDefinitionVO;
 import com.ferry.devops.api.vo.PipelinePreviewVO;
 import com.ferry.devops.api.vo.PipelineStageVO;
-import com.ferry.devops.api.vo.PipelineTaskVO;
 import com.ferry.devops.api.vo.PipelineVO;
 import com.ferry.devops.api.vo.TriggerRecordVO;
 import com.ferry.devops.api.vo.ValidateResultVO;
@@ -30,6 +28,7 @@ import com.ferry.devops.api.vo.VersionVO;
 import com.ferry.devops.biz.mapper.AppMapper;
 import com.ferry.devops.biz.mapper.PipelineMapper;
 import com.ferry.devops.biz.mapper.RunTriggerMapper;
+import com.ferry.devops.biz.service.IAppService;
 import com.ferry.devops.biz.service.IPipelineService;
 import com.ferry.devops.biz.service.IPipelineStageService;
 import lombok.RequiredArgsConstructor;
@@ -55,10 +54,11 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class PipelineServiceImpl extends ServiceImpl<PipelineMapper, Pipeline> implements IPipelineService {
-    private final RunTriggerMapper triggerMapper;
-    private final IPipelineStageService pipelineStageService;
-    private final AppMapper appMapper;
+    private final IAppService appService;
     private final PipelineJobSyncService jobSyncService;
+    private final IPipelineStageService pipelineStageService;
+
+    private final RunTriggerMapper triggerMapper;
     private final TransactionTemplate transactionTemplate;
 
     /** 同流水线版本递增的分段锁（单实例内存锁） */
@@ -76,17 +76,18 @@ public class PipelineServiceImpl extends ServiceImpl<PipelineMapper, Pipeline> i
             throw new ServiceException("流水线不存在");
         }
         PipelineVO vo = BeanUtil.copy(pipeline, PipelineVO.class);
-        App app = appMapper.selectById(pipeline.getAppId());
+        App app = appService.getById(pipeline.getAppId());
         if (app != null) {
             vo.setAppName(app.getName());
             vo.setRepoBranch(app.getRepoBranch());
         }
-        if (pipeline.getVersion() != null && pipeline.getVersion() > 0) {
-            PipelineDefinitionDTO definition = pipelineStageService.loadDefinition(id, pipeline.getVersion());
-            if (definition.getStages() != null) {
-                vo.setStages(definition.getStages().stream().map(this::stageVo).collect(Collectors.toList()));
-                vo.setStageCount(definition.getStages().size());
-            }
+        PipelineStageDTO stageDTO = new PipelineStageDTO();
+        stageDTO.setPipelineId(pipeline.getId());
+        stageDTO.setVersion(pipeline.getVersion());
+        List<PipelineStageVO> stageVOList = pipelineStageService.list(stageDTO);
+        if (CollUtil.isNotEmpty(stageVOList)) {
+            vo.setStages(stageVOList);
+            vo.setStageCount(stageVOList.size());
         }
         return vo;
     }
@@ -144,26 +145,13 @@ public class PipelineServiceImpl extends ServiceImpl<PipelineMapper, Pipeline> i
     }
 
     @Override
-    public String enable(Long id) {
-        Pipeline pipeline = requirePipeline(id);
-        PipelineDefinitionDTO definition = pipelineStageService.loadDefinition(
-                id, pipeline.getVersion() == null ? 0 : pipeline.getVersion());
-        if (definition.getStages() == null || definition.getStages().isEmpty()) {
-            throw new ServiceException("流水线定义未配置，无法启用");
+    public boolean changeStatus(Long id, Integer status) {
+        if (!PipelineStatusEnum.ENABLED.getCode().equals(status)
+                && !PipelineStatusEnum.DISABLED.getCode().equals(status)) {
+            throw new ServiceException("流水线状态仅支持启用或停用");
         }
-        pipeline.setStatus(PipelineStatusEnum.ENABLED.getCode());
-        updateById(pipeline);
-        PipelineJobSyncService.SyncOutcome outcome = jobSyncService.sync(id);
-        return composeMessage("启用成功", outcome);
-    }
-
-    @Override
-    public String disable(Long id) {
-        Pipeline pipeline = requirePipeline(id);
-        pipeline.setStatus(PipelineStatusEnum.DISABLED.getCode());
-        updateById(pipeline);
-        PipelineJobSyncService.SyncOutcome outcome = jobSyncService.sync(id);
-        return composeMessage("停用成功", outcome);
+        return update(Wrappers.<Pipeline>lambdaUpdate()
+                .set(Pipeline::getStatus, status).eq(Pipeline::getId, id));
     }
 
     /**
@@ -184,10 +172,10 @@ public class PipelineServiceImpl extends ServiceImpl<PipelineMapper, Pipeline> i
         PipelineDefinitionVO vo = new PipelineDefinitionVO();
         vo.setVersionNo(version);
         vo.setJson(json);
-        PipelineDefinitionDTO dto = pipelineStageService.loadDefinition(id, version);
-        if (dto.getStages() != null) {
-            vo.setStages(dto.getStages().stream().map(this::stageVo).collect(Collectors.toList()));
-        }
+        PipelineStageDTO stageDTO = new PipelineStageDTO();
+        stageDTO.setPipelineId(id);
+        stageDTO.setVersion(version);
+        vo.setStages(pipelineStageService.list(stageDTO));
         return vo;
     }
 
@@ -351,29 +339,6 @@ public class PipelineServiceImpl extends ServiceImpl<PipelineMapper, Pipeline> i
             return base;
         }
         return base + "，但 Jenkins 同步失败：" + outcome.message() + "，可稍后重试同步";
-    }
-
-    private PipelineStageVO stageVo(PipelineStageDTO stage) {
-        PipelineStageVO vo = new PipelineStageVO();
-        vo.setType(stage.getType());
-        vo.setName(stage.getName());
-        vo.setBuildTool(stage.getBuildTool());
-        vo.setTimeoutSeconds(stage.getTimeoutSeconds());
-        vo.setOutputs(stage.getOutputs());
-        if (stage.getTasks() != null) {
-            List<PipelineTaskVO> tasks = new ArrayList<>();
-            for (PipelineTaskDTO task : stage.getTasks()) {
-                PipelineTaskVO taskVo = new PipelineTaskVO();
-                taskVo.setName(task.getName());
-                taskVo.setExecutor(task.getExecutor());
-                taskVo.setScriptRef(task.getScriptRef());
-                taskVo.setScriptContent(task.getScriptContent());
-                taskVo.setParams(task.getParams());
-                tasks.add(taskVo);
-            }
-            vo.setTasks(tasks);
-        }
-        return vo;
     }
 
     /**

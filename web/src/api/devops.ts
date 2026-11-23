@@ -61,8 +61,8 @@ export const pipelineApi = {
   detail: (id: string) => get<PipelineDetail>(`${B}/pipeline/detail`, { id }),
   save: (body: Record<string, unknown>) => post<string>(`${B}/pipeline/save`, body),
   deleted: (ids: string[]) => post<string>(`${B}/pipeline/deleted`, ids),
-  enable: (body: Record<string, unknown>) => post<string>(`${B}/pipeline/enable`, body),
-  disable: (body: Record<string, unknown>) => post<string>(`${B}/pipeline/disable`, body),
+  changeStatus: (id: string, status: number) =>
+    post<string>(`${B}/pipeline/changeStatus`, {}, { params: { id, status } }),
   definition: (id: string, versionId?: string) => get<PipelineDefinition>(`${B}/pipeline/definition`, { id, versionId }),
   validateDefinition: (body: Record<string, unknown>) => post<ValidateResult>(`${B}/pipeline/definition/validate`, body),
   previewDefinition: (body: Record<string, unknown>) => post<PipelinePreview>(`${B}/pipeline/definition/preview`, body),

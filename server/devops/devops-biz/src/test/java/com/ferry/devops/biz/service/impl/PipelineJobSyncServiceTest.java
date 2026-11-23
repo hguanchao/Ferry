@@ -3,7 +3,7 @@ package com.ferry.devops.biz.service.impl;
 import com.ferry.common.core.exception.ServiceException;
 import com.ferry.devops.api.dto.PipelineDefinitionDTO;
 import com.ferry.devops.api.dto.PipelineStageDTO;
-import com.ferry.devops.api.dto.PipelineTaskDTO;
+import com.ferry.devops.api.dto.PipelineStageTaskDTO;
 import com.ferry.devops.api.entity.App;
 import com.ferry.devops.api.entity.Pipeline;
 import com.ferry.devops.api.enums.PipelineStatusEnum;
@@ -80,9 +80,9 @@ class PipelineJobSyncServiceTest {
     }
 
     private PipelineDefinitionDTO definitionWithCiStage() {
-        PipelineTaskDTO task = new PipelineTaskDTO();
+        PipelineStageTaskDTO task = new PipelineStageTaskDTO();
         task.setName("打包");
-        task.setExecutor("jenkins");
+        task.setExecutor(1);
         task.setScriptContent("mvn -B package");
         PipelineStageDTO stage = new PipelineStageDTO();
         stage.setType(1);

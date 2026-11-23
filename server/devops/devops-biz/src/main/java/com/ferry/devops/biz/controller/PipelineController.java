@@ -3,11 +3,13 @@ package com.ferry.devops.biz.controller;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.ferry.common.cache.annotation.Idempotent;
 import com.ferry.common.core.http.R;
+import com.ferry.common.core.utils.ObjUtil;
 import com.ferry.common.security.annotation.PreAuthorize;
 import com.ferry.devops.api.dto.PipelineDTO;
 import com.ferry.devops.api.dto.PipelinePreviewDTO;
 import com.ferry.devops.api.dto.RunTriggerDTO;
 import com.ferry.devops.api.dto.query.PipelineQuery;
+import com.ferry.devops.api.enums.PipelineStatusEnum;
 import com.ferry.devops.api.vo.DiffVO;
 import com.ferry.devops.api.vo.PipelineDefinitionVO;
 import com.ferry.devops.api.vo.PipelinePreviewVO;
@@ -72,18 +74,13 @@ public class PipelineController {
         return R.data(service.deleted(ids));
     }
 
-    @PostMapping("/enable")
-    @PreAuthorize("devops:pipeline:enable")
-    @Operation(summary = "流水线-启用并同步 Job")
-    public R<String> enable(@RequestBody PipelineDTO body) {
-        return R.data(service.enable(body.getId()));
-    }
-
-    @PostMapping("/disable")
-    @PreAuthorize("devops:pipeline:disable")
-    @Operation(summary = "流水线-停用并同步 Job")
-    public R<String> disable(@RequestBody PipelineDTO body) {
-        return R.data(service.disable(body.getId()));
+    @PostMapping("/changeStatus")
+    @PreAuthorize("devops:pipeline:changeStatus")
+    @Operation(summary = "流水线-变更状态")
+    public R<String> changeStatus(@RequestParam("id") Long id, @RequestParam("status") Integer status) {
+        boolean isSuccess = service.changeStatus(id, status);
+        String title = PipelineStatusEnum.ENABLED.getCode().equals(status) ? "启用" : "停用";
+        return isSuccess ? R.success(title + "成功") : R.fail(title + "失败");
     }
 
     @PostMapping("/sync")

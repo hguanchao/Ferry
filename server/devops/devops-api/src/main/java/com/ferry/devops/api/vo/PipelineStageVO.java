@@ -1,5 +1,6 @@
 package com.ferry.devops.api.vo;
 
+import com.ferry.devops.api.entity.PipelineStageTask;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
@@ -11,21 +12,33 @@ import java.util.List;
 @Data
 public class PipelineStageVO {
 
-    @Schema(description = "阶段类型 1–8")
+    @Schema(name = "数据id")
+    private Long id;
+
+    @Schema(name = "阶段类型", description = "1构建 2单测 3静态扫描 4制品入库 5部署非生产 6集成测试 7准入 8生产发布")
     private Integer type;
 
-    @Schema(description = "阶段名")
+    @Schema(name = "阶段名称")
     private String name;
 
-    @Schema(description = "构建工具，如 Maven/Node/Gradle")
+    @Schema(name = "构建工具", description = "Maven/Node/Gradle")
     private String buildTool;
 
-    @Schema(description = "超时秒数")
-    private Integer timeoutSeconds;
+    @Schema(name = "版本号")
+    private Integer version;
 
-    @Schema(description = "任务列表")
-    private List<PipelineTaskVO> tasks;
+    @Schema(name = "超时秒数")
+    private Integer timeout;
 
-    @Schema(description = "产出物")
-    private List<String> outputs;
+    @Schema(name = "产出物")
+    private String outputs;
+
+    @Schema(name = "流水线id")
+    private Long pipelineId;
+
+    @Schema(name = "排序号")
+    private Integer sort;
+
+    @Schema(name = "阶段任务列表")
+    private List<PipelineStageTaskVO> taskList;
 }
