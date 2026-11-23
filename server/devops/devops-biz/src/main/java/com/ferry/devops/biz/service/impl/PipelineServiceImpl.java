@@ -17,13 +17,9 @@ import com.ferry.devops.api.dto.query.PipelineQuery;
 import com.ferry.devops.api.entity.App;
 import com.ferry.devops.api.entity.Pipeline;
 import com.ferry.devops.api.enums.PipelineStatusEnum;
-import com.ferry.devops.api.vo.DiffVO;
-import com.ferry.devops.api.vo.PipelinePreviewVO;
 import com.ferry.devops.api.vo.PipelineStageVO;
 import com.ferry.devops.api.vo.PipelineVO;
-import com.ferry.devops.api.vo.ValidateResultVO;
 import com.ferry.devops.api.vo.VersionVO;
-import com.ferry.devops.biz.mapper.AppMapper;
 import com.ferry.devops.biz.mapper.PipelineMapper;
 import com.ferry.devops.biz.service.IAppService;
 import com.ferry.devops.biz.service.IPipelineService;
@@ -33,11 +29,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
-import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.Collectors;
 
 /**
  * 流水线服务实现：定义落库到阶段/任务三表，并编排 Jenkins Job 同步。
@@ -149,87 +142,16 @@ public class PipelineServiceImpl extends ServiceImpl<PipelineMapper, Pipeline> i
     }
 
     /**
-     * Jenkins Job 同步重试入口：对同步失败（或停用待补齐禁用位）的流水线重新执行同步编排。
-     */
-    @Override
-    public String sync(Long id) {
-        requirePipeline(id);
-        PipelineJobSyncService.SyncOutcome outcome = jobSyncService.sync(id);
-        return outcome.synced() ? "同步成功" : "同步失败：" + outcome.message();
-    }
-
-    @Override
-    public ValidateResultVO validateDefinition(String definition, Integer mode) {
-        return PipelineDefinitionCodec.validate(definition, mode);
-    }
-
-    @Override
-    public PipelinePreviewVO previewDefinition(String definition, Integer mode) {
-        if (Integer.valueOf(2).equals(mode)) {
-            throw new ServiceException("YAML 模式暂不支持脚本预览，请切换到表单模式");
-        }
-        return PipelineScriptRenderer.preview(PipelineDefinitionCodec.decode(definition));
-    }
-
-    /**
-     * 保存定义生成新版本（编辑器定义保存）：校验 → 版本落库（内容未变更不建版本）→ 同步。
-     */
-    @Override
-    public VersionVO saveDefinition(Long id, String definition, Integer mode, String changeNote) {
-        Pipeline pipeline = requirePipeline(id);
-        PipelineDefinitionDTO dto = PipelineDefinitionCodec.decode(definition);
-        ValidateResultVO result = PipelineDefinitionCodec.validateDto(dto, false);
-        if (!Boolean.TRUE.equals(result.getValid())) {
-            throw new ServiceException("流水线定义校验不通过：" + result.getErrors().get(0).getMessage());
-        }
-        boolean changed = persistDefinition(pipeline, dto.getStages());
-        PipelineJobSyncService.SyncOutcome outcome = null;
-        // 内容变更必须同步；未变更时若不是已同步启用态（失败重试/待配置补齐）也执行同步
-        if (changed || !PipelineStatusEnum.ENABLED.getCode().equals(pipeline.getStatus())) {
-            outcome = jobSyncService.sync(id);
-        }
-        return versionVo(id, changeNote, outcome, pipeline.getStatus());
-    }
-
-    @Override
-    public IPage<VersionVO> versionPage(Long pipelineId, Long current, Long size) {
-        List<Integer> versions = pipelineStageService.listVersions(pipelineId);
-        long total = versions.size();
-        long cur = current == null ? 1 : current;
-        long sz = size == null ? 20 : size;
-        int from = (int) Math.min((cur - 1) * sz, total);
-        int to = (int) Math.min(from + sz, total);
-        List<VersionVO> records = versions.subList(from, to).stream().map(v -> {
-            VersionVO vo = new VersionVO();
-            vo.setPipelineId(pipelineId);
-            vo.setVersionNo(v);
-            return vo;
-        }).collect(Collectors.toList());
-        IPage<VersionVO> result = new com.baomidou.mybatisplus.extension.plugins.pagination.Page<>(cur, sz, total);
-        result.setRecords(records);
-        return result;
-    }
-
-    @Override
-    public DiffVO versionDiff(Long leftId, Long rightId) {
-        Pipeline pipeline = requirePipeline(leftId);
-        String left = pipelineStageService.loadDefinitionJson(pipeline.getId(), leftId.intValue());
-        String right = pipelineStageService.loadDefinitionJson(pipeline.getId(), rightId.intValue());
-        DiffVO vo = new DiffVO();
-        vo.setLeft(left);
-        vo.setRight(right);
-        vo.setLines(lineDiff(left, right));
-        return vo;
-    }
-
-    /**
      * 版本回退：复制旧版本内容为新当前版本（版本号推进、内容回退）并同步 Jenkins。
      *
      * <p>旧版本运行断点重跑也经由该方法先回退到运行时版本，避免新脚本跑旧阶段快照。
      */
     @Override
     public VersionVO rollback(Long id, Long versionId, String changeNote) {
-        Pipeline pipeline = requirePipeline(id);
+        Pipeline pipeline = getById(id);
+        if (pipeline == null) {
+            throw new ServiceException("流水线不存在");
+        }
         int target = versionId.intValue();
         if (!pipelineStageService.listVersions(id).contains(target)) {
             throw new ServiceException("回退版本不存在");
@@ -302,51 +224,5 @@ public class PipelineServiceImpl extends ServiceImpl<PipelineMapper, Pipeline> i
         vo.setChangeNote(changeNote);
         vo.setStatus(outcome == null ? fallbackStatus : outcome.status());
         return vo;
-    }
-
-    /**
-     * 简单行级 diff：按行比较，标注新增/删除/未变。
-     */
-    private List<DiffVO.DiffLine> lineDiff(String left, String right) {
-        String[] leftLines = (left == null ? "" : left).split("\\R", -1);
-        String[] rightLines = (right == null ? "" : right).split("\\R", -1);
-        List<DiffVO.DiffLine> lines = new ArrayList<>();
-        int max = Math.max(leftLines.length, rightLines.length);
-        for (int i = 0; i < max; i++) {
-            String l = i < leftLines.length ? leftLines[i] : null;
-            String r = i < rightLines.length ? rightLines[i] : null;
-            DiffVO.DiffLine line = new DiffVO.DiffLine();
-            if (l != null && r != null && l.equals(r)) {
-                line.setType("unchanged");
-                line.setText(l);
-            } else if (l == null) {
-                line.setType("added");
-                line.setRightNo(i + 1);
-                line.setText(r);
-            } else if (r == null) {
-                line.setType("removed");
-                line.setLeftNo(i + 1);
-                line.setText(l);
-            } else {
-                line.setType("removed");
-                line.setLeftNo(i + 1);
-                line.setText(l);
-                DiffVO.DiffLine added = new DiffVO.DiffLine();
-                added.setType("added");
-                added.setRightNo(i + 1);
-                added.setText(r);
-                lines.add(added);
-            }
-            lines.add(line);
-        }
-        return lines;
-    }
-
-    private Pipeline requirePipeline(Long id) {
-        Pipeline pipeline = getById(id);
-        if (pipeline == null) {
-            throw new ServiceException("流水线不存在");
-        }
-        return pipeline;
     }
 }

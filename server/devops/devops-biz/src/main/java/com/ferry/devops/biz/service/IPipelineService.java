@@ -5,10 +5,7 @@ import com.ferry.common.jdbc.base.IService;
 import com.ferry.devops.api.dto.PipelineDTO;
 import com.ferry.devops.api.dto.query.PipelineQuery;
 import com.ferry.devops.api.entity.Pipeline;
-import com.ferry.devops.api.vo.DiffVO;
-import com.ferry.devops.api.vo.PipelinePreviewVO;
 import com.ferry.devops.api.vo.PipelineVO;
-import com.ferry.devops.api.vo.ValidateResultVO;
 import com.ferry.devops.api.vo.VersionVO;
 
 import java.util.List;
@@ -29,17 +26,8 @@ public interface IPipelineService extends IService<Pipeline> {
 
     boolean changeStatus(Long id, Integer status);
 
-    String sync(Long id);
-
-    ValidateResultVO validateDefinition(String definition, Integer mode);
-
-    PipelinePreviewVO previewDefinition(String definition, Integer mode);
-
-    VersionVO saveDefinition(Long id, String definition, Integer mode, String changeNote);
-
-    IPage<VersionVO> versionPage(Long pipelineId, Long current, Long size);
-
-    DiffVO versionDiff(Long leftId, Long rightId);
-
+    /**
+     * 回退到指定历史版本（复制为新版本）：供断点重跑恢复运行时脚本快照。
+     */
     VersionVO rollback(Long id, Long versionId, String changeNote);
 }

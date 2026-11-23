@@ -24,7 +24,7 @@ import org.springframework.stereotype.Service;
  *
  * <p>渲染与配置页预览共用 {@link PipelineScriptRenderer#render}，保证“预览即所得”。
  * 数据库与 Jenkins 不宣称原子事务：同步失败时定义已落库，落同步失败状态并返回失败结果，
- * 可通过 {@code /pipeline/sync} 重试；失败详情仅记日志（脱敏），不落库。
+ * 重新保存流水线可触发再次同步；失败详情仅记日志（脱敏），不落库。
  */
 @Slf4j
 @Service

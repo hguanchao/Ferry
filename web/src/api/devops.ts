@@ -5,12 +5,12 @@ import type {
   ActionCatalogRow, ActionRecordRow, AiFeedbackRow, AiOutputRow, AppAiLevelRow,
   AppOption, AppOverview, AppDependencyRow, AppRow, ArtifactRow, GateBaseline,
   ChangeTicketRow, CleanPolicyRow, CleanTaskRow, ClosureRow, DeployBatchRow,
-  DeployRecordRow, DiffResult, EnvironmentRow, EnvConfigRow, GateExemption,
+  DeployRecordRow, EnvironmentRow, EnvConfigRow, GateExemption,
   RunStageGate, GateRule, ImpactResult, MetricRow, NotifyChannelRow, NotifyTemplateRow,
-  OpenTokenRow, PipelineDetail, PipelinePreview, PipelineRow, PipelineVersionRow, PrecheckResult,
+  OpenTokenRow, PipelineDetail, PipelineRow, PrecheckResult,
   PrecheckResultVO, ReleaseDetail, ReleaseRecordRow, ReleaseRow, ReleaseStrategyRow,
   RepoCommitOption, RiskResult, RollbackCandidate, RollbackRow, RunDetail, Run, StageStat, StoragePolicyRow,
-  TechDebtRow, RunTrigger, TriggerResult, ValidateResult,
+  TechDebtRow, RunTrigger, TriggerResult,
   WizardProgress,
 } from './types-devops'
 
@@ -63,14 +63,6 @@ export const pipelineApi = {
   deleted: (ids: string[]) => post<string>(`${B}/pipeline/deleted`, ids),
   changeStatus: (id: string, status: number) =>
     post<string>(`${B}/pipeline/changeStatus`, {}, { params: { id, status } }),
-  validateDefinition: (body: Record<string, unknown>) => post<ValidateResult>(`${B}/pipeline/definition/validate`, body),
-  previewDefinition: (body: Record<string, unknown>) => post<PipelinePreview>(`${B}/pipeline/definition/preview`, body),
-  saveDefinition: (body: Record<string, unknown>) => post<PipelineVersionRow>(`${B}/pipeline/definition/save`, body),
-  /** Jenkins Job 同步重试：保存/启停同步失败后调用 */
-  syncRetry: (id: string) => post<string>(`${B}/pipeline/sync`, { id }),
-  versionPage: (pipelineId: string, current = 1, size = 20) => get<ApiPage<PipelineVersionRow>>(`${B}/pipeline/version/pageList`, { pipelineId, current, size }),
-  versionDiff: (leftId: string, rightId: string) => get<DiffResult>(`${B}/pipeline/version/diff`, { leftId, rightId }),
-  versionRollback: (body: Record<string, unknown>) => post<PipelineVersionRow>(`${B}/pipeline/version/rollback`, body),
   triggerPrecheck: (body: Record<string, unknown>) => post<PrecheckResult>(`${B}/run/trigger/precheck`, body),
   triggerBranches: (appId: string) => get<string[]>(`${B}/run/trigger/branches`, { appId }, { silent: true }),
   triggerCommits: (appId: string, branch: string, limit = 10) =>

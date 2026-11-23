@@ -14,6 +14,7 @@ import com.ferry.common.core.constant.IntConst;
 import com.ferry.common.core.exception.ServiceException;
 import com.ferry.common.core.utils.BeanUtil;
 import com.ferry.common.core.utils.ObjUtil;
+import com.ferry.common.core.utils.RegexUtil;
 import com.ferry.common.core.utils.StrUtil;
 import com.ferry.common.jdbc.base.ServiceImpl;
 import com.ferry.common.jdbc.provider.Page;
@@ -79,7 +80,8 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 @Service
 @RequiredArgsConstructor
 public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunService {
-    private static final Pattern COMMIT_PATTERN = Pattern.compile("^[0-9a-fA-F]{7,40}$");
+    /** 提交 id：7-40 位十六进制（零散规则，统一定义在 RegexUtil 常量侧维护） */
+    private static final String COMMIT_REGEX = "^[0-9a-fA-F]{7,40}$";
     private static final Pattern REF_PATTERN = Pattern.compile("^[^\\s~^:?*\\[\\\\]{1,100}$");
     private static final Pattern SECRET_PATTERN = Pattern.compile(
             "(?i)(password|passwd|token|secret|access[_-]?key|secret[_-]?key|api[_-]?key)\\s*[:=]\\s*\\S+");
@@ -553,7 +555,7 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
         if (Integer.valueOf(2).equals(refType)) {
             return REF_PATTERN.matcher(commit).matches();
         }
-        return COMMIT_PATTERN.matcher(commit).matches();
+        return RegexUtil.matches(COMMIT_REGEX, commit);
     }
 
     /**

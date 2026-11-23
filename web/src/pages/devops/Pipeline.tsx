@@ -1,16 +1,16 @@
 import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import { App, Alert, AutoComplete, Button, Drawer, Form, Input, Modal, Select, Tag, Tooltip, type TableColumnsType } from 'antd'
+import { App, AutoComplete, Button, Drawer, Form, Input, Modal, Select, Tag, Tooltip, type TableColumnsType } from 'antd'
 import FerryTable from '@/components/FerryTable'
 import {
-  CirclePause, CirclePlay, Code2, Pencil, Play, Plus, RotateCw,
+  CirclePause, CirclePlay, Pencil, Play, Plus, RotateCw,
   Search, Trash2,
 } from 'lucide-react'
 import PageHeader from '@/components/PageHeader'
 import PipelineCanvasEditor from '@/components/PipelineCanvasEditor'
 import { appApi, pipelineApi } from '@/api/devops'
-import type { AppOption, PipelinePreview, PipelineRow, PipelineStageDef, PipelineStageRow, PrecheckResult, TriggerResult } from '@/api/types-devops'
+import type { AppOption, PipelineRow, PipelineStageDef, PipelineStageRow, PrecheckResult, TriggerResult } from '@/api/types-devops'
 import { useAuthStore } from '@/stores/auth'
 import { showError } from '@/lib/notify'
 import { useDebouncedValue } from '@/lib/debounce'
@@ -38,11 +38,6 @@ interface TriggerValues {
 
 interface TriggerPrecheck extends PrecheckResult {
   values: TriggerValues
-}
-
-/** stages -> definition JSON，与后端 PipelineDefinitionDTO 结构一致 */
-function buildDefinition(stages: PipelineStageDef[]): string {
-  return JSON.stringify({ schemaVersion: 1, stages })
 }
 
 /** detail 返回的阶段(VO) -> 画布阶段定义：taskList 映射为 tasks */
@@ -92,8 +87,6 @@ export default function Pipeline() {
   const [filters, setFilters] = useState<Record<string, unknown>>({})
   const [page, setPage] = useState({ current: 1, size: 30 })
   const [stages, setStages] = useState<PipelineStageDef[]>([])
-  const [previewOpen, setPreviewOpen] = useState(false)
-  const [preview, setPreview] = useState<PipelinePreview | null>(null)
   // 用户是否手动改过画布：为 true 时定义回填不再覆盖草稿（防缓存回填吞掉草稿）
   const draftDirtyRef = useRef(false)
 
@@ -172,7 +165,6 @@ export default function Pipeline() {
 
   const invalidate = () => {
     void queryClient.invalidateQueries({ queryKey: ['pipelines'] })
-    void queryClient.invalidateQueries({ queryKey: ['pipeline-definition'] })
   }
 
   // 保存：单一请求同时提交档案与 stages（空数组=显式清空旧脚本），后端内容比对决定是否生成新版本并同步 Job
@@ -191,35 +183,9 @@ export default function Pipeline() {
     },
     onError: showError,
   })
-  const previewMutation = useMutation({
-    mutationFn: () => pipelineApi.previewDefinition({ definition: buildDefinition(stages), mode: 1 }),
-    onSuccess: (result) => {
-      setPreview(result)
-      setPreviewOpen(true)
-    },
-    onError: showError,
-  })
-  const copyPreviewScript = async () => {
-    if (!preview?.script) return
-    try {
-      await navigator.clipboard.writeText(preview.script)
-      message.success('脚本已复制')
-    } catch {
-      message.error('复制失败，请手动选择文本')
-    }
-  }
   const deleteMutation = useMutation({
     mutationFn: (ids: string[]) => pipelineApi.deleted(ids),
     onSuccess: (text) => { message.success(text || '删除成功'); invalidate() },
-    onError: showError,
-  })
-  const syncMutation = useMutation({
-    mutationFn: (id: string) => pipelineApi.syncRetry(id),
-    onSuccess: (text) => {
-      if (text?.includes('同步失败')) message.warning(text)
-      else message.success(text || '同步成功')
-      invalidate()
-    },
     onError: showError,
   })
   const changeStatusMutation = useMutation({
@@ -267,11 +233,11 @@ export default function Pipeline() {
     && precheck.values.commitId === currentTriggerValues.commitId
     && precheck.values.refType === currentTriggerValues.refType
 
-  // 关闭编辑器：失效当前流水线的定义缓存，保证下次打开拉到最新版本（避免旧缓存回填）
+  // 关闭编辑器：失效当前流水线的详情缓存，保证下次打开拉到最新版本（避免旧缓存回填）
   const closeEditor = () => {
     setOpen(false)
     draftDirtyRef.current = false
-    if (editing) void queryClient.invalidateQueries({ queryKey: ['pipeline-definition', editing.id] })
+    if (editing) void queryClient.invalidateQueries({ queryKey: ['pipeline-detail', editing.id] })
   }
 
   const openEditor = (record: PipelineRow | null) => {
@@ -379,12 +345,6 @@ export default function Pipeline() {
                 onClick={() => changeStatusMutation.mutate({ id: record.id, status: 0 })} />
             </Tooltip>
           )}
-          {can('devops:pipeline:save') && record.status === 3 && (
-            <Tooltip title="重新同步 Jenkins Job">
-              <Button type="link" size="small" icon={<RotateCw size={15} />}
-                onClick={() => syncMutation.mutate(record.id)} />
-            </Tooltip>
-          )}
           {can('devops:pipeline:deleted') && (
             <Tooltip title="删除">
               <Button type="link" size="small" danger icon={<Trash2 size={15} />}
@@ -445,9 +405,6 @@ export default function Pipeline() {
         destroyOnHidden styles={{ body: { padding: 0, display: 'flex', flexDirection: 'column' } }}
         extra={
           <div style={{ display: 'flex', gap: 8 }}>
-            <Button icon={<Code2 size={14} />} loading={previewMutation.isPending}
-              disabled={!!editing && detailQuery.isFetching}
-              onClick={() => previewMutation.mutate()}>预览脚本</Button>
             <Button onClick={closeEditor}>取消</Button>
             <Button type="primary" loading={saveMutation.isPending}
               disabled={!!editing && (detailQuery.isPending || detailQuery.isFetching)}
@@ -477,28 +434,6 @@ export default function Pipeline() {
           </div>
         </div>
       </Drawer>
-
-      <Modal open={previewOpen} title="脚本预览（基于当前定义）" width={900} destroyOnHidden
-        onCancel={() => setPreviewOpen(false)}
-        footer={[
-          <Button key="copy" onClick={copyPreviewScript}>复制脚本</Button>,
-          <Button key="close" type="primary" onClick={() => setPreviewOpen(false)}>关闭</Button>,
-        ]}>
-        {preview?.warnings?.length ? (
-          <Alert type="warning" showIcon style={{ marginBottom: 12 }} message="预览告警"
-            description={
-              <ul style={{ margin: 0, paddingLeft: 18 }}>
-                {preview.warnings.map((warning, index) => <li key={index}>{warning}</li>)}
-              </ul>
-            } />
-        ) : null}
-        <pre className="ferry-mono" style={{
-          background: 'var(--bg-subtle)', padding: 16, borderRadius: 8, margin: 0,
-          maxHeight: 560, overflow: 'auto', whiteSpace: 'pre-wrap', fontSize: 12,
-        }}>
-          {preview?.script ?? ''}
-        </pre>
-      </Modal>
 
       <Modal
         open={triggerOpen}

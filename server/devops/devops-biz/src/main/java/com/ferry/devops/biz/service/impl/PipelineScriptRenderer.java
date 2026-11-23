@@ -5,7 +5,6 @@ import com.ferry.common.core.utils.StrUtil;
 import com.ferry.devops.api.dto.PipelineDefinitionDTO;
 import com.ferry.devops.api.dto.PipelineStageDTO;
 import com.ferry.devops.api.dto.PipelineStageTaskDTO;
-import com.ferry.devops.api.vo.PipelinePreviewVO;
 import com.ferry.devops.biz.gate.GateReportContract;
 
 import java.util.ArrayList;
@@ -57,16 +56,6 @@ final class PipelineScriptRenderer {
         script.append("    }\n");
         script.append("}\n");
         return script.toString();
-    }
-
-    /**
-     * 预览：脚本与 Job 同步完全同源，仅附加告警（空命令、缺产出物等），预览不触发 Jenkins。
-     */
-    static PipelinePreviewVO preview(PipelineDefinitionDTO definition) {
-        PipelinePreviewVO vo = new PipelinePreviewVO();
-        vo.setScript(render(definition));
-        vo.setWarnings(collectWarnings(definition));
-        return vo;
     }
 
     /**
@@ -154,55 +143,6 @@ final class PipelineScriptRenderer {
         } else {
             script.append("                // 未配置执行命令，本任务不执行任何内容\n");
         }
-    }
-
-    /**
-     * 收集预览告警，口径与 render() 完全一致。
-     */
-    private static List<String> collectWarnings(PipelineDefinitionDTO definition) {
-        List<String> warnings = new ArrayList<>();
-        List<PipelineStageDTO> ciStages = selectCiStages(definition);
-        if (ciStages.isEmpty()) {
-            warnings.add("当前定义没有可下发的 CI 阶段（构建/单元测试/静态扫描/制品入库）");
-            return warnings;
-        }
-        for (PipelineStageDTO stage : ciStages) {
-            boolean hasJenkinsTask = false;
-            if (stage.getTasks() != null) {
-                for (PipelineStageTaskDTO task : stage.getTasks()) {
-                    if (task.getExecutor() != null && !IntConst.ONE.equals(task.getExecutor())) {
-                        continue;
-                    }
-                    hasJenkinsTask = true;
-                    if (StrUtil.isBlank(task.getScriptContent())) {
-                        if (StrUtil.isNotBlank(task.getScriptRef())) {
-                            warnings.add("阶段「" + stage.getName() + "」任务「" + task.getName()
-                                    + "」只配置了 scriptRef，不会自动加载执行");
-                        } else {
-                            warnings.add("阶段「" + stage.getName() + "」任务「" + task.getName()
-                                    + "」未配置执行命令");
-                        }
-                    }
-                }
-            }
-            if (!hasJenkinsTask) {
-                warnings.add("阶段「" + stage.getName() + "」没有 Jenkins 任务");
-            }
-            if (stage.getType() == 2) {
-                warnings.add("单元测试阶段「" + stage.getName() + "」需产出 "
-                        + GateReportContract.UNIT_TEST_REPORT_PATH
-                        + "，否则门禁判数据获取失败；测试命令执行完成应退出 0，不达标写入报告");
-            }
-            if (stage.getType() == 3) {
-                warnings.add("静态扫描阶段「" + stage.getName() + "」需产出 "
-                        + GateReportContract.SCAN_REPORT_PATH
-                        + "，否则门禁判数据获取失败；扫描命令执行完成应退出 0，不达标写入报告");
-            }
-            if (stage.getType() == 4 && splitOutputs(stage.getOutputs()).isEmpty()) {
-                warnings.add("制品入库阶段「" + stage.getName() + "」未配置产出物路径");
-            }
-        }
-        return warnings;
     }
 
     private static List<String> splitOutputs(String outputs) {

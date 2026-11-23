@@ -3,7 +3,6 @@ package com.ferry.devops.biz.service.impl;
 import com.ferry.devops.api.dto.PipelineDefinitionDTO;
 import com.ferry.devops.api.dto.PipelineStageDTO;
 import com.ferry.devops.api.dto.PipelineStageTaskDTO;
-import com.ferry.devops.api.vo.PipelinePreviewVO;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -119,50 +118,31 @@ class PipelineScriptRendererTest {
         assertTrue(script.contains("archiveArtifacts artifacts: 'target/*.jar', allowEmptyArchive: true"));
         assertTrue(script.contains("archiveArtifacts artifacts: 'dist/**', allowEmptyArchive: true"));
         assertFalse(script.contains("archiveArtifacts artifacts: ''"));
-        assertFalse(PipelineScriptRenderer.preview(definition).getWarnings().stream()
-                .anyMatch(warning -> warning.contains("未配置产出物")));
     }
 
     @Test
-    void 产出物为空或只有分隔符_不归档且提示未配置() {
+    void 产出物为空或只有分隔符_不归档() {
         for (String outputs : new String[]{null, "", " , , "}) {
-            PipelinePreviewVO preview = PipelineScriptRenderer.preview(definition(
+            String script = PipelineScriptRenderer.render(definition(
                     stage(4, "制品入库", null, null, List.of(task("归档", 1, null, "ls target")), outputs)));
 
-            assertFalse(preview.getScript().contains("archiveArtifacts artifacts:"));
-            assertTrue(preview.getWarnings().stream().anyMatch(warning -> warning.contains("未配置产出物")));
+            assertFalse(script.contains("archiveArtifacts artifacts:"));
         }
     }
 
     @Test
-    void 空定义渲染最小脚本_预览告警提示无可下发阶段() {
+    void 空定义渲染最小脚本() {
         String script = PipelineScriptRenderer.render(new PipelineDefinitionDTO());
         assertFalse(script.contains("stage("));
         assertTrue(script.contains("agent any"));
-        PipelinePreviewVO vo = PipelineScriptRenderer.preview(new PipelineDefinitionDTO());
-        assertTrue(vo.getWarnings().stream().anyMatch(w -> w.contains("没有可下发的 CI 阶段")));
     }
 
     @Test
-    void 预览脚本与同步脚本同源_仅附加告警() {
-        PipelineDefinitionDTO definition = definition(
-                stage(1, "构建", null, null,
-                        List.of(task("打包", 1, null, "mvn package"),
-                                task("空任务", 1, null, null)),
-                        null));
-        PipelinePreviewVO vo = PipelineScriptRenderer.preview(definition);
-        assertEquals(PipelineScriptRenderer.render(definition), vo.getScript());
-        assertTrue(vo.getWarnings().stream().anyMatch(w -> w.contains("未配置执行命令")));
-        assertFalse(vo.getWarnings().isEmpty());
-    }
-
-    @Test
-    void scriptRef任务生成提示注释并告警() {
+    void scriptRef任务生成提示注释() {
         PipelineDefinitionDTO definition = definition(
                 stage(1, "构建", null, null, List.of(task("打包", 1, "script/build.sh", null)), null));
-        PipelinePreviewVO vo = PipelineScriptRenderer.preview(definition);
-        assertTrue(vo.getScript().contains("// 仅配置 scriptRef: script/build.sh"));
-        assertTrue(vo.getWarnings().stream().anyMatch(w -> w.contains("只配置了 scriptRef")));
+        String script = PipelineScriptRenderer.render(definition);
+        assertTrue(script.contains("// 仅配置 scriptRef: script/build.sh"));
     }
 
     @Test

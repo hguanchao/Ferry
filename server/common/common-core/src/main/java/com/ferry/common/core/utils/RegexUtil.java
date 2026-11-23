@@ -18,14 +18,37 @@ public final class RegexUtil {
     private static final Pattern PHONE = Pattern.compile("^1[3-9]\\d{9}$");
 
     /**
-     * 仓库地址：http(s) 协议且以 .git 结尾
+     * 整数：可带正负号，不含小数点
      */
-    private static final Pattern REPO_URL = Pattern.compile("^https?://\\S+\\.git$");
+    private static final Pattern NUMERIC = Pattern.compile("^[+-]?\\d+$");
 
     /**
-     * 提交 id：7-40 位十六进制
+     * 小数：可带正负号，必须含小数点
      */
-    private static final Pattern COMMIT_ID = Pattern.compile("^[0-9a-fA-F]{7,40}$");
+    private static final Pattern DECIMAL = Pattern.compile("^[+-]?\\d+\\.\\d+$");
+
+    /**
+     * 邮箱：常规 本地部分@域名.顶级域 格式
+     */
+    private static final Pattern EMAIL = Pattern.compile(
+            "^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$");
+
+    /**
+     * URL：http(s) 协议，主机部分不含空白
+     */
+    private static final Pattern URL = Pattern.compile("^https?://[^\\s]+$");
+
+    /**
+     * IPv4：四段 0-255
+     */
+    private static final Pattern IPV4 = Pattern.compile(
+            "^((25[0-5]|2[0-4]\\d|1\\d{2}|[1-9]?\\d)\\.){3}(25[0-5]|2[0-4]\\d|1\\d{2}|[1-9]?\\d)$");
+
+    /**
+     * UUID：8-4-4-4-12 十六进制
+     */
+    private static final Pattern UUID = Pattern.compile(
+            "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$");
 
     /**
      * 零散正则的编译缓存，避免同一规则重复编译
@@ -49,29 +72,81 @@ public final class RegexUtil {
     }
 
     /**
-     * 校验仓库地址
+     * 校验整数（可带正负号，不含小数点）
      *
      * @param value 待校验值
      * @return 是否匹配
      */
-    public static boolean isRepoUrl(String value) {
+    public static boolean isNumeric(String value) {
         if (StrUtil.isBlank(value)) {
             return false;
         }
-        return REPO_URL.matcher(value).matches();
+        return NUMERIC.matcher(value).matches();
     }
 
     /**
-     * 校验提交 id
+     * 校验小数（可带正负号，必须含小数点）
      *
      * @param value 待校验值
      * @return 是否匹配
      */
-    public static boolean isCommitId(String value) {
+    public static boolean isDecimal(String value) {
         if (StrUtil.isBlank(value)) {
             return false;
         }
-        return COMMIT_ID.matcher(value).matches();
+        return DECIMAL.matcher(value).matches();
+    }
+
+    /**
+     * 校验邮箱
+     *
+     * @param value 待校验值
+     * @return 是否匹配
+     */
+    public static boolean isEmail(String value) {
+        if (StrUtil.isBlank(value)) {
+            return false;
+        }
+        return EMAIL.matcher(value).matches();
+    }
+
+    /**
+     * 校验 http/https 地址
+     *
+     * @param value 待校验值
+     * @return 是否匹配
+     */
+    public static boolean isUrl(String value) {
+        if (StrUtil.isBlank(value)) {
+            return false;
+        }
+        return URL.matcher(value).matches();
+    }
+
+    /**
+     * 校验 IPv4 地址
+     *
+     * @param value 待校验值
+     * @return 是否匹配
+     */
+    public static boolean isIpv4(String value) {
+        if (StrUtil.isBlank(value)) {
+            return false;
+        }
+        return IPV4.matcher(value).matches();
+    }
+
+    /**
+     * 校验 UUID
+     *
+     * @param value 待校验值
+     * @return 是否匹配
+     */
+    public static boolean isUuid(String value) {
+        if (StrUtil.isBlank(value)) {
+            return false;
+        }
+        return UUID.matcher(value).matches();
     }
 
     /**

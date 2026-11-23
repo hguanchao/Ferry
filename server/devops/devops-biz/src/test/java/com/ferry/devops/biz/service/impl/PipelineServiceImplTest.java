@@ -282,29 +282,6 @@ class PipelineServiceImplTest {
     }
 
     @Test
-    void 同步重试入口_返回失败原因() {
-        lenient().when(pipelineMapper.selectById(PIPELINE_ID)).thenAnswer(inv -> pipeline(1, PipelineStatusEnum.SYNC_FAILED));
-        lenient().when(jobSyncService.sync(PIPELINE_ID))
-                .thenReturn(new PipelineJobSyncService.SyncOutcome(false,
-                        PipelineStatusEnum.SYNC_FAILED.getCode(), "更新 Jenkins Job 失败：HTTP 503"));
-
-        assertEquals("同步失败：更新 Jenkins Job 失败：HTTP 503", service.sync(PIPELINE_ID));
-    }
-
-    @Test
-    void 定义保存内容未变更且已同步_不建版本不重复同步() {
-        lenient().when(pipelineMapper.selectById(PIPELINE_ID)).thenAnswer(inv -> pipeline(2, PipelineStatusEnum.ENABLED));
-        lenient().when(pipelineStageService.loadDefinition(PIPELINE_ID, 2)).thenReturn(ciDefinition("打包"));
-
-        VersionVO vo = service.saveDefinition(PIPELINE_ID, JsonUtil.toJson(ciDefinition("打包")), 1, "画布编辑");
-
-        verify(pipelineStageService, never()).saveDefinition(anyLong(), anyInt(), any());
-        verify(jobSyncService, never()).sync(anyLong());
-        assertEquals(2, vo.getVersionNo());
-        assertEquals(PipelineStatusEnum.ENABLED.getCode(), vo.getStatus());
-    }
-
-    @Test
     void 回退到旧版本_复制为新当前版本并同步() {
         // 版本号用状态桩模拟 CAS 递增，保证 versionVo 回读读到新版本
         AtomicInteger version = new AtomicInteger(3);
