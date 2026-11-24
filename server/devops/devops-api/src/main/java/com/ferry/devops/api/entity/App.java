@@ -48,7 +48,12 @@ public class App extends BaseEntity implements Serializable {
     /** 仓库git地址 */
     private String repoUrl;
 
-    /** 仓库访问令牌 */
+    /**
+     * 仓库访问令牌（落库 AES 密文，接口不返回明文，列表仅返回掩码）。
+     *
+     * <p>用途：仅作为应用档案登记的私有仓库凭据占位；当前 Jenkins Job 触发使用全局
+     * ferry.devops.jenkins.git-credentials-id，不使用本字段，后续可按应用接入独立凭据时再消费。
+     */
     private String repoToken;
 
     /** 应用状态 0停用 1启用 2草稿 3完善 */

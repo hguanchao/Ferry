@@ -3,15 +3,14 @@ import { get, post } from './client'
 import type { ApiPage } from './types'
 import type {
   ActionCatalogRow, ActionRecordRow, AiFeedbackRow, AiOutputRow, AppAiLevelRow,
-  AppOption, AppOverview, AppRow, ArtifactRow, GateBaseline,
+  AppOption, AppRow, ArtifactRow, GateBaseline,
   ChangeTicketRow, CleanPolicyRow, CleanTaskRow, ClosureRow, DeployBatchRow,
   DeployRecordRow, EnvironmentRow, EnvConfigRow, GateExemption,
   RunStageGate, GateRule, ImpactResult, MetricRow, NotifyChannelRow, NotifyTemplateRow,
   OpenTokenRow, PipelineDetail, PipelineRow, PrecheckResult,
   PrecheckResultVO, ReleaseDetail, ReleaseRecordRow, ReleaseRow, ReleaseStrategyRow,
   RepoCommitOption, RiskResult, RollbackCandidate, RollbackRow, RunDetail, Run, StageStat, StoragePolicyRow,
-  TechDebtRow, TriggerResult,
-  WizardProgress,
+  TechDebtRow, TriggerResult, VersionResult,
 } from './types-devops'
 
 const B = '/ferry-devops'
@@ -31,10 +30,7 @@ export const appApi = {
         repoBranch: r.repoBranch,
         repoCommitId: r.repoCommitId,
       }))),
-  // TODO(dev_app-schema): dev_app_repo、dev_app_dependency、核心链路审批已删除，对应接口已移除。
-  saveWizardStep: (body: Record<string, unknown>) => post<string>(`${B}/app/wizard/saveStep`, body),
-  wizardProgress: (id: string) => get<WizardProgress>(`${B}/app/wizard/progress`, { id }),
-  overview: (id: string) => get<AppOverview>(`${B}/app/aggregate/overview`, { id }),
+  // TODO(dev_app-schema): dev_app_repo、dev_app_dependency、核心链路审批、接入向导已删除，对应接口已移除。
 }
 
 export const envApi = {
@@ -54,7 +50,8 @@ export const envConfigApi = {
 export const pipelineApi = {
   pageList: (body: Record<string, unknown>) => post<ApiPage<PipelineRow>>(`${B}/pipeline/pageList`, body),
   detail: (id: string) => get<PipelineDetail>(`${B}/pipeline/detail`, { id }),
-  save: (body: Record<string, unknown>) => post<string>(`${B}/pipeline/save`, body),
+  save: (body: Record<string, unknown>) => post<VersionResult>(`${B}/pipeline/save`, body),
+  retrySync: (id: string) => post<VersionResult>(`${B}/pipeline/retrySync`, {}, { params: { id } }),
   deleted: (ids: string[]) => post<string>(`${B}/pipeline/deleted`, ids),
   changeStatus: (id: string, status: number) =>
     post<string>(`${B}/pipeline/changeStatus`, {}, { params: { id, status } }),

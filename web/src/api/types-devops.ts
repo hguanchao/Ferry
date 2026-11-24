@@ -29,9 +29,6 @@ export interface AppOption {
   repoBranch?: string
   repoCommitId?: string
 }
-export interface WizardProgress { appId: ID; completedSteps: number[]; skippedSteps: number[]; status: number }
-export interface AppOverview { appId: ID; pipelineCount: number; envCount: number; runningCount: number; prodArtifactDigest?: string; prodDeployType?: string; blockers: Array<Record<string, unknown>> }
-
 /* ------------------------------ 环境 ------------------------------ */
 export interface EnvironmentRow {
   id: ID
@@ -112,6 +109,7 @@ export interface PipelineDetail extends PipelineRow {
 }
 export interface PrecheckItem { type: number; conclusion: number; detail?: string }
 export interface PrecheckResult { items: PrecheckItem[]; canTrigger: boolean; aiPassed?: boolean; aiReason?: string }
+export interface VersionResult { pipelineId: string; versionNo: number; changeNote?: string; status: number; synced?: boolean | null; message?: string | null }
 export interface TriggerResult { result: string; runId?: ID; artifactDigest?: string; message: string }
 
 /* ------------------------------ 运行 ------------------------------ */

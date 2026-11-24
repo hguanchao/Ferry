@@ -40,6 +40,7 @@
                a.repo_commit_id AS repoCommitId,
                a.`status`       AS status,
                a.description    AS description,
+               CASE WHEN a.repo_token IS NOT NULL AND a.repo_token <> '' THEN '******' ELSE NULL END AS repoTokenMask,
                a.create_time    AS createTime
         FROM dev_app a
                  LEFT JOIN sys_dept d ON d.id = a.dept_id AND d.is_deleted = 0

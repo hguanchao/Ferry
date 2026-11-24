@@ -30,17 +30,8 @@ public interface AuthConst {
     Set<String> DEFAULT_EXCLUDE_PATH = CollUtil.asSet(
             "/login",
             "/**/captcha",
-            // 内部接口由网关挡住外部访问，这里放行是因为服务间调用不带令牌。
-            // 登记的是具体路径而不是 /internal/**：新增内部接口要显式加一行，避免一条通配把业务接口也放进来。
-            // Jenkins 结果回传走公开回调：不携带登录令牌，由回调控制器自行做签名校验。
-            // 网关侧 /internal/** 仍对外部关闭，回调路径不受影响。
             "/callback/**",
             "/internal/user/auth",
-            // 交付域内部接口：服务间调用不带令牌，由网关 InternalPathFilter 挡住外部访问。
-            "/internal/app/options",
-            "/internal/app/owner",
-            "/internal/environment/options",
-            // 登录页选择租户用，此时还没有会话，标注权限会直接 401。
             "/tenant/list",
             "/actuator/health",
             "/v3/api-docs/**",

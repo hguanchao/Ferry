@@ -126,7 +126,8 @@ export default function RunDetail() {
     enabled: !!runId,
     refetchInterval: (q) => {
       const status = (q.state.data as RunDetail | undefined)?.run?.status
-      return status === 1 || status === 2 || status === 3 || status === 8 ? 5000 : false
+      // 1排队 2运行中 3阻塞为活跃态；8预检未通过是终态，不再轮询
+      return status === 1 || status === 2 || status === 3 ? 5000 : false
     },
   })
   const rerunPlanQuery = useQuery({
@@ -138,7 +139,10 @@ export default function RunDetail() {
     queryKey: ['run-gate', runId],
     queryFn: () => gateApi.resultList(runId!),
     enabled: !!runId,
-    refetchInterval: 5000,
+    refetchInterval: () => {
+      const status = detailQuery.data?.run?.status
+      return status === 1 || status === 2 || status === 3 ? 5000 : false
+    },
   })
 
   const invalidate = () => {
@@ -203,7 +207,7 @@ export default function RunDetail() {
     { title: '来源', dataIndex: 'source', ellipsis: true, render: (v?: string) => v || '—' },
     { title: '原因', dataIndex: 'fetchError', ellipsis: true, render: (v?: string) => v || '—' },
     { title: '操作', width: 100, align: 'center',
-      render: (_: unknown, r) => r.status === 2 && can('devops:run:detail') && (
+      render: (_: unknown, r) => r.status === 2 && can('devops:gateExemption:apply') && (
         <Button type="link" size="small" onClick={() => setExemptTarget(r)}>申请豁免</Button>
       ) },
   ]
@@ -297,6 +301,18 @@ export default function RunDetail() {
               onChange: (current, size) => setRunPage({ current, size }),
             }}
           />
+        </div>
+      )}
+
+      {runId && detailQuery.isError && (
+        <div className="ferry-panel">
+          <div style={{ padding: 24 }}>
+            <div style={{ marginBottom: 12 }}>运行详情加载失败：{detailQuery.error?.message || '无权限或运行不存在'}</div>
+            <Space>
+              <Button onClick={() => void detailQuery.refetch()}>重试</Button>
+              <Button onClick={backToList}>返回列表</Button>
+            </Space>
+          </div>
         </div>
       )}
 
@@ -422,8 +438,14 @@ export default function RunDetail() {
       )}
 
       <Modal open={abortOpen} title="中止运行" onCancel={() => setAbortOpen(false)}
-        onOk={() => abortMutation.mutate({ id: runId, reason: abortReason })} okText="确认中止"
-        okButtonProps={{ danger: true }} confirmLoading={abortMutation.isPending}>
+        onOk={() => {
+          if (abortReason.trim().length < 10) {
+            message.warning('中止原因不少于 10 字')
+            return
+          }
+          abortMutation.mutate({ id: runId, reason: abortReason })
+        }} okText="确认中止"
+        okButtonProps={{ danger: true, disabled: abortReason.trim().length < 10 }} confirmLoading={abortMutation.isPending}>
         <div style={{ color: 'var(--text-2)', marginBottom: 8 }}>中止后不可恢复，已产出制品保留不删除。请输入中止原因（不少于 10 字）：</div>
         <Input.TextArea rows={3} value={abortReason} onChange={(e) => setAbortReason(e.target.value)} />
       </Modal>
@@ -447,7 +469,14 @@ export default function RunDetail() {
       </Modal>
 
       <Modal open={!!exemptTarget} title="申请门禁豁免" onCancel={() => setExemptTarget(null)}
-        onOk={() => exemptMutation.mutate()} okText="确认豁免" confirmLoading={exemptMutation.isPending}>
+        onOk={() => {
+          if (exemptReason.trim().length < 20) {
+            message.warning('豁免理由不少于 20 字')
+            return
+          }
+          exemptMutation.mutate()
+        }} okText="确认豁免"
+        okButtonProps={{ disabled: exemptReason.trim().length < 20 }} confirmLoading={exemptMutation.isPending}>
         <div style={{ color: 'var(--text-2)', marginBottom: 8 }}>
           规则：{RULE_TYPE[exemptTarget?.ruleType ?? 0] ?? '—'}；理由不少于 20 字，有效期不超过 72 小时。
         </div>

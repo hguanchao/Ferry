@@ -8,7 +8,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
 /**
- * 应用列表项
+ * 应用列表项。
  */
 @Data
 public class AppVO {
@@ -47,23 +47,14 @@ public class AppVO {
     @Schema(description = "仓库提交id")
     private String repoCommitId;
 
+    @Schema(description = "仓库访问令牌掩码（固定 ******，明文不回显）")
+    private String repoTokenMask;
+
     @Schema(description = "应用描述")
     private String description;
 
     @Schema(description = "应用状态 0停用 1启用 2草稿 3完善")
     private Integer status;
-
-    @Schema(description = "生产部署类型")
-    private String prodDeployTypes;
-
-    @Schema(description = "流水线数")
-    private Integer pipelineCount;
-
-    @Schema(description = "最近运行状态")
-    private Integer lastRunStatus;
-
-    @Schema(description = "最近运行时间")
-    private String lastRunTime;
 
     @Schema(description = "创建时间")
     @JsonFormat(pattern = DateUtil.NORM_DATETIME_PATTERN)

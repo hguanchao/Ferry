@@ -112,6 +112,9 @@ export default function Pipeline() {
     enabled: open && !!editing?.id,
     retry: false,
   })
+  useEffect(() => {
+    if (detailQuery.isError) showError(detailQuery.error)
+  }, [detailQuery.isError, detailQuery.error])
 
   const rows = query.data?.records ?? []
   const appOptions = appOptionsQuery.data ?? []
@@ -155,13 +158,28 @@ export default function Pipeline() {
   // 保存：单一请求同时提交档案与 stages（空数组=显式清空旧脚本），后端内容比对决定是否生成新版本并同步 Job
   const saveMutation = useMutation({
     mutationFn: async (values: Record<string, unknown>) => {
+      // 详情加载失败时禁止保存，避免用空画布产生"版本变了内容没变"的幽灵版本
+      if (editing && detailQuery.isError) {
+        throw new Error('流水线详情加载失败，请刷新后重试，切勿保存')
+      }
+      if (stages.length === 0) {
+        throw new Error('请至少保留一个阶段后再保存')
+      }
+      // 画布任务必须有可执行脚本，否则运行期必失败
+      for (const stage of stages) {
+        for (const task of stage.tasks ?? []) {
+          if (!task.scriptContent?.trim() && !task.scriptRef?.trim()) {
+            throw new Error(`阶段「${stage.name}」的任务「${task.name}」未配置脚本内容`)
+          }
+        }
+      }
       const text = await pipelineApi.save({ ...values, stages })
       return text
     },
-    onSuccess: (text) => {
-      // 同步失败已在服务端落「同步失败」状态并记日志：提示但不算保存失败
-      if (text?.includes('同步失败')) message.warning(text)
-      else message.success(text || '保存成功')
+    onSuccess: (result) => {
+      // 同步失败已在服务端落「同步失败」状态：提示但不算保存失败
+      if (result?.synced === false) message.warning(result.message || '定义已保存，但 Jenkins 同步失败，请重试同步')
+      else message.success(`保存成功，版本 v${result?.versionNo ?? ''}`)
       draftDirtyRef.current = false
       closeEditor()
       invalidate()
@@ -364,7 +382,7 @@ export default function Pipeline() {
           <div style={{ display: 'flex', gap: 8 }}>
             <Button onClick={closeEditor}>取消</Button>
             <Button type="primary" loading={saveMutation.isPending}
-              disabled={!!editing && (detailQuery.isPending || detailQuery.isFetching)}
+              disabled={!!editing && (detailQuery.isPending || detailQuery.isFetching || detailQuery.isError)}
               onClick={() => form.submit()}>保存</Button>
           </div>
         }>
@@ -376,7 +394,7 @@ export default function Pipeline() {
               paddingLeft: 8, borderLeft: '3px solid var(--color-primary)' }}>基础信息</div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '0 16px' }}>
               <Form.Item name="appId" label="所属应用" rules={[{ required: true, message: '请选择应用' }]}>
-                <Select showSearch allowClear placeholder="选择应用"
+                <Select showSearch allowClear disabled={!!editing} placeholder="选择应用"
                   loading={appOptionsQuery.isLoading}
                   options={(appOptionsQuery.data ?? []).map((a: AppOption) => ({ value: a.value, label: `${a.label}（${a.code}）` }))}
                 />
@@ -482,10 +500,10 @@ export default function Pipeline() {
               filterOption={(input, option) =>
                 String(option?.value ?? '').toLowerCase().includes(input.toLowerCase())}
               notFoundContent={triggerBranchesQuery.isFetching ? '加载中…' : '无匹配分支，可直接输入'}
-              onSelect={() => {
+              onChange={() => {
+                // 分支变化后旧提交可能不属于新分支，清空避免用错分支+错误提交触发
                 triggerForm.setFieldsValue({ commitId: undefined })
-                }}
-              onChange={() => undefined}
+              }}
             />
           </Form.Item>
           <Form.Item

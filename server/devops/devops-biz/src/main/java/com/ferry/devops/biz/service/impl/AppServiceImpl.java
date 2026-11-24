@@ -48,7 +48,11 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements IAppS
     @Override
     @Transactional(rollbackFor = Exception.class)
     public boolean save(AppDTO body) {
-        checkCode(body.getCode(), body.getId());
+        long count = count(Wrappers.<App>lambdaQuery().eq(App::getCode, body.getCode())
+                .ne(ObjUtil.isNotEmpty(body.getId()), App::getId, body.getId()));
+        if (count > IntConst.ZERO) {
+            throw new ServiceException("应用编码已存在，请更换");
+        }
         if (ObjUtil.isNotEmpty(body.getId())) {
             App app = getById(body.getId());
             if (app == null) {
@@ -57,7 +61,6 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements IAppS
             if (!ObjUtil.equals(app.getCode(), body.getCode())) {
                 throw new ServiceException("应用编码创建后不可修改");
             }
-            // 列表/详情不回显 repoToken，编辑表单提交空值时保留已存令牌，防止误清空
             if (StrUtil.isBlank(body.getRepoToken())) {
                 body.setRepoToken(app.getRepoToken());
             }
@@ -65,7 +68,6 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements IAppS
         App app = BeanUtil.copy(body, App.class);
         boolean isSuccess = saveOrUpdate(app);
         if (isSuccess) {
-            // Job 与应用同生命周期：Jenkins 失败即整体回滚，应用不落库，用户重试
             JenkinsJob job = new JenkinsJob();
             job.setName(JenkinsJobNames.appJobName(app.getCode()));
             job.setAppCode(app.getCode().trim());
@@ -74,15 +76,12 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements IAppS
             job.setRepoUrl(app.getRepoUrl());
             job.setRepoName(app.getName());
             if (ObjUtil.isNotEmpty(body.getId())) {
-                // 编辑：先探测 Job 是否存在，不存在则补建，再刷新脚本与 GitHub 项目属性。
-                // 避免 Job 被外部删除或从未同步过时 updateJob 直接报"不存在"导致应用保存失败。
                 String jobName = job.getName();
                 if (!jenkinsClient.jobExists(jobName)) {
                     jenkinsClient.createJob(job);
                 }
                 jenkinsClient.updateJob(job);
             } else {
-                // 新建：初始化空白 Job
                 jenkinsClient.createJob(job);
             }
         }
@@ -113,32 +112,5 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements IAppS
             appList.forEach(app -> jenkinsClient.deleteJob(JenkinsJobNames.appJobName(app.getCode())));
         }
         return isSuccess;
-    }
-
-    @Override
-    public Map<String, String> optionMap() {
-        Map<String, String> result = new LinkedHashMap<>();
-        for (App app : list(Wrappers.<App>lambdaQuery().orderByAsc(App::getName))) {
-            result.put(String.valueOf(app.getId()), app.getName());
-        }
-        return result;
-    }
-
-    @Override
-    public void checkCode(String code, Long id) {
-        long count = count(Wrappers.<App>lambdaQuery()
-                .eq(App::getCode, code)
-                .ne(ObjUtil.isNotEmpty(id), App::getId, id));
-        if (count > IntConst.ZERO) {
-            throw new ServiceException("应用编码已存在，请更换");
-        }
-        if (!code.matches("[a-z0-9-]{2,40}")) {
-            throw new ServiceException("应用编码只能包含小写字母、数字和中划线，长度 2-40");
-        }
-    }
-
-    @Override
-    public boolean saveOrUpdateApp(App app) {
-        return saveOrUpdate(app);
     }
 }

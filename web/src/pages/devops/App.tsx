@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { App, Button, Form, Input, Modal, Select, Tag, Tooltip, TreeSelect, type SelectProps, type TableColumnsType } from 'antd'
 import FerryTable from '@/components/FerryTable'
-import { Pencil, Plus, RotateCw, Search, Trash2, WandSparkles } from 'lucide-react'
+import { Pencil, Plus, RotateCw, Search, Trash2 } from 'lucide-react'
 import PageHeader from '@/components/PageHeader'
 import { appApi } from '@/api/devops'
 import { deptApi, userApi } from '@/api/system'
@@ -95,8 +95,9 @@ export default function AppList() {
     [presetOptions, userOptions],
   )
 
+  const userSearchSeqRef = useRef(0)
   const loadUsers = async (keyword: string, reset: boolean) => {
-    if (userLoading) return
+    const seq = ++userSearchSeqRef.current
     if (reset) {
       userPageRef.current = 1
       userTotalRef.current = 0
@@ -106,13 +107,15 @@ export default function AppList() {
     setUserLoading(true)
     try {
       const result = await userApi.pageList({ current: userPageRef.current, size: USER_PAGE_SIZE, nickname: keyword || undefined })
+      // 只接受最新一次搜索的响应，避免快速输入时旧请求结果覆盖新结果
+      if (seq !== userSearchSeqRef.current) return
       userTotalRef.current = result.total
       setUserOptions((prev) => mergeOptions(reset ? [] : prev, result.records.map(toUserOption)))
       userPageRef.current += 1
     } catch (error) {
-      showError(error)
+      if (seq === userSearchSeqRef.current) showError(error)
     } finally {
-      setUserLoading(false)
+      if (seq === userSearchSeqRef.current) setUserLoading(false)
     }
   }
 
@@ -161,8 +164,12 @@ export default function AppList() {
     if (record) {
       const ownerId = record.ownerId ? String(record.ownerId) : undefined
       if (ownerId) {
-        const preset: UserOption[] = [{ value: ownerId, label: record.ownerName ? `${record.ownerName}（${ownerId}）` : ownerId }]
-        setPresetOptions(preset)
+        // 用账号生成与下拉选项一致的标签，避免用户误以为负责人被改动
+        void userApi.detail(ownerId).then((user) => {
+          setPresetOptions([toUserOption(user)])
+        }).catch(() => {
+          setPresetOptions([{ value: ownerId, label: record.ownerName ?? ownerId }])
+        })
       }
       form.setFieldsValue({
         code: record.code,
@@ -211,10 +218,6 @@ export default function AppList() {
               <Button type="link" size="small" icon={<Pencil size={14} />} onClick={() => openEditor(record)} />
             </Tooltip>
           )}
-          {/* TODO(dev_app-schema): dev_app_repo 已删除，代码源操作移除；仓库信息在应用表单维护。 */}
-          <Tooltip title="向导">
-            <Button type="link" size="small" icon={<WandSparkles size={14} />} />
-          </Tooltip>
           {can('devops:app:deleted') && (
             <Tooltip title="删除">
               <Button type="link" size="small" danger icon={<Trash2 size={14} />}
@@ -278,7 +281,7 @@ export default function AppList() {
         <Form form={form} layout="vertical" requiredMark="optional">
           <SectionTitle title="基础信息" />
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '0 16px' }}>
-            <Form.Item name="code" label="应用编码" rules={[{ required: true, message: '请输入应用编码' }, { pattern: /^[a-z0-9-]{2,40}$/, message: '小写字母、数字、中划线，2-40 位' }]}
+            <Form.Item name="code" label="应用编码" rules={[{ required: true, message: '请输入应用编码' }, { pattern: /^[a-z0-9]([a-z0-9-]{1,38}[a-z0-9])?$/, message: '小写字母或数字开头/结尾，中间可用中划线，2-40 位' }]}
               extra="创建后不可修改">
               <Input placeholder="例如 order-service" maxLength={40} disabled={!!editing} />
             </Form.Item>
