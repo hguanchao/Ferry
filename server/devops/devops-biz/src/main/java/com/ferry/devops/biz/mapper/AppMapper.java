@@ -19,7 +19,7 @@ public interface AppMapper extends BaseMapper<App> {
     /**
      * 应用是否存在进行中的运行
      */
-    @Select("SELECT COUNT(1) FROM dev_run WHERE is_deleted = 0 AND app_id = #{appId} AND status IN (1,2,3,8)")
+    @Select("SELECT COUNT(1) FROM dev_run WHERE is_deleted = 0 AND app_id = #{appId} AND status IN (0,1,2,3)")
     long countActiveRun(@Param("appId") Long appId);
 
     /**

@@ -46,6 +46,7 @@ import com.ferry.devops.api.vo.RunVO;
 import com.ferry.devops.api.vo.TriggerResultVO;
 import com.ferry.devops.api.vo.TriggerRecordVO;
 import com.ferry.devops.api.vo.VersionVO;
+import com.ferry.devops.biz.integration.ai.AiPrecheckAssistant;
 import com.ferry.devops.biz.integration.jenkins.BuildSource;
 import com.ferry.devops.biz.integration.jenkins.JenkinsClient;
 import com.ferry.devops.biz.integration.jenkins.JenkinsDispatchException;
@@ -89,7 +90,7 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
     private static final int MAX_LOG_LINES = 100_000;
     private static final int SEGMENT_LINES = 500;
     private static final int DEFAULT_LOG_LIMIT = 2000;
-    private static final int PRE_CHECK_CONTENT_MAX = 500;
+    private static final int PRE_CHECK_RESULT_MAX = 500;
     // 运行任务表的 executor 是 varchar，仅在创建运行快照时转换定义表的数字码。
     private static final Map<Integer, String> EXECUTOR_NAMES = Map.of(
             1, "jenkins", 2, "deployer", 3, "gate", 4, "release");
@@ -107,6 +108,7 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
     private final AppMapper appMapper;
     private final IPipelineService pipelineService;
     private final IRunStageService runStageService;
+    private final AiPrecheckAssistant aiPrecheckAssistant;
 
     /**
      * 触发生效的代码源。
@@ -258,11 +260,21 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
         App app = appMapper.selectById(body.getAppId());
         ResolvedSource source = resolveSource(app, body);
         PrecheckResultVO precheck = doPrecheck(body, app, source);
+        Pipeline pipeline = pipelineMapper.selectById(body.getPipelineId());
+
+        // 确定性五项校验不通过：仍落一条运行记录，沉淀拒绝原因，便于列表回溯
         if (!Boolean.TRUE.equals(precheck.getCanTrigger())) {
-            writeTriggerRecord(body, source, 4, null, firstFailDetail(precheck));
+            String rejectReason = firstFailDetail(precheck);
+            Run rejected = newRunRecord(body, source, pipeline, app);
+            rejected.setStatus(RunStatusEnum.PRECHECK.getCode());
+            rejected.setPreCheckResult(truncatePreCheckResult(buildPreCheckResult(precheck)));
+            save(rejected);
+            persistPrechecks(rejected.getId(), precheck.getItems());
+            writeTriggerRecord(body, source, 4, rejected.getId(), rejectReason);
             TriggerResultVO vo = new TriggerResultVO();
             vo.setResult(TriggerResultEnum.REJECTED.getCode());
-            vo.setMessage("预校验不通过：" + firstFailDetail(precheck));
+            vo.setRunId(rejected.getId());
+            vo.setMessage("预校验不通过：" + rejectReason);
             return vo;
         }
         // 命中活动运行直接合并
@@ -274,21 +286,29 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
             vo.setMessage("命中幂等键，已合并到进行中的运行");
             return vo;
         }
-        Pipeline pipeline = pipelineMapper.selectById(body.getPipelineId());
-        Run run = new Run();
-        run.setCode(generateCode());
-        run.setAppId(body.getAppId());
-        run.setPipelineId(body.getPipelineId());
-        run.setPipelineVersion(pipeline.getVersion());
-        run.setBranch(source.branch());
-        run.setRefType(source.refType());
-        run.setRefValue(source.commitId());
-        run.setTriggerType(IntConst.ONE);
-        run.setTriggerUser(AuthUtil.getUserId());
-        run.setTriggerNote(body.getNote());
+
+        // AI 风险研判：确定性校验通过后再问模型，模型否决则同样落库并拒绝
+        AiPrecheckAssistant.RiskVerdict verdict = aiPrecheckAssistant.assess(
+                app == null ? "" : app.getName(),
+                pipeline == null ? "" : pipeline.getName(),
+                source.branch(), source.commitId(), precheck.getItems());
+        if (!verdict.passed()) {
+            Run rejected = newRunRecord(body, source, pipeline, app);
+            rejected.setStatus(RunStatusEnum.PRECHECK.getCode());
+            rejected.setPreCheckResult(truncatePreCheckResult(aiRejectContent(precheck, verdict.reason())));
+            save(rejected);
+            persistPrechecks(rejected.getId(), precheck.getItems());
+            writeTriggerRecord(body, source, 4, rejected.getId(), verdict.reason());
+            TriggerResultVO vo = new TriggerResultVO();
+            vo.setResult(TriggerResultEnum.REJECTED.getCode());
+            vo.setRunId(rejected.getId());
+            vo.setMessage("AI 预检不通过：" + verdict.reason());
+            return vo;
+        }
+
+        Run run = newRunRecord(body, source, pipeline, app);
         run.setStatus(RunStatusEnum.QUEUED.getCode());
-        run.setPreCheckStatus(IntConst.ONE);
-        run.setPreCheckContent(preCheckContent(precheck));
+        run.setPreCheckResult(truncatePreCheckResult(aiApproveContent(precheck, verdict.reason())));
         save(run);
         createStages(run.getId(), pipeline.getId(), pipeline.getVersion());
         persistPrechecks(run.getId(), precheck.getItems());
@@ -299,6 +319,40 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
         vo.setRunId(run.getId());
         vo.setMessage("运行已创建，状态排队中");
         return vo;
+    }
+
+    /**
+     * 构造运行记录骨架：触发信息与预检无关，成功与被拒绝两条路径共用。
+     */
+    private Run newRunRecord(RunTriggerDTO body, ResolvedSource source, Pipeline pipeline, App app) {
+        Run run = new Run();
+        run.setCode(generateCode());
+        run.setAppId(body.getAppId());
+        run.setPipelineId(body.getPipelineId());
+        run.setPipelineVersion(pipeline == null ? null : pipeline.getVersion());
+        run.setBranch(source.branch());
+        run.setRefType(source.refType());
+        run.setRefValue(source.commitId());
+        run.setTriggerType(IntConst.ONE);
+        run.setTriggerUser(AuthUtil.getUserId());
+        run.setTriggerNote(body.getNote());
+        return run;
+    }
+
+    /**
+     * 预检内容按表字段上限截断，避免超长写入失败。
+     */
+    private String truncatePreCheckResult(String content) {
+        return content == null || content.length() <= PRE_CHECK_RESULT_MAX
+                ? content : content.substring(0, PRE_CHECK_RESULT_MAX);
+    }
+
+    private String aiApproveContent(PrecheckResultVO precheck, String reason) {
+        return buildPreCheckResult(precheck) + "；AI：" + reason;
+    }
+
+    private String aiRejectContent(PrecheckResultVO precheck, String reason) {
+        return buildPreCheckResult(precheck) + "；AI 否决：" + reason;
     }
 
     @Override
@@ -409,8 +463,7 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
         run.setTriggerUser(AuthUtil.getUserId());
         run.setTriggerNote(body.getNote());
         run.setStatus(RunStatusEnum.QUEUED.getCode());
-        run.setPreCheckStatus(IntConst.ONE);
-        run.setPreCheckContent("断点重跑");
+        run.setPreCheckResult("断点重跑");
         save(run);
         // 阶段：复用成功阶段（status=8 已复用），其余未开始
         int sort = 1;
@@ -587,12 +640,15 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
                 .map(PrecheckItemVO::getDetail).findFirst().orElse("预校验不通过");
     }
 
-    private String preCheckContent(PrecheckResultVO precheck) {
+    /**
+     * 拼装预检结果摘要：逐项类型与明细，超长按字段上限截断。
+     */
+    private String buildPreCheckResult(PrecheckResultVO precheck) {
         String content = precheck.getItems().stream()
                 .map(item -> item.getType() + ":" + item.getDetail())
                 .collect(Collectors.joining("；"));
-        return content.length() > PRE_CHECK_CONTENT_MAX
-                ? content.substring(0, PRE_CHECK_CONTENT_MAX) : content;
+        return content.length() > PRE_CHECK_RESULT_MAX
+                ? content.substring(0, PRE_CHECK_RESULT_MAX) : content;
     }
 
     /**

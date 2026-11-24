@@ -63,11 +63,8 @@ public class Run extends BaseEntity implements Serializable {
     /** Jenkins队列项id */
     private Long jenkinsQueueId;
 
-    /** 预检状态 1=正常 2=异常 */
-    private Integer preCheckStatus;
-
-    /** 预检内容 */
-    private String preCheckContent;
+    /** 预检结果：五项校验摘要与 AI 研判理由 */
+    private String preCheckResult;
 
     /** 开始时间 */
     private Date startTime;

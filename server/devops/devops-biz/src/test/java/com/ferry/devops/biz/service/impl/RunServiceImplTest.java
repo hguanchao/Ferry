@@ -3,6 +3,7 @@ package com.ferry.devops.biz.service.impl;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.ferry.devops.api.entity.RunTrigger;
 import com.ferry.devops.biz.integration.jenkins.JenkinsClient;
+import com.ferry.devops.biz.integration.ai.AiPrecheckAssistant;
 import com.ferry.devops.biz.mapper.AppMapper;
 import com.ferry.devops.biz.mapper.PipelineMapper;
 import com.ferry.devops.biz.mapper.RunLogSegmentMapper;
@@ -65,6 +66,8 @@ class RunServiceImplTest {
     private IPipelineService pipelineService;
     @Mock
     private IRunStageService runStageService;
+    @Mock
+    private AiPrecheckAssistant aiPrecheckAssistant;
 
     private RunServiceImpl service;
 
@@ -72,7 +75,7 @@ class RunServiceImplTest {
     void setUp() {
         service = new RunServiceImpl(runMapper, pipelineMapper, pipelineStageService, stageMapper,
                 taskMapper, logMapper, precheckMapper, triggerMapper, operationMapper, jenkinsClient,
-                appMapper, pipelineService, runStageService);
+                appMapper, pipelineService, runStageService, aiPrecheckAssistant);
     }
 
     @Test

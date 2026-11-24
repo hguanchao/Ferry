@@ -22,7 +22,7 @@
         SELECT COUNT(1)
         FROM dev_run
         WHERE is_deleted = 0
-          AND status IN (1, 2, 3)
+          AND status IN (0, 1, 2, 3)
           AND pipeline_id IN
         <foreach collection="ids" item="id" open="(" separator="," close=")">
             #{id}

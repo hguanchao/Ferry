@@ -139,8 +139,7 @@ export interface Run {
   triggerUser: ID
   triggerNote?: string
   status: number
-  preCheckStatus?: number
-  preCheckContent?: string
+  preCheckResult?: string
   jenkinsJobId?: string
   jenkinsBuildNo?: number
   startTime?: string

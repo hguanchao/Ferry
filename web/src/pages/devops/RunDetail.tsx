@@ -13,13 +13,13 @@ import { useAuthStore } from '@/stores/auth'
 import { showError } from '@/lib/notify'
 
 const RUN_STATUS: Record<number, string> = {
-  1: '排队中', 2: '运行中', 3: '阻塞', 4: '成功', 5: '失败', 6: '超时', 7: '已取消', 8: '结果待确认',
+  0: '待确认', 1: '排队中', 2: '运行中', 3: '阻塞', 4: '成功', 5: '失败', 6: '超时', 7: '已取消', 8: '预检未通过',
 }
 const STAGE_STATUS: Record<number, string> = {
   1: '未开始', 2: '进行中', 3: '成功', 4: '失败', 5: '阻塞', 6: '跳过', 7: '超时', 8: '已复用', 9: '已取消', 10: '待门禁',
 }
 const STATUS_COLOR: Record<number, string> = {
-  1: 'blue', 2: 'processing', 3: 'orange', 4: 'green', 5: 'red', 6: 'red', 7: 'default', 8: 'purple', 9: 'default',
+  0: 'purple', 1: 'blue', 2: 'processing', 3: 'orange', 4: 'green', 5: 'red', 6: 'red', 7: 'default', 8: 'red',
 }
 /** 阶段/任务状态色：与运行状态语义不同，1 未开始应为灰色而非蓝色 */
 const STAGE_STATUS_COLOR: Record<number, string> = {
@@ -345,7 +345,11 @@ export default function RunDetail() {
                   {totalDuration != null ? `${totalDuration.toFixed(1)}s` : '—'}
                 </Descriptions.Item>
                 <Descriptions.Item label="预检">
-                  {run?.preCheckStatus === 2 ? <Tag color="red">异常</Tag> : run?.preCheckStatus === 1 ? <Tag color="green">正常</Tag> : '—'}
+                  {run?.status === 8
+                    ? <Tag color="red">未通过</Tag>
+                    : run?.preCheckResult
+                      ? <Tooltip title={run.preCheckResult}><Tag color="green">通过</Tag></Tooltip>
+                      : '—'}
                 </Descriptions.Item>
               </Descriptions>
             </div>

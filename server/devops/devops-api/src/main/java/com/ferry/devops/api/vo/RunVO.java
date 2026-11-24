@@ -50,11 +50,8 @@ public class RunVO {
     @Schema(description = "状态")
     private Integer status;
 
-    @Schema(description = "预检状态 1=正常 2=异常")
-    private Integer preCheckStatus;
-
-    @Schema(description = "预检内容")
-    private String preCheckContent;
+    @Schema(description = "预检结果：五项校验摘要与 AI 研判理由")
+    private String preCheckResult;
 
     @Schema(description = "Jenkins任务id")
     private String jenkinsJobId;

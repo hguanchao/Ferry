@@ -22,7 +22,7 @@ public interface RunMapper extends BaseMapper<Run> {
      */
     @Select("SELECT * FROM dev_run WHERE is_deleted = 0 AND app_id = #{appId} "
             + "AND ref_value = #{refValue} AND pipeline_version = #{pipelineVersion} "
-            + "AND status IN (1,2,3) ORDER BY id DESC LIMIT 1")
+            + "AND status IN (0,1,2,3) ORDER BY id DESC LIMIT 1")
     Run selectActiveBySource(@Param("appId") Long appId, @Param("refValue") String refValue,
                              @Param("pipelineVersion") Integer pipelineVersion);
 
@@ -41,9 +41,9 @@ public interface RunMapper extends BaseMapper<Run> {
                               @Param("pipelineVersion") Integer pipelineVersion);
 
     /**
-     * 同一流水线是否存在进行中的运行（排队/运行/阻塞）
+     * 同一流水线是否存在进行中的运行（待确认/排队/运行/阻塞）
      */
-    @Select("SELECT COUNT(1) FROM dev_run WHERE is_deleted = 0 AND pipeline_id = #{pipelineId} AND status IN (1,2,3)")
+    @Select("SELECT COUNT(1) FROM dev_run WHERE is_deleted = 0 AND pipeline_id = #{pipelineId} AND status IN (0,1,2,3)")
     long countActiveByPipeline(@Param("pipelineId") Long pipelineId);
 
     /**
