@@ -34,8 +34,7 @@ import com.ferry.devops.api.vo.AiFeedbackVO;
 import com.ferry.devops.api.vo.AiOutputVO;
 import com.ferry.devops.api.vo.AiQualityVO;
 import com.ferry.devops.api.vo.AppAiLevelVO;
-import com.ferry.devops.biz.integration.ai.AiClient;
-import com.ferry.devops.biz.integration.ai.PromptBuilder;
+import com.ferry.common.ai.utils.AiUtil;
 import com.ferry.devops.biz.mapper.AiEvalSampleMapper;
 import com.ferry.devops.biz.mapper.AiEvidenceMapper;
 import com.ferry.devops.biz.mapper.AiFeedbackMapper;
@@ -50,7 +49,6 @@ import com.ferry.devops.biz.mapper.RunMapper;
 import com.ferry.devops.biz.service.IAiService;
 import com.ferry.devops.biz.wrapper.AiOutputWrapper;
 import lombok.RequiredArgsConstructor;
-import org.springframework.ai.model.openai.autoconfigure.OpenAiChatProperties;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -70,13 +68,14 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class AiServiceImpl extends ServiceImpl<AiOutputMapper, AiOutput> implements IAiService {
+
+    /** 模型不可用时的业务兜底结论 */
+    private static final String FALLBACK_CONCLUSION = "基于证据分析：结论待确认";
+
     private final AiEvidenceMapper evidenceMapper;
     private final AiFeedbackMapper feedbackMapper;
     private final AiEvalSampleMapper evalSampleMapper;
     private final AppAiLevelMapper appAiLevelMapper;
-    private final AiClient aiClient;
-    private final PromptBuilder promptBuilder;
-    private final OpenAiChatProperties chatProperties;
     // 真实证据链依赖：四个入口据此从库里取证据，analyze 里逐条回查校验
     private final RunLogSegmentMapper runLogSegmentMapper;
     private final RunMapper runMapper;
@@ -195,7 +194,7 @@ public class AiServiceImpl extends ServiceImpl<AiOutputMapper, AiOutput> impleme
         output.setRunId(runId);
         output.setRcId(rcId);
         output.setAlertId(alertId);
-        output.setModelVersion(chatProperties.getModel() == null ? "unknown" : chatProperties.getModel());
+        output.setModelVersion(AiUtil.model());
         output.setPromptVersion("p-v1");
 
         // 无有效证据：直接落「无法归因」，不调模型
@@ -210,10 +209,11 @@ public class AiServiceImpl extends ServiceImpl<AiOutputMapper, AiOutput> impleme
         String promptEvidence = effective.stream()
                 .map(e -> e.locator() + " " + e.snippet())
                 .collect(Collectors.joining("\n"));
-        String prompt = promptBuilder.build(type.getDesc(), bizId, promptEvidence);
-        String conclusion = aiClient.chat(prompt);
-        // 模型不可用返回固定降级文本：仍视为成功，但置信度强制降为低
-        boolean degraded = AiClient.FALLBACK_RESULT.equals(conclusion);
+        String prompt = buildPrompt(type.getDesc(), bizId, promptEvidence);
+        String answer = AiUtil.chat(prompt);
+        // 模型不可用（返回 null）：落业务兜底结论，仍视为成功但置信度强制降为低
+        boolean degraded = answer == null;
+        String conclusion = degraded ? FALLBACK_CONCLUSION : answer;
 
         // 服务端按证据数量与来源数计算置信度：≥3 条不同来源为高；1 条强证据为中；其余低
         Set<String> sources = new LinkedHashSet<>();
@@ -254,6 +254,16 @@ public class AiServiceImpl extends ServiceImpl<AiOutputMapper, AiOutput> impleme
             sort++;
         }
         return render(output, evidenceVOs);
+    }
+
+    /**
+     * 拼装归因提示词：业务侧自定用户提示词，系统提示词由 common-ai 统一配置注入。
+     */
+    private String buildPrompt(String type, String bizId, String evidences) {
+        return "你是 DevOps 归因助手。业务类型：" + type + "，业务id：" + bizId + "。\n"
+                + "请仅依据以下证据输出固定 JSON：{category,conclusion,confidence,evidence,suggestion}。\n"
+                + "不得臆造证据；无可靠证据时 conclusion 输出“无有效证据，无法归因”。\n"
+                + "证据列表：\n" + evidences;
     }
 
     /**

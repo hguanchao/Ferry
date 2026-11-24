@@ -18,6 +18,12 @@
             <artifactId>common-web</artifactId>
             <version>${revision}</version>
         </dependency>
+        <!-- AI 能力由 common-ai 统一封装：模型配置与提示词均在其内管理 -->
+        <dependency>
+            <groupId>com.ferry</groupId>
+            <artifactId>common-ai</artifactId>
+            <version>${revision}</version>
+        </dependency>
         <dependency>
             <groupId>com.ferry</groupId>
             <artifactId>common-cache</artifactId>
@@ -38,12 +44,12 @@
             <artifactId>system-api</artifactId>
             <version>${revision}</version>
         </dependency>
-        <!-- Spring AI OpenAI 兼容客户端：版本由根 pom 的 spring-ai-bom 管理 -->
+        <!-- 测试：junit5 + mockito，版本由 spring-boot-dependencies BOM 管理；Jenkins 联调用 Mock -->
         <dependency>
             <groupId>org.springframework.ai</groupId>
             <artifactId>spring-ai-starter-model-openai</artifactId>
+            <scope>test</scope>
         </dependency>
-        <!-- 测试：junit5 + mockito，版本由 spring-boot-dependencies BOM 管理；Jenkins 联调用 Mock -->
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
