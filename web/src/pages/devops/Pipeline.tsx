@@ -10,7 +10,7 @@ import {
 import PageHeader from '@/components/PageHeader'
 import PipelineCanvasEditor from '@/components/PipelineCanvasEditor'
 import { appApi, pipelineApi } from '@/api/devops'
-import type { AppOption, PipelineRow, PipelineStageDef, PipelineStageRow, PrecheckResult, TriggerResult } from '@/api/types-devops'
+import type { AppOption, PipelineRow, PipelineStageDef, PipelineStageRow, TriggerResult } from '@/api/types-devops'
 import { useAuthStore } from '@/stores/auth'
 import { showError } from '@/lib/notify'
 import { useDebouncedValue } from '@/lib/debounce'
@@ -18,26 +18,12 @@ import { useDebouncedValue } from '@/lib/debounce'
 const RUN_STATUS_LABEL: Record<number, string> = {
   0: '待确认', 1: '排队中', 2: '运行中', 3: '阻塞', 4: '成功', 5: '失败', 6: '超时', 7: '已取消', 8: '预检未通过',
 }
-const CONCLUSION_LABEL: Record<number, string> = { 1: '通过', 2: '不通过', 3: '合并' }
 /** 流水线状态（含 Jenkins 同步态，与后端 dev_pipeline.status 口径一致） */
 const PIPELINE_STATUS: Record<number, { label: string; color: string }> = {
   0: { label: '停用', color: 'default' },
   1: { label: '启用', color: 'green' },
   2: { label: '待配置', color: 'orange' },
   3: { label: '同步失败', color: 'red' },
-}
-
-interface TriggerValues {
-  appId: string
-  pipelineId: string
-  branch: string
-  commitId: string
-  refType: number
-  note?: string
-}
-
-interface TriggerPrecheck extends PrecheckResult {
-  values: TriggerValues
 }
 
 /** detail 返回的阶段(VO) -> 画布阶段定义：taskList 映射为 tasks */
@@ -83,7 +69,6 @@ export default function Pipeline() {
   const [triggerOpen, setTriggerOpen] = useState(false)
   const [editing, setEditing] = useState<PipelineRow | null>(null)
   const [triggerRow, setTriggerRow] = useState<PipelineRow | null>(null)
-  const [precheck, setPrecheck] = useState<TriggerPrecheck | null>(null)
   const [filters, setFilters] = useState<Record<string, unknown>>({})
   const [page, setPage] = useState({ current: 1, size: 30 })
   const [stages, setStages] = useState<PipelineStageDef[]>([])
@@ -197,19 +182,10 @@ export default function Pipeline() {
     },
     onError: showError,
   })
-  const precheckMutation = useMutation({
-    mutationFn: (body: TriggerValues) => pipelineApi.triggerPrecheck(body as unknown as Record<string, unknown>),
-    onSuccess: (result, values) => {
-      setPrecheck({ ...result, values })
-      if (!result.canTrigger) message.warning('预校验未全部通过')
-    },
-    onError: showError,
-  })
   const triggerMutation = useMutation({
     mutationFn: (body: Record<string, unknown>) => pipelineApi.trigger(body, newRequestId()),
     onSuccess: (result: TriggerResult) => {
       setTriggerOpen(false)
-      setPrecheck(null)
       invalidate()
       if (result.runId) {
         modal.success({
@@ -224,14 +200,6 @@ export default function Pipeline() {
     },
     onError: showError,
   })
-
-  const currentTriggerValues = triggerForm.getFieldsValue() as Partial<TriggerValues>
-  const hasCurrentPrecheck = precheck?.canTrigger === true
-    && precheck.values.appId === currentTriggerValues.appId
-    && precheck.values.pipelineId === currentTriggerValues.pipelineId
-    && precheck.values.branch === currentTriggerValues.branch
-    && precheck.values.commitId === currentTriggerValues.commitId
-    && precheck.values.refType === currentTriggerValues.refType
 
   // 关闭编辑器：失效当前流水线的详情缓存，保证下次打开拉到最新版本（避免旧缓存回填）
   const closeEditor = () => {
@@ -262,7 +230,6 @@ export default function Pipeline() {
 
   const openTrigger = (record: PipelineRow | null) => {
     setTriggerRow(record)
-    setPrecheck(null)
     triggerForm.resetFields()
     if (record) {
       const appOption = appOptions.find((app) => app.value === record.appId)
@@ -276,17 +243,7 @@ export default function Pipeline() {
     setTriggerOpen(true)
   }
 
-  const runPrecheck = async () => {
-    try {
-      const values = await triggerForm.validateFields()
-      precheckMutation.mutate(values)
-    } catch {
-      // Form renders validation messages next to invalid fields.
-    }
-  }
-
   const submitTrigger = async () => {
-    if (!precheck?.canTrigger) return
     try {
       const values = await triggerForm.validateFields()
       triggerMutation.mutate({
@@ -441,8 +398,7 @@ export default function Pipeline() {
         onCancel={() => setTriggerOpen(false)}
         footer={[
           <Button key="cancel" onClick={() => setTriggerOpen(false)}>取消</Button>,
-          <Button key="precheck" loading={precheckMutation.isPending} onClick={runPrecheck}>预校验</Button>,
-          <Button key="run" type="primary" disabled={!hasCurrentPrecheck}
+          <Button key="run" type="primary"
             loading={triggerMutation.isPending} onClick={submitTrigger}>开始运行</Button>,
         ]}
         width={620}
@@ -474,7 +430,6 @@ export default function Pipeline() {
                 }))}
                 onChange={(appId) => {
                   const selected = appOptions.find((app) => app.value === appId)
-                  setPrecheck(null)
                   triggerForm.setFieldsValue({
                     pipelineId: undefined,
                     branch: selected?.repoBranch,
@@ -504,7 +459,6 @@ export default function Pipeline() {
                 onChange={(pipelineId) => {
                   const selected = triggerPipelinesQuery.data?.records.find((row) => row.id === pipelineId)
                   const currentCommit = triggerForm.getFieldValue('commitId') as string | undefined
-                  setPrecheck(null)
                   triggerForm.setFieldsValue({
                     branch: selected?.repoBranch ?? triggerApp?.repoBranch,
                     // 选流水线只补默认提交，不覆盖用户已输入的提交
@@ -530,9 +484,8 @@ export default function Pipeline() {
               notFoundContent={triggerBranchesQuery.isFetching ? '加载中…' : '无匹配分支，可直接输入'}
               onSelect={() => {
                 triggerForm.setFieldsValue({ commitId: undefined })
-                setPrecheck(null)
-              }}
-              onChange={() => setPrecheck(null)}
+                }}
+              onChange={() => undefined}
             />
           </Form.Item>
           <Form.Item
@@ -550,31 +503,16 @@ export default function Pipeline() {
               notFoundContent={triggerRefType === 2
                 ? 'Tag/Ref 模式可直接输入'
                 : triggerCommitsQuery.isFetching ? '加载中…' : '无匹配提交，可直接输入'}
-              onChange={() => setPrecheck(null)}
+              onChange={() => undefined}
             />
           </Form.Item>
           <Form.Item name="refType" label="引用类型" initialValue={1}>
             <Select
               options={[{ value: 1, label: 'Commit' }, { value: 2, label: 'Tag/Ref' }]}
-              onChange={() => setPrecheck(null)}
+              onChange={() => undefined}
             />
           </Form.Item>
           <Form.Item name="note" label="触发说明"><Input.TextArea rows={2} placeholder="选填" /></Form.Item>
-          {precheck && (
-            <div style={{ marginTop: 12 }}>
-              {precheck.items?.map((item) => (
-                <div key={item.type} style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
-                  <Tag color={item.conclusion === 1 ? 'green' : item.conclusion === 2 ? 'red' : 'blue'}>
-                    {CONCLUSION_LABEL[item.conclusion] ?? item.conclusion}
-                  </Tag>
-                  <span>{item.detail}</span>
-                </div>
-              ))}
-              <div style={{ marginTop: 8, fontWeight: 500 }}>
-                {precheck.canTrigger ? '预校验通过，请确认后开始运行' : '预校验未通过，请根据结果修正'}
-              </div>
-            </div>
-          )}
         </Form>
       </Modal>
     </div>

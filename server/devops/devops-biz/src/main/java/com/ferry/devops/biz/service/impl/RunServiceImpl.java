@@ -26,12 +26,9 @@ import com.ferry.devops.api.dto.query.RunQuery;
 import com.ferry.devops.api.entity.App;
 import com.ferry.devops.api.entity.Pipeline;
 import com.ferry.devops.api.entity.Run;
-import com.ferry.devops.api.entity.RunLogSegment;
 import com.ferry.devops.api.entity.RunOperation;
-import com.ferry.devops.api.entity.RunPrecheck;
 import com.ferry.devops.api.entity.RunStage;
 import com.ferry.devops.api.entity.RunStageTask;
-import com.ferry.devops.api.entity.RunTrigger;
 import com.ferry.devops.api.enums.DevopsStateMachine;
 import com.ferry.devops.api.enums.PipelineStatusEnum;
 import com.ferry.devops.api.enums.RunStatusEnum;
@@ -44,9 +41,7 @@ import com.ferry.devops.api.vo.RunStageVO;
 import com.ferry.devops.api.vo.RunStageTaskVO;
 import com.ferry.devops.api.vo.RunVO;
 import com.ferry.devops.api.vo.TriggerResultVO;
-import com.ferry.devops.api.vo.TriggerRecordVO;
 import com.ferry.devops.api.vo.VersionVO;
-import com.ferry.devops.biz.integration.ai.AiPrecheckAssistant;
 import com.ferry.devops.biz.integration.jenkins.BuildSource;
 import com.ferry.devops.biz.integration.jenkins.JenkinsClient;
 import com.ferry.devops.biz.integration.jenkins.JenkinsDispatchException;
@@ -54,13 +49,10 @@ import com.ferry.devops.biz.integration.jenkins.JenkinsDispatchResult;
 import com.ferry.devops.biz.integration.jenkins.JenkinsJobNames;
 import com.ferry.devops.biz.mapper.AppMapper;
 import com.ferry.devops.biz.mapper.PipelineMapper;
-import com.ferry.devops.biz.mapper.RunLogSegmentMapper;
 import com.ferry.devops.biz.mapper.RunMapper;
 import com.ferry.devops.biz.mapper.RunOperationMapper;
-import com.ferry.devops.biz.mapper.RunPrecheckMapper;
 import com.ferry.devops.biz.mapper.RunStageMapper;
 import com.ferry.devops.biz.mapper.RunStageTaskMapper;
-import com.ferry.devops.biz.mapper.RunTriggerMapper;
 import com.ferry.devops.biz.service.IPipelineService;
 import com.ferry.devops.biz.service.IPipelineStageService;
 import com.ferry.devops.biz.service.IRunService;
@@ -84,12 +76,6 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
     private static final String COMMIT_REGEX = "^[0-9a-fA-F]{7,40}$";
     /** Git ref/tag：不含空白与 ~^:?*[\ 等非法字符，最长 100 */
     private static final String REF_REGEX = "^[^\\s~^:?*\\[\\\\]{1,100}$";
-    /** 日志脱敏规则：password/token/secret/key 等键值对，保留键名、遮蔽值 */
-    private static final String SECRET_REGEX =
-            "(?i)(password|passwd|token|secret|access[_-]?key|secret[_-]?key|api[_-]?key)\\s*[:=]\\s*\\S+";
-    private static final int MAX_LOG_LINES = 100_000;
-    private static final int SEGMENT_LINES = 500;
-    private static final int DEFAULT_LOG_LIMIT = 2000;
     private static final int PRE_CHECK_RESULT_MAX = 500;
     // 运行任务表的 executor 是 varchar，仅在创建运行快照时转换定义表的数字码。
     private static final Map<Integer, String> EXECUTOR_NAMES = Map.of(
@@ -100,15 +86,11 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
     private final IPipelineStageService pipelineStageService;
     private final RunStageMapper stageMapper;
     private final RunStageTaskMapper taskMapper;
-    private final RunLogSegmentMapper logMapper;
-    private final RunPrecheckMapper precheckMapper;
-    private final RunTriggerMapper triggerMapper;
     private final RunOperationMapper operationMapper;
     private final JenkinsClient jenkinsClient;
     private final AppMapper appMapper;
     private final IPipelineService pipelineService;
     private final IRunStageService runStageService;
-    private final AiPrecheckAssistant aiPrecheckAssistant;
 
     /**
      * 触发生效的代码源。
@@ -154,101 +136,6 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
     }
 
     @Override
-    public List<RunStageVO> stages(Long runId) {
-        return stageMapper.selectByRun(runId).stream()
-                .map(s -> BeanUtil.copy(s, RunStageVO.class)).collect(Collectors.toList());
-    }
-
-    @Override
-    public List<RunStageTaskVO> tasks(Long runStageId) {
-        return taskMapper.selectByStage(runStageId).stream()
-                .map(t -> BeanUtil.copy(t, RunStageTaskVO.class)).collect(Collectors.toList());
-    }
-
-    @Override
-    public List<?> log(Long taskId, Integer fromLine, Integer limit) {
-        int from = fromLine == null ? 1 : fromLine;
-        int size = limit == null ? DEFAULT_LOG_LIMIT : limit;
-        List<RunLogSegment> segments = logMapper.selectByTask(taskId);
-        List<Map<String, Object>> result = new ArrayList<>();
-        for (RunLogSegment seg : segments) {
-            if (seg.getEndLine() < from) {
-                continue;
-            }
-            if (result.size() >= size) {
-                break;
-            }
-            Map<String, Object> m = new java.util.LinkedHashMap<>();
-            m.put("id", seg.getId());
-            m.put("taskId", seg.getTaskId());
-            m.put("segmentNo", seg.getSegmentNo());
-            m.put("startLine", seg.getStartLine());
-            m.put("endLine", seg.getEndLine());
-            m.put("content", seg.getContent());
-            m.put("isTruncated", seg.getIsTruncated());
-            result.add(m);
-        }
-        return result;
-    }
-
-    @Override
-    public List<?> logSearch(Long taskId, String keyword, Integer fromLine) {
-        int from = fromLine == null ? 1 : fromLine;
-        List<Map<String, Object>> hits = new ArrayList<>();
-        for (RunLogSegment seg : logMapper.selectByTask(taskId)) {
-            if (seg.getEndLine() < from || StrUtil.isBlank(seg.getContent())) {
-                continue;
-            }
-            String[] lines = seg.getContent().split("\\R");
-            int lineNo = seg.getStartLine();
-            for (String line : lines) {
-                if (lineNo >= from && line.contains(keyword)) {
-                    Map<String, Object> m = new java.util.LinkedHashMap<>();
-                    m.put("lineNo", lineNo);
-                    m.put("content", line);
-                    m.put("segmentNo", seg.getSegmentNo());
-                    hits.add(m);
-                }
-                lineNo++;
-            }
-        }
-        return hits;
-    }
-
-    @Override
-    public void saveLog(Long runId, Long taskId, String rawLog) {
-        if (rawLog == null) {
-            return;
-        }
-        String[] lines = rawLog.split("\\R", -1);
-        int total = Math.min(lines.length, MAX_LOG_LINES);
-        boolean truncated = lines.length > MAX_LOG_LINES;
-        // 按 500 行分段，段内保留原始行号，入库前脱敏
-        for (int start = 0; start < total; start += SEGMENT_LINES) {
-            int end = Math.min(start + SEGMENT_LINES, total);
-            StringBuilder content = new StringBuilder();
-            for (int i = start; i < end; i++) {
-                content.append(mask(lines[i])).append('\n');
-            }
-            RunLogSegment segment = new RunLogSegment();
-            segment.setRunId(runId);
-            segment.setTaskId(taskId);
-            segment.setSegmentNo(start / SEGMENT_LINES + 1);
-            segment.setStartLine(start + 1);
-            segment.setEndLine(end);
-            segment.setContent(content.toString());
-            segment.setIsTruncated(truncated && end == total ? 1 : 0);
-            logMapper.insert(segment);
-        }
-    }
-
-    @Override
-    public PrecheckResultVO precheck(RunTriggerDTO body) {
-        App app = appMapper.selectById(body.getAppId());
-        return doPrecheck(body, app, resolveSource(app, body));
-    }
-
-    @Override
     @Transactional(rollbackFor = Exception.class)
     public TriggerResultVO trigger(RunTriggerDTO body) {
         // 频率管控：同一用户同一应用 60 秒内第 6 次触发拒绝
@@ -262,15 +149,13 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
         PrecheckResultVO precheck = doPrecheck(body, app, source);
         Pipeline pipeline = pipelineMapper.selectById(body.getPipelineId());
 
-        // 确定性五项校验不通过：仍落一条运行记录，沉淀拒绝原因，便于列表回溯
-        if (!Boolean.TRUE.equals(precheck.getCanTrigger())) {
+        // 确定性五项不通过：仍落一条运行记录，沉淀拒绝原因，便于列表回溯
+        if (!itemsPassed(precheck)) {
             String rejectReason = firstFailDetail(precheck);
             Run rejected = newRunRecord(body, source, pipeline, app);
             rejected.setStatus(RunStatusEnum.PRECHECK.getCode());
             rejected.setPreCheckResult(truncatePreCheckResult(buildPreCheckResult(precheck)));
             save(rejected);
-            persistPrechecks(rejected.getId(), precheck.getItems());
-            writeTriggerRecord(body, source, 4, rejected.getId(), rejectReason);
             TriggerResultVO vo = new TriggerResultVO();
             vo.setResult(TriggerResultEnum.REJECTED.getCode());
             vo.setRunId(rejected.getId());
@@ -279,7 +164,6 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
         }
         // 命中活动运行直接合并
         if (ObjUtil.isNotEmpty(precheck.getMergedRunId())) {
-            writeTriggerRecord(body, source, 2, precheck.getMergedRunId(), null);
             TriggerResultVO vo = new TriggerResultVO();
             vo.setResult(TriggerResultEnum.MERGED.getCode());
             vo.setRunId(precheck.getMergedRunId());
@@ -287,32 +171,12 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
             return vo;
         }
 
-        // AI 风险研判：确定性校验通过后再问模型，模型否决则同样落库并拒绝
-        AiPrecheckAssistant.RiskVerdict verdict = aiPrecheckAssistant.assess(
-                app == null ? "" : app.getName(),
-                pipeline == null ? "" : pipeline.getName(),
-                source.branch(), source.commitId(), precheck.getItems());
-        if (!verdict.passed()) {
-            Run rejected = newRunRecord(body, source, pipeline, app);
-            rejected.setStatus(RunStatusEnum.PRECHECK.getCode());
-            rejected.setPreCheckResult(truncatePreCheckResult(aiRejectContent(precheck, verdict.reason())));
-            save(rejected);
-            persistPrechecks(rejected.getId(), precheck.getItems());
-            writeTriggerRecord(body, source, 4, rejected.getId(), verdict.reason());
-            TriggerResultVO vo = new TriggerResultVO();
-            vo.setResult(TriggerResultEnum.REJECTED.getCode());
-            vo.setRunId(rejected.getId());
-            vo.setMessage("AI 预检不通过：" + verdict.reason());
-            return vo;
-        }
-
+        // AI 研判已关闭：五项规则通过后直接创建运行
         Run run = newRunRecord(body, source, pipeline, app);
         run.setStatus(RunStatusEnum.QUEUED.getCode());
-        run.setPreCheckResult(truncatePreCheckResult(aiApproveContent(precheck, verdict.reason())));
+        run.setPreCheckResult(truncatePreCheckResult(buildPreCheckResult(precheck)));
         save(run);
-        createStages(run.getId(), pipeline.getId(), pipeline.getVersion());
-        persistPrechecks(run.getId(), precheck.getItems());
-        writeTriggerRecord(body, source, 1, run.getId(), null);
+        createStages(run.getId(), pipeline.getId(), pipeline.getVersion(), precheck);
         triggerJenkinsAfterCommit(run);
         TriggerResultVO vo = new TriggerResultVO();
         vo.setResult(TriggerResultEnum.CREATED.getCode());
@@ -347,13 +211,6 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
                 ? content : content.substring(0, PRE_CHECK_RESULT_MAX);
     }
 
-    private String aiApproveContent(PrecheckResultVO precheck, String reason) {
-        return buildPreCheckResult(precheck) + "；AI：" + reason;
-    }
-
-    private String aiRejectContent(PrecheckResultVO precheck, String reason) {
-        return buildPreCheckResult(precheck) + "；AI 否决：" + reason;
-    }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -416,7 +273,7 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
                 && !ObjUtil.equals(run.getStatus(), RunStatusEnum.TIMEOUT.getCode())) {
             throw new ServiceException("仅失败或超时的运行可断点重跑");
         }
-        return stages(id).stream().map(s -> {
+        return stageMapper.selectByRun(id).stream().map(s -> {
             RunStageVO vo = BeanUtil.copy(s, RunStageVO.class);
             boolean reusable = ObjUtil.equals(s.getStatus(), StageStatusEnum.SUCCESS.getCode());
             vo.setReusable(reusable);
@@ -485,22 +342,12 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
             stageMapper.insert(stage);
             createRerunTasks(run.getId(), stage.getId(), old.getId(), reused);
         }
-        writeTriggerRecordFromRun(run, 1);
         triggerJenkinsAfterCommit(run);
         TriggerResultVO vo = new TriggerResultVO();
         vo.setResult(TriggerResultEnum.CREATED.getCode());
         vo.setRunId(run.getId());
         vo.setMessage("断点重跑已创建，前序成功阶段已复用");
         return vo;
-    }
-
-    @Override
-    public IPage<TriggerRecordVO> triggerRecords(Long appId, Long current, Long size) {
-        List<RunTrigger> records = triggerMapper.selectRecentByApp(appId);
-        IPage<TriggerRecordVO> result = new com.baomidou.mybatisplus.extension.plugins.pagination.Page<>(
-                current == null ? 1 : current, size == null ? 20 : size, records.size());
-        result.setRecords(records.stream().map(t -> BeanUtil.copy(t, TriggerRecordVO.class)).collect(Collectors.toList()));
-        return result;
     }
 
     // ==================== 内部实现 ====================
@@ -567,7 +414,14 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
         } else {
             defDetail = checkRunnableDefinition(pipeline.getId(), pipeline.getVersion());
             if (defDetail == null) {
-                defDetail = "流水线已启用且脚本已同步";
+                // 定义本身齐备后，真实探测 Jenkins Job：避免预检说"已同步"、触发却 404
+                String jobName = app == null ? null : JenkinsJobNames.appJobName(app.getCode());
+                if (!jenkinsClient.jobExists(jobName)) {
+                    defOk = false;
+                    defDetail = "Jenkins Job「" + jobName + "」不存在，请到流水线重新保存触发同步";
+                } else {
+                    defDetail = "流水线已启用且 Jenkins Job 已就绪";
+                }
             } else {
                 defOk = false;
             }
@@ -594,8 +448,21 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
 
         PrecheckResultVO result = new PrecheckResultVO();
         result.setItems(items);
-        boolean canTrigger = items.subList(0, 4).stream().allMatch(i -> ObjUtil.equals(i.getConclusion(), 1));
-        result.setCanTrigger(canTrigger);
+        boolean rulesPassed = items.subList(0, 4).stream().allMatch(i -> ObjUtil.equals(i.getConclusion(), 1));
+
+        // AI 风险研判前置到预检：五项规则通过后再问模型，结论随预检结果一并返回并复用给 trigger
+        // boolean jobExists = items.get(3) != null
+        //         && ObjUtil.equals(items.get(3).getConclusion(), 1);
+        // AiPrecheckAssistant.RiskVerdict verdict = aiPrecheckAssistant.assess(
+        //         app == null ? "" : app.getName(),
+        //         pipeline == null ? "" : pipeline.getName(),
+        //         app == null ? "" : app.getRepoUrl(),
+        //         source.branch(), source.commitId(), items, jobExists);
+        // result.setAiPassed(verdict.passed());
+        // result.setAiReason(verdict.reason());
+        // result.setCanTrigger(rulesPassed && verdict.passed());
+        result.setCanTrigger(rulesPassed);
+
         if (active != null) {
             result.setMergedRunId(active.getId());
         }
@@ -634,6 +501,13 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
         return item;
     }
 
+    /** 五项确定性规则是否全部通过（不含 AI 研判结论） */
+    private boolean itemsPassed(PrecheckResultVO precheck) {
+        List<PrecheckItemVO> items = precheck.getItems();
+        return items != null && items.subList(0, Math.min(4, items.size())).stream()
+                .allMatch(i -> ObjUtil.equals(i.getConclusion(), 1));
+    }
+
     private String firstFailDetail(PrecheckResultVO precheck) {
         return precheck.getItems().stream()
                 .filter(i -> ObjUtil.equals(i.getConclusion(), 2))
@@ -652,9 +526,9 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
     }
 
     /**
-     * 按版本快照创建阶段与任务（全部未开始）。
+     * 按版本快照创建阶段与任务：首个阶段为预检（已通过，result 存五项结论），其余未开始。
      */
-    private void createStages(Long runId, Long pipelineId, Integer version) {
+    private void createStages(Long runId, Long pipelineId, Integer version, PrecheckResultVO precheck) {
         PipelineDefinitionDTO definition = pipelineStageService.loadDefinition(pipelineId, version);
         List<PipelineStageDTO> stages = definition.getStages();
         if (stages == null || stages.isEmpty()) {
@@ -667,8 +541,19 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
             entity.setType(stage.getType());
             entity.setName(stage.getName());
             entity.setSort(sort++);
-            entity.setStatus(StageStatusEnum.NOT_STARTED.getCode());
+            // 预检阶段由定义中的 type=0 配置驱动：触发前五项校验已通过，落为成功并留痕
+            boolean precheckStage = Integer.valueOf(0).equals(stage.getType());
+            entity.setStatus(precheckStage
+                    ? StageStatusEnum.SUCCESS.getCode()
+                    : StageStatusEnum.NOT_STARTED.getCode());
+            if (precheckStage) {
+                entity.setResult(com.ferry.common.core.utils.JsonUtil.toJson(precheck.getItems()));
+            }
             stageMapper.insert(entity);
+            if (precheckStage) {
+                // 预检结论由服务端生成，不配置任务
+                continue;
+            }
             int taskSort = 1;
             if (stage.getTasks() != null) {
                 for (PipelineStageTaskDTO task : stage.getTasks()) {
@@ -721,10 +606,15 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
         }
         int seq = 1;
         for (PipelineStageDTO stage : stages) {
+            // 预检阶段由服务端生成五项结论，无需配置任务
+            if (Integer.valueOf(0).equals(stage.getType())) {
+                seq++;
+                continue;
+            }
             if (stage.getTasks() == null || stage.getTasks().isEmpty()) {
                 return "第 " + seq + " 个阶段「" + stage.getName() + "」未添加任务，请先在画布中补充";
             }
-            if (stage.getType() != null && stage.getType() <= 4) {
+            if (stage.getType() != null && stage.getType() >= 1 && stage.getType() <= 4) {
                 boolean hasCommand = stage.getTasks().stream()
                         .filter(t -> t.getExecutor() == null || IntConst.ONE.equals(t.getExecutor()))
                         .anyMatch(t -> StrUtil.isNotBlank(t.getScriptContent())
@@ -852,44 +742,6 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
                 .map(RunStage::getSort).findFirst().orElse(1);
     }
 
-    private void persistPrechecks(Long runId, List<PrecheckItemVO> items) {
-        for (PrecheckItemVO i : items) {
-            RunPrecheck precheck = new RunPrecheck();
-            precheck.setRunId(runId);
-            precheck.setItemType(i.getType());
-            precheck.setConclusion(i.getConclusion());
-            precheck.setDetail(i.getDetail());
-            precheck.setCheckedAt(new Date());
-            precheckMapper.insert(precheck);
-        }
-    }
-
-    private void writeTriggerRecord(RunTriggerDTO body, ResolvedSource source,
-                                    int result, Long runId, String rejectReason) {
-        RunTrigger record = new RunTrigger();
-        record.setAppId(body.getAppId());
-        record.setPipelineId(body.getPipelineId());
-        record.setBranch(source.branch() == null ? "" : source.branch());
-        record.setCommitId(source.commitId() == null ? "" : source.commitId());
-        record.setTriggerUser(AuthUtil.getUserId());
-        record.setResult(result);
-        record.setRunId(runId);
-        record.setRejectReason(rejectReason);
-        triggerMapper.insert(record);
-    }
-
-    private void writeTriggerRecordFromRun(Run run, int result) {
-        RunTrigger record = new RunTrigger();
-        record.setAppId(run.getAppId());
-        record.setPipelineId(run.getPipelineId());
-        record.setBranch(run.getBranch());
-        record.setCommitId(run.getRefValue());
-        record.setTriggerUser(run.getTriggerUser());
-        record.setResult(result);
-        record.setRunId(run.getId());
-        triggerMapper.insert(record);
-    }
-
     private void writeOperation(Long runId, int type, String reason) {
         RunOperation op = new RunOperation();
         op.setRunId(runId);
@@ -911,12 +763,5 @@ public class RunServiceImpl extends ServiceImpl<RunMapper, Run> implements IRunS
             throw new ServiceException("运行不存在");
         }
         return run;
-    }
-
-    /**
-     * 日志入库前脱敏（credential/token/key 遮蔽）。
-     */
-    static String mask(String line) {
-        return RegexUtil.replaceAll(SECRET_REGEX, line, "$1=******");
     }
 }

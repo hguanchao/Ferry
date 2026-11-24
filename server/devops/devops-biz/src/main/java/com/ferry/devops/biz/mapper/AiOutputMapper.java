@@ -3,7 +3,6 @@ package com.ferry.devops.biz.mapper;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.ferry.devops.api.entity.AiOutput;
 import org.apache.ibatis.annotations.Mapper;
-import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 
 /**
@@ -28,9 +27,4 @@ public interface AiOutputMapper extends BaseMapper<AiOutput> {
     /** 拒答数：无法归因 */
     @Select("SELECT COUNT(1) FROM dev_ai_output WHERE is_deleted = 0 AND status = 4")
     long countRefusal();
-
-    /** 按业务id取最近一条成功输出 */
-    @Select("SELECT * FROM dev_ai_output WHERE is_deleted = 0 AND type = #{type} AND biz_id = #{bizId} "
-            + "ORDER BY create_time DESC LIMIT 1")
-    AiOutput latestByBiz(@Param("type") Integer type, @Param("bizId") String bizId);
 }

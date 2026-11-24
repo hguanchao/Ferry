@@ -8,7 +8,6 @@
         <result column="code" jdbcType="VARCHAR" property="code"/>
         <result column="name" jdbcType="VARCHAR" property="name"/>
         <result column="description" jdbcType="VARCHAR" property="description"/>
-        <result column="core_link" jdbcType="TINYINT" property="coreLink"/>
         <result column="repo_type" jdbcType="TINYINT" property="repoType"/>
         <result column="repo_branch" jdbcType="VARCHAR" property="repoBranch"/>
         <result column="repo_commit_id" jdbcType="VARCHAR" property="repoCommitId"/>
@@ -22,7 +21,7 @@
         <result column="is_deleted" jdbcType="TINYINT" property="isDeleted"/>
     </resultMap>
     <sql id="Base_Column_List">
-        id, dept_id, owner_id, code, name, description, core_link, repo_type, repo_branch,
+        id, dept_id, owner_id, code, name, description, repo_type, repo_branch,
         repo_commit_id, repo_url, repo_token, status, create_user, create_time, update_user,
         update_time, is_deleted
     </sql>
@@ -35,7 +34,6 @@
                d.`name`         AS deptName,
                a.owner_id       AS ownerId,
                u.nickname       AS ownerName,
-               a.core_link      AS coreLink,
                a.repo_type      AS repoType,
                a.repo_url       AS repoUrl,
                a.repo_branch    AS repoBranch,
@@ -70,9 +68,6 @@
                 <foreach collection="query.repoTypes" item="repoType" open="(" separator="," close=")">
                     #{repoType}
                 </foreach>
-            </if>
-            <if test="query.coreLink != null">
-                AND a.core_link = #{query.coreLink}
             </if>
             <if test="query.ownerIds != null and query.ownerIds.size() > 0">
                 AND a.owner_id IN

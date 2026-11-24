@@ -35,8 +35,6 @@ public class App extends BaseEntity implements Serializable {
     /** 应用描述 */
     private String description;
 
-    /** 核心链路 0否 1是 */
-    private Integer coreLink;
 
     /** 代码平台 1GitLab 2GitHub 3Gitee */
     private Integer repoType;

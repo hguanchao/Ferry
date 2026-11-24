@@ -1,0 +1,42 @@
+spring:
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://127.0.0.1:3306/ferry?useSSL=false&&allowPublicKeyRetrieval=true
+    username: root
+    password: 123456
+  data:
+    redis:
+      host: 127.0.0.1
+      port: 6379
+      password: 123456
+  ai:
+    openai:
+      # 内部统一模型网关，需兼容 OpenAI /v1/chat/completions
+      base-url: http://127.0.0.1:3425/v1
+      api-key: magpie
+      chat:
+        # 需求：单次调用、不重试，总预算 60s（连接+读取超时）
+        model: hiyo/deepseek-v4.1-flash-1017
+        timeout: 45s
+        max-retries: 0
+        temperature: 0.3
+        top-p: 0.8
+    retry:
+      # 与 chat.max-retries 双保险，确保框架层不产生第二次请求
+      max-attempts: 1
+      on-client-errors: false
+
+# 交付域外部集成配置：端点留空时各集成走本地模拟，配置后走真实调用
+ferry:
+  devops:
+    jenkins:
+      # Jenkins 基址，留空则下发只记日志；填写后按 buildPath 真实触发 Job
+      base-url: http://127.0.0.1:9180
+      build-path: /job/{job}/buildWithParameters
+      user: admin
+      token: 11ff55e2e610f4dacecc3ced85dc284541
+    deploy:
+      # 是否真实执行部署命令（ProcessBuilder 调脚本/ssh/docker/kubectl），false 只记日志
+      execute: ${FERRY_DEPLOY_EXECUTE:false}
+      script-dir: ${FERRY_DEPLOY_SCRIPT_DIR:./deploy-scripts}
+      timeout-seconds: 600

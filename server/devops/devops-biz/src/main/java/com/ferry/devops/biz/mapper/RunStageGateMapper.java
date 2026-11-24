@@ -27,13 +27,6 @@ public interface RunStageGateMapper extends BaseMapper<RunStageGate> {
     List<RunStageGate> listByStage(@Param("runStageId") Long runStageId);
 
     /**
-     * 按运行阶段 + 规则类型查结果（唯一键）。
-     */
-    @Select("SELECT * FROM dev_run_stage_gate WHERE run_stage_id = #{runStageId} "
-            + "AND rule_type = #{ruleType} LIMIT 1")
-    RunStageGate selectByStageAndRule(@Param("runStageId") Long runStageId, @Param("ruleType") Integer ruleType);
-
-    /**
      * 统计运行下阻塞结果数量（不通过 2、数据获取失败 5）。
      */
     @Select("SELECT COUNT(1) FROM dev_run_stage_gate WHERE run_id = #{runId} AND status IN (2,5)")

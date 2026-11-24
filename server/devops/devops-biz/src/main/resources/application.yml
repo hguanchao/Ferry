@@ -22,31 +22,6 @@ spring:
     import:
       - nacos:application.yaml?group=DEFAULT_GROUP&refreshEnabled=true
       - nacos:ferry-devops.yaml?group=DEFAULT_GROUP&refreshEnabled=true
-  ai:
-    openai:
-      # 内部统一模型网关，需兼容 OpenAI /v1/chat/completions
-      base-url: ${AI_GATEWAY_URL:https://api.deepseek.com}
-      api-key: ${AI_API_KEY:}
-      chat:
-        # 需求：单次调用、不重试，总预算 60s（连接+读取超时）
-        timeout: 45s
-        max-retries: 0
-        options:
-          model: ${AI_MODEL:deepseek-chat}
-          temperature: 0.3
-          top-p: 0.8
-    retry:
-      # 与 chat.max-retries 双保险，确保框架层不产生第二次请求
-      max-attempts: 1
-      on-client-errors: false
-
-ferry:
-  ai:
-    # 全局系统提示词：只确立角色与总体纪律；具体输出格式由各场景用户提示词自带
-    system-prompt: ${AI_SYSTEM_PROMPT:你是研发交付助手。严格依据用户提供的证据作答，不臆造事实；输出格式与措辞以用户提示词要求为准。}
-    # 结构化输出：校验 JSON 并失败重试（默认开）；原生结构化输出默认关，OpenAI 不支持顶层 JSON 数组
-    validate-schema: ${AI_VALIDATE_SCHEMA:true}
-    use-provider-structured-output: ${AI_USE_PROVIDER_STRUCTURED_OUTPUT:false}
 
 logging:
   file:

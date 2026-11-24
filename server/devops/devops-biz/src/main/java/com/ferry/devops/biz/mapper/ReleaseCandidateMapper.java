@@ -18,8 +18,4 @@ public interface ReleaseCandidateMapper extends BaseMapper<ReleaseCandidate> {
             + "JOIN dev_app app ON app.id = a.app_id AND app.is_deleted = 0 "
             + "WHERE a.delete_seq = 0 AND a.gate_conclusion IN (1,4) AND a.app_id = #{appId} ORDER BY a.create_time DESC")
     java.util.List<java.util.Map<String, Object>> selectArtifactCandidates(@Param("appId") Long appId);
-
-    /** 应用是否核心链路 */
-    @org.apache.ibatis.annotations.Select("SELECT id, core_link AS coreLink FROM dev_app WHERE is_deleted = 0 AND id = #{appId}")
-    com.ferry.devops.api.entity.App selectAppCore(@Param("appId") Long appId);
 }

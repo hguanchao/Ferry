@@ -18,12 +18,6 @@ public interface PipelineStageMapper extends BaseMapper<PipelineStage> {
     List<PipelineStage> selectByPipelineVersion(@Param("pipelineId") Long pipelineId, @Param("version") Integer version);
 
     /**
-     * 查询流水线已存在的最大版本号
-     */
-    @Select("SELECT IFNULL(MAX(version), 0) FROM dev_pipeline_stage WHERE is_deleted = 0 AND pipeline_id = #{pipelineId}")
-    int selectMaxVersion(@Param("pipelineId") Long pipelineId);
-
-    /**
      * 查询流水线已有的版本号列表（降序）
      */
     @Select("SELECT DISTINCT version FROM dev_pipeline_stage WHERE is_deleted = 0 AND pipeline_id = #{pipelineId} ORDER BY version DESC")

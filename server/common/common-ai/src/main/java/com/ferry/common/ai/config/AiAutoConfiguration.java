@@ -15,8 +15,8 @@ import org.springframework.context.annotation.Import;
  * 业务侧直接静态调用，无需声明 Bean 或注入字段。缺少 Spring AI 依赖时整个配置不生效。
  */
 @AutoConfiguration
-@EnableConfigurationProperties(AiProperties.class)
-@ConditionalOnClass(ChatClient.class)
 @Import(AiUtil.class)
+@ConditionalOnClass(ChatClient.class)
+@EnableConfigurationProperties(AiProperties.class)
 public class AiAutoConfiguration {
 }

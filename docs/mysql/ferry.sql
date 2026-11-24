@@ -247,7 +247,6 @@ CREATE TABLE `dev_app`  (
   `code` varchar(40) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '应用编码',
   `name` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '应用名称',
   `description` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '应用描述',
-  `core_link` tinyint(1) NOT NULL DEFAULT 0 COMMENT '核心链路 0否 1是',
   `repo_type` tinyint NOT NULL COMMENT '代码平台 1GitLab 2GitHub 3Gitee',
   `repo_branch` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '仓库分支',
   `repo_commit_id` varchar(40) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '默认提交id（7–40 位十六进制）',
@@ -264,48 +263,6 @@ CREATE TABLE `dev_app`  (
   KEY `idx_app_dept` (`dept_id`) USING BTREE,
   KEY `idx_app_name` (`name`) USING BTREE
 ) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '应用档案表' ROW_FORMAT = DYNAMIC;
-
--- ----------------------------
--- Table structure for dev_app_dependency
--- ----------------------------
-DROP TABLE IF EXISTS `dev_app_dependency`;
-CREATE TABLE `dev_app_dependency`  (
-  `id` bigint NOT NULL COMMENT '主键',
-  `app_id` bigint NOT NULL COMMENT '应用id',
-  `dep_name` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '依赖服务名',
-  `dep_app_id` bigint NULL COMMENT '关联应用id，可空',
-  `version_range` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '版本范围',
-  `create_user` bigint NULL COMMENT '创建人',
-  `create_time` datetime(3) NULL COMMENT '创建时间',
-  `update_user` bigint NULL COMMENT '更新人',
-  `update_time` datetime(3) NULL COMMENT '更新时间',
-  `is_deleted` tinyint(1) NULL DEFAULT 0 COMMENT '是否删除 0：否 1：是',
-  PRIMARY KEY (`id`) USING BTREE,
-  KEY `idx_app_dep_app` (`app_id`) USING BTREE,
-  KEY `idx_app_dep_dep` (`dep_app_id`) USING BTREE
-) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '依赖服务表' ROW_FORMAT = DYNAMIC;
-
--- ----------------------------
--- Table structure for dev_app_core_flag_apply
--- ----------------------------
-DROP TABLE IF EXISTS `dev_app_core_flag_apply`;
-CREATE TABLE `dev_app_core_flag_apply`  (
-  `id` bigint NOT NULL COMMENT '主键',
-  `app_id` bigint NOT NULL COMMENT '应用id',
-  `is_target_core` tinyint(1) NOT NULL COMMENT '申请的目标值，0 关闭 1 开启',
-  `reason` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '申请理由',
-  `status` tinyint NOT NULL DEFAULT 1 COMMENT '1 待审批 2 已通过 3 已驳回',
-  `applicant` bigint NOT NULL COMMENT '申请人',
-  `approver` bigint NULL COMMENT '审批人',
-  `approve_time` datetime(3) NULL COMMENT '审批时间',
-  `create_user` bigint NULL COMMENT '创建人',
-  `create_time` datetime(3) NULL COMMENT '创建时间',
-  `update_user` bigint NULL COMMENT '更新人',
-  `update_time` datetime(3) NULL COMMENT '更新时间',
-  `is_deleted` tinyint(1) NULL DEFAULT 0 COMMENT '是否删除 0：否 1：是',
-  PRIMARY KEY (`id`) USING BTREE,
-  KEY `idx_core_apply_app` (`app_id`,`status`) USING BTREE
-) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '核心链路变更申请表' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
 -- Table structure for dev_pipeline
@@ -333,7 +290,7 @@ CREATE TABLE `dev_pipeline`  (
 DROP TABLE IF EXISTS `dev_pipeline_stage`;
 CREATE TABLE `dev_pipeline_stage`  (
   `id` bigint NOT NULL COMMENT '主键id',
-  `type` tinyint NOT NULL COMMENT '阶段类型 1构建 2单测 3静态扫描 4制品入库 5部署非生产 6集成测试 7准入 8生产发布',
+  `type` tinyint NOT NULL COMMENT '阶段类型 0预检 1构建 2单测 3静态扫描 4制品入库 5部署非生产 6集成测试 7准入 8生产发布',
   `name` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '阶段名称',
   `build_tool` varchar(30) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci DEFAULT NULL COMMENT '构建工具，如 Maven/Node/Gradle',
   `version` int NOT NULL COMMENT '版本号',
@@ -418,10 +375,10 @@ CREATE TABLE `dev_run`  (
 DROP TABLE IF EXISTS `dev_run_stage`;
 CREATE TABLE `dev_run_stage`  (
   `id` bigint NOT NULL COMMENT '主键id',
-  `type` tinyint NOT NULL COMMENT '阶段类型 1=构建 2=单元测试 3=静态扫描 4=制品入库 5=部署非生产 6=集成测试 7=准入 8=生产发布',
+  `type` tinyint NOT NULL COMMENT '阶段类型 0=预检 1=构建 2=单元测试 3=静态扫描 4=制品入库 5=部署非生产 6=集成测试 7=准入 8=生产发布',
   `name` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '阶段名称',
   `status` tinyint NOT NULL DEFAULT 1 COMMENT '状态 1=未开始 2=进行中 3=成功 4=失败 5=阻塞 6=跳过 7=超时 8=已复用 9=已取消 10=待门禁',
-  `result` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '运行结果信息',
+  `result` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '结果摘要',
   `run_id` bigint NOT NULL COMMENT '运行id',
   `start_time` datetime(3) NULL COMMENT '开始时间',
   `end_time` datetime(3) NULL COMMENT '结束时间',
@@ -446,8 +403,8 @@ CREATE TABLE `dev_run_stage_task`  (
   `executor` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '执行器',
   `script_ref` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '源码脚本路径',
   `script_content` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '自定义脚本内容',
-  `status` tinyint NOT NULL DEFAULT 1 COMMENT '状态 1=未开始 2=进行中 3=成功 4=失败 5=阻塞 6=跳过 7=超时 8=已复用 9=已取消；复用阶段状态码，实际写入1/3/4/6/9，不使用10=待门禁',
-  `result` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '运行结果信息',
+  `status` tinyint NOT NULL DEFAULT 1 COMMENT '状态 1=未开始 2=进行中 3=成功 4=失败 5=阻塞 6=跳过 7=超时 8=已复用 9=已取消',
+  `result` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '结果摘要',
   `run_id` bigint NOT NULL COMMENT '运行id',
   `run_stage_id` bigint NOT NULL COMMENT '运行阶段id',
   `start_time` datetime(3) NULL COMMENT '开始时间',
@@ -462,60 +419,6 @@ CREATE TABLE `dev_run_stage_task`  (
   KEY `idx_stage_task_stage` (`run_stage_id`,`sort`) USING BTREE,
   KEY `idx_stage_task_run` (`run_id`) USING BTREE
 ) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '运行阶段任务表' ROW_FORMAT = DYNAMIC;
-
--- ----------------------------
--- Table structure for dev_run_log_segment
--- ----------------------------
-DROP TABLE IF EXISTS `dev_run_log_segment`;
-CREATE TABLE `dev_run_log_segment`  (
-  `id` bigint NOT NULL COMMENT '主键',
-  `run_id` bigint NOT NULL COMMENT '运行id',
-  `task_id` bigint NOT NULL COMMENT '任务id',
-  `segment_no` int NOT NULL COMMENT '段号',
-  `start_line` int NOT NULL COMMENT '起始行号',
-  `end_line` int NOT NULL COMMENT '结束行号',
-  `content` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '打码后的日志',
-  `is_truncated` tinyint(1) NOT NULL DEFAULT 0 COMMENT '段是否被截断',
-  `create_time` datetime(3) NOT NULL COMMENT '入库时间',
-  PRIMARY KEY (`id`) USING BTREE,
-  KEY `idx_log_task` (`task_id`,`segment_no`) USING BTREE,
-  KEY `idx_log_run` (`run_id`) USING BTREE
-) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '日志分段表' ROW_FORMAT = DYNAMIC;
-
--- ----------------------------
--- Table structure for dev_run_precheck
--- ----------------------------
-DROP TABLE IF EXISTS `dev_run_precheck`;
-CREATE TABLE `dev_run_precheck`  (
-  `id` bigint NOT NULL COMMENT '主键',
-  `run_id` bigint NOT NULL COMMENT '运行id',
-  `item_type` tinyint NOT NULL COMMENT '1 仓库可达 2 分支存在 3 提交可达 4 定义匹配 5 幂等检查',
-  `conclusion` tinyint NOT NULL COMMENT '1 通过 2 不通过 3 合并 4 复用',
-  `detail` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '明细',
-  `checked_at` datetime(3) NOT NULL COMMENT '校验时间',
-  PRIMARY KEY (`id`) USING BTREE,
-  KEY `idx_precheck_run` (`run_id`) USING BTREE
-) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '触发预校验表' ROW_FORMAT = DYNAMIC;
-
--- ----------------------------
--- Table structure for dev_run_trigger
--- ----------------------------
-DROP TABLE IF EXISTS `dev_run_trigger`;
-CREATE TABLE `dev_run_trigger`  (
-  `id` bigint NOT NULL COMMENT '主键',
-  `app_id` bigint NOT NULL COMMENT '应用id',
-  `pipeline_id` bigint NOT NULL COMMENT '流水线id',
-  `branch` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '分支',
-  `commit_id` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '提交或引用值（与运行生效值一致）',
-  `trigger_user` bigint NOT NULL COMMENT '触发人',
-  `result` tinyint NOT NULL COMMENT '1 已创建 2 已合并 3 已复用 4 已拒绝',
-  `run_id` bigint NULL COMMENT '运行id',
-  `reject_reason` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '拒绝原因',
-  `create_time` datetime(3) NOT NULL COMMENT '触发时间',
-  PRIMARY KEY (`id`) USING BTREE,
-  KEY `idx_trigger_app` (`app_id`,`create_time`) USING BTREE,
-  KEY `idx_trigger_user` (`trigger_user`,`create_time`) USING BTREE
-) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '触发记录表' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
 -- Table structure for dev_run_operation
@@ -1224,7 +1127,7 @@ DROP TABLE IF EXISTS `dev_ai_evidence`;
 CREATE TABLE `dev_ai_evidence`  (
   `id` bigint NOT NULL COMMENT '主键',
   `output_id` bigint NOT NULL COMMENT '输出id',
-  `type` tinyint NOT NULL COMMENT '1 日志 2 指标 3 变更 4 历史',
+  `type` tinyint NOT NULL COMMENT '1 阶段 2 门禁/指标 3 变更 4 历史 5 任务',
   `locator` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '定位',
   `snippet` varchar(1000) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '原文片段',
   `is_valid` tinyint(1) NOT NULL DEFAULT 0 COMMENT '服务端校验是否通过',

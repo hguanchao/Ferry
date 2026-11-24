@@ -18,7 +18,7 @@ public class RunStageVO {
     @Schema(description = "运行id")
     private Long runId;
 
-    @Schema(description = "阶段类型 1=构建 2=单元测试 3=静态扫描 4=制品入库 5=部署非生产 6=集成测试 7=准入 8=生产发布")
+    @Schema(description = "阶段类型 0=预检 1=构建 2=单元测试 3=静态扫描 4=制品入库 5=部署非生产 6=集成测试 7=准入 8=生产发布")
     private Integer type;
 
     @Schema(description = "阶段名称")

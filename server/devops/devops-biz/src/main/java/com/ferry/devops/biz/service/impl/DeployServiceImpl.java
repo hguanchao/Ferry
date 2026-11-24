@@ -97,10 +97,8 @@ public class DeployServiceImpl extends ServiceImpl<DeployRecordMapper, DeployRec
                 && baseMapper.countActiveDeploy(body.getEnvId()) == IntConst.ZERO;
         addResult(items, DeployPrecheckTypeEnum.ENV_IDLE, idle,
                 idle ? "环境空闲" : "环境正在进行其他部署");
-        // 4. 依赖兼容（简化：有依赖则视为兼容）
-        long deps = baseMapper.countDependencies(body.getAppId());
-        addResult(items, DeployPrecheckTypeEnum.DEPENDENCY_COMPATIBLE, true,
-                deps == IntConst.ZERO ? "无依赖服务" : "存在 " + deps + " 个依赖服务，版本兼容");
+        // 4. 依赖兼容（依赖拓扑未接入，无登记数据可校验）
+        addResult(items, DeployPrecheckTypeEnum.DEPENDENCY_COMPATIBLE, true, "无依赖登记数据，跳过校验");
         // 5. 变更单（生产必填且已批准）
         boolean ticketOk = !ObjUtil.equals(env.getCategory(), EnvCategoryEnum.PRODUCTION.getCode())
                 || (StrUtil.isNotBlank(body.getChangeTicketId())

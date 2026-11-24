@@ -49,6 +49,31 @@ class JenkinsClientImpl implements JenkinsClient {
     private volatile String httpClientKey;
 
     /**
+     * 探测 Job 是否存在：读取 config.xml，200 存在 / 404 不存在。
+     * 模拟模式与其他读取异常按"存在"处理，避免在信息不足时误拦截触发。
+     */
+    @Override
+    public boolean jobExists(String jobName) {
+        DevopsProperties.Jenkins cfg = properties.getJenkins();
+        if (cfg == null || StrUtil.isBlank(cfg.getBaseUrl())) {
+            return true;
+        }
+        if (StrUtil.isBlank(jobName)) {
+            return false;
+        }
+        try {
+            JenkinsHttpClient.HttpResult result = httpClient(cfg).get(configPath(jobName));
+            if (result.status() == 404) {
+                return false;
+            }
+            return result.isOk() || isUncertain(result.status());
+        } catch (RuntimeException e) {
+            log.warn("Jenkins jobExists probe failed, treat as present: jobName={}", jobName, e);
+            return true;
+        }
+    }
+
+    /**
      * 创建 Job（幂等）：先查 Job 是否存在，存在直接完成返回。
      */
     @Override

@@ -9,6 +9,7 @@ import type { PipelineStageDef, PipelineTaskDef } from '@/api/types-devops'
 
 /** 阶段类型：与后端 StageTypeEnum 对应 */
 export const STAGE_TYPES = [
+  { value: 0, label: '预检' },
   { value: 1, label: '构建' },
   { value: 2, label: '单元测试' },
   { value: 3, label: '静态扫描' },
@@ -21,11 +22,11 @@ export const STAGE_TYPES = [
 
 /** 各阶段类型的图标与主题色，画布卡片据此着色 */
 const STAGE_ICONS: Record<number, typeof Code2> = {
-  1: Code2, 2: FlaskConical, 3: ShieldCheck, 4: PackageCheck,
+  0: CircleDot, 1: Code2, 2: FlaskConical, 3: ShieldCheck, 4: PackageCheck,
   5: Wrench, 6: Boxes, 7: GitMerge, 8: Rocket,
 }
 const STAGE_COLORS: Record<number, string> = {
-  1: '#4096ff', 2: '#36cfc9', 3: '#ffc53d', 4: '#b37feb',
+  0: '#95de64', 1: '#4096ff', 2: '#36cfc9', 3: '#ffc53d', 4: '#b37feb',
   5: '#69b1ff', 6: '#5cdbd3', 7: '#ffd666', 8: '#ff85c0',
 }
 

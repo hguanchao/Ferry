@@ -17,7 +17,6 @@ import com.ferry.devops.api.dto.ReleaseCandidateDTO;
 import com.ferry.devops.api.dto.ReleaseCheckDTO;
 import com.ferry.devops.api.dto.ReleaseTerminateDTO;
 import com.ferry.devops.api.dto.query.ReleaseQuery;
-import com.ferry.devops.api.entity.AppDependency;
 import com.ferry.devops.api.entity.ReleaseApproval;
 import com.ferry.devops.api.entity.ReleaseArtifact;
 import com.ferry.devops.api.entity.ReleaseCandidate;
@@ -37,7 +36,6 @@ import com.ferry.devops.api.vo.ReleaseRecordVO;
 import com.ferry.devops.api.vo.ReleaseTimelineVO;
 import com.ferry.devops.api.vo.ReleaseVO;
 import com.ferry.devops.api.vo.RiskVO;
-import com.ferry.devops.biz.mapper.AppDependencyMapper;
 import com.ferry.devops.biz.mapper.ReleaseApprovalMapper;
 import com.ferry.devops.biz.mapper.ReleaseArtifactMapper;
 import com.ferry.devops.biz.mapper.ReleaseCandidateMapper;
@@ -74,7 +72,6 @@ public class ReleaseServiceImpl extends ServiceImpl<ReleaseCandidateMapper, Rele
     private final ReleaseApprovalMapper approvalMapper;
     private final ReleaseTimelineMapper timelineMapper;
     private final ReleaseRecordMapper recordMapper;
-    private final AppDependencyMapper dependencyMapper;
     private final IReleaseStrategyService strategyService;
 
     @Override
@@ -448,23 +445,14 @@ public class ReleaseServiceImpl extends ServiceImpl<ReleaseCandidateMapper, Rele
         };
     }
 
-    /** 影响面三层：直接依赖（一层）、间接依赖、共享资源；简化为一层 + 推断标注 */
+    /** 影响面三层：直接依赖（一层）、间接依赖、共享资源；依赖拓扑未接入，均为推断 */
     private ImpactVO evaluateImpact(ReleaseCandidate rc) {
         List<Map<String, Object>> layers = new ArrayList<>();
         Map<String, Object> direct = new LinkedHashMap<>();
         direct.put("layer", 1);
         direct.put("name", "直接依赖");
-        List<Long> appIds = artifactAppIds(rc.getId());
-        List<String> deps = new ArrayList<>();
-        for (Long appId : appIds) {
-            List<AppDependency> rows = dependencyMapper.selectList(Wrappers.<AppDependency>lambdaQuery()
-                    .eq(AppDependency::getAppId, appId));
-            for (AppDependency d : rows) {
-                deps.add(d.getDepName());
-            }
-        }
-        direct.put("items", deps);
-        direct.put("inferred", "部分关系来自人工依赖清单，标注为推断");
+        direct.put("items", new ArrayList<>());
+        direct.put("inferred", "依赖拓扑未接入，标注为推断");
         layers.add(direct);
         Map<String, Object> indirect = new LinkedHashMap<>();
         indirect.put("layer", 2);
@@ -483,24 +471,12 @@ public class ReleaseServiceImpl extends ServiceImpl<ReleaseCandidateMapper, Rele
         return vo;
     }
 
-    /** 五因子加权：变更文件20% 服务数20% 核心链路30% 失败率20% 时间窗口10%，1-5 分制 */
+    /** 四因子加权：变更文件25% 服务数25% 失败率25% 时间窗口15%，1-5 分制 */
     private RiskVO evaluateRisk(ReleaseCandidate rc) {
-        List<Long> appIds = artifactAppIds(rc.getId());
         // 变更文件：无文件差异数据，取中位 2 分
         double fileScore = 2.0;
-        // 服务数：依赖越多分越高（1-4）
+        // 服务数：依赖拓扑未接入，取基准 1 分
         double serviceScore = 1.0;
-        // 核心链路：命中核心给 5 分，否则 1 分
-        double coreScore = 1.0;
-        for (Long appId : appIds) {
-            com.ferry.devops.api.entity.App app = baseMapper.selectAppCore(appId);
-            if (app != null && ObjUtil.equals(app.getCoreLink(), IntConst.ONE)) {
-                coreScore = 5.0;
-            }
-            long deps = dependencyMapper.selectCount(Wrappers.<AppDependency>lambdaQuery()
-                    .eq(AppDependency::getAppId, appId));
-            serviceScore = Math.max(serviceScore, Math.min(1.0 + deps, 4.0));
-        }
         // 近 90 天失败率：无历史数据取中位 2 分
         double failScore = 2.0;
         // 时间窗口：非工作时段（22:00-08:00）给 4 分，否则 1 分
@@ -513,17 +489,16 @@ public class ReleaseServiceImpl extends ServiceImpl<ReleaseCandidateMapper, Rele
                 windowScore = 4.0;
             }
         }
-        double total = fileScore * 0.2 + serviceScore * 0.2 + coreScore * 0.3
-                + failScore * 0.2 + windowScore * 0.1;
+        double total = fileScore * 0.25 + serviceScore * 0.25
+                + failScore * 0.25 + windowScore * 0.15;
         BigDecimal score = BigDecimal.valueOf(total).setScale(2, RoundingMode.HALF_UP);
         int level = total <= 2.0 ? RiskLevelEnum.LOW.getCode()
                 : total <= 3.5 ? RiskLevelEnum.MEDIUM.getCode() : RiskLevelEnum.HIGH.getCode();
         Map<String, Object> detail = new LinkedHashMap<>();
-        detail.put("变更文件(20%)", fileScore);
-        detail.put("服务数(20%)", serviceScore);
-        detail.put("核心链路(30%)", coreScore);
-        detail.put("近90天失败率(20%)", failScore);
-        detail.put("时间窗口(10%)", windowScore);
+        detail.put("变更文件(25%)", fileScore);
+        detail.put("服务数(25%)", serviceScore);
+        detail.put("近90天失败率(25%)", failScore);
+        detail.put("时间窗口(15%)", windowScore);
         RiskVO vo = new RiskVO();
         vo.setLevel(level);
         vo.setScore(score);

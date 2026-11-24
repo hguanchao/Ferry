@@ -1,0 +1,93 @@
+# 暴露服务端点
+management:
+  endpoints:
+    web:
+      exposure:
+        # 仅暴露探活端点，env / heapdump 等可读取配置与环境变量的端点不开放
+        include: "health"
+  endpoint:
+    health:
+      # 不返回组件明细，避免暴露数据库、中间件等内部信息
+      show-details: never
+
+# Spring配置
+spring:
+  jackson:
+    # 当地时区
+    locale: zh_CN
+    # 设置全局时区
+    time-zone: GMT+8
+    # 日期格式化
+    date-format: yyyy-MM-dd HH:mm:ss
+  web:
+    resources:
+      # 关闭静态资源映射：本系统只提供接口，避免无谓的静态资源查找
+      add-mappings: false
+
+# Mybatis-Plus配置
+mybatis-plus:
+  mapper-locations: classpath:mapper/*Mapper.xml
+  type-aliases-package: com.ferry.**.entity
+  configuration:
+    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
+  global-config:
+    db-config:
+      id-type: assign_id
+      table-underline: true
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+
+# 系统自定义配置
+ferry:
+  # MybatisPlus配置
+  mybatis-plus:
+    max-limit: 100
+    # 数据库类型，取值见 mybatis-plus 的 DbType 枚举，默认 mysql
+    db-type: mysql
+  # 安全配置
+  security:
+    token-header: Authorization
+    token-prefix: Bearer
+    token-timeout: 3600
+    refresh-timeout: 86400
+    is-auto-renew: true
+    # 令牌剩余有效期低于该值时自动续签（秒），须小于 token-timeout
+    renew-threshold: 600
+    # 登录连续失败达到该次数后锁定账号，调整需安全评审
+    max-fail-count: 5
+    # 登录失败锁定时长（秒）
+    lock-duration: 900
+    # 令牌加密密钥，长度必须为 16/24/32 字节；生产环境通过环境变量 FERRY_SECRET_KEY 注入
+    secret-key: "FerryDevKeys2026"
+    exclude-path:
+      - /tenant/list
+
+# springdoc配置
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    tags-sorter: alpha
+    operations-sorter: alpha
+  api-docs:
+    path: /v3/api-docs
+
+# swagger基础信息配置
+swagger:
+  title: Ferry(持续交付智能助手)接口文档
+  description: Ferry(持续交付智能助手)接口文档
+  version: 1.0.0
+  license: Apache 2.0
+  licenseUrl: https://www.apache.org/licenses/LICENSE-2.0.html
+  contact:
+    name: Chao
+    url: https://github.com/hguanchao
+    email: hguanchao@yeah.net
+
+# 日志配置
+logging:
+  level:
+    com.ferry: debug
+    org.apache.ibatis.logging: info
+    com.alibaba.nacos: error
+    com.alibaba.cloud.nacos: error
+    org.springframework.cloud.gateway.route: error

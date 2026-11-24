@@ -74,7 +74,12 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements IAppS
             job.setRepoUrl(app.getRepoUrl());
             job.setRepoName(app.getName());
             if (ObjUtil.isNotEmpty(body.getId())) {
-                // 编辑：Job 已存在，刷新脚本与 GitHub 项目属性
+                // 编辑：先探测 Job 是否存在，不存在则补建，再刷新脚本与 GitHub 项目属性。
+                // 避免 Job 被外部删除或从未同步过时 updateJob 直接报"不存在"导致应用保存失败。
+                String jobName = job.getName();
+                if (!jenkinsClient.jobExists(jobName)) {
+                    jenkinsClient.createJob(job);
+                }
                 jenkinsClient.updateJob(job);
             } else {
                 // 新建：初始化空白 Job

@@ -13,6 +13,16 @@ import com.ferry.devops.api.model.JenkinsJob;
 public interface JenkinsClient {
 
     /**
+     * 探测 Job 是否存在（读取 config.xml，200 存在 / 404 不存在）。
+     *
+     * <p>供触发预检使用，在发起构建前拦截"未同步 Job"的失败。未配置 Jenkins 基址时按模拟模式返回 true。
+     *
+     * @param jobName 完整 Job 名
+     * @return Job 存在返回 true；明确 404 返回 false；其他读取失败按不确定处理返回 true，避免误拦截
+     */
+    boolean jobExists(String jobName);
+
+    /**
      * 创建 Job（幂等）：先查 Job 是否存在，存在直接完成返回，不存在时以最小配置创建。
      *
      * <p>仅负责"让 Job 存在"，不更新既有 Job 的脚本与属性——脚本更新走 {@link #updateJob}。

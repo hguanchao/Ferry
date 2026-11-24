@@ -26,6 +26,7 @@ import com.ferry.devops.biz.mapper.RunMapper;
 import com.ferry.devops.biz.mapper.RunStageMapper;
 import com.ferry.devops.biz.service.IRunStageGateService;
 import com.ferry.devops.biz.service.IRunStageService;
+import com.ferry.devops.biz.utils.StageResultUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -307,7 +308,7 @@ public class RunStageGateEvaluator {
         if (StrUtil.isNotBlank(error)) {
             summary.put("error", error);
         }
-        stage.setResult(JsonUtil.toJson(summary));
+        stage.setResult(StageResultUtil.gate(stage.getResult(), summary));
         stageMapper.updateById(stage);
     }
 

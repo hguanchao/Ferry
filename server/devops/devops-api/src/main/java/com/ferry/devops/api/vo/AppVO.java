@@ -34,8 +34,6 @@ public class AppVO {
     @Schema(description = "应用负责人名称，联表 sys_user 获取")
     private String ownerName;
 
-    @Schema(description = "核心链路 0否 1是")
-    private Integer coreLink;
 
     @Schema(description = "代码平台 1GitLab 2GitHub 3Gitee")
     private Integer repoType;

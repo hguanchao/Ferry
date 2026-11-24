@@ -3,14 +3,14 @@ import { get, post } from './client'
 import type { ApiPage } from './types'
 import type {
   ActionCatalogRow, ActionRecordRow, AiFeedbackRow, AiOutputRow, AppAiLevelRow,
-  AppOption, AppOverview, AppDependencyRow, AppRow, ArtifactRow, GateBaseline,
+  AppOption, AppOverview, AppRow, ArtifactRow, GateBaseline,
   ChangeTicketRow, CleanPolicyRow, CleanTaskRow, ClosureRow, DeployBatchRow,
   DeployRecordRow, EnvironmentRow, EnvConfigRow, GateExemption,
   RunStageGate, GateRule, ImpactResult, MetricRow, NotifyChannelRow, NotifyTemplateRow,
   OpenTokenRow, PipelineDetail, PipelineRow, PrecheckResult,
   PrecheckResultVO, ReleaseDetail, ReleaseRecordRow, ReleaseRow, ReleaseStrategyRow,
   RepoCommitOption, RiskResult, RollbackCandidate, RollbackRow, RunDetail, Run, StageStat, StoragePolicyRow,
-  TechDebtRow, RunTrigger, TriggerResult,
+  TechDebtRow, TriggerResult,
   WizardProgress,
 } from './types-devops'
 
@@ -31,12 +31,7 @@ export const appApi = {
         repoBranch: r.repoBranch,
         repoCommitId: r.repoCommitId,
       }))),
-  // TODO(dev_app-schema): dev_app_repo 已删除，repoList/saveRepo/deletedRepo 接口已移除。
-  dependencyList: (appId: string) => get<AppDependencyRow[]>(`${B}/app/dependency/list`, { appId }),
-  saveDependency: (body: Record<string, unknown>) => post<string>(`${B}/app/dependency/save`, body),
-  deletedDependency: (ids: string[]) => post<string>(`${B}/app/dependency/deleted`, ids),
-  applyCoreFlag: (body: Record<string, unknown>) => post<string>(`${B}/app/coreFlag/apply`, body),
-  approveCoreFlag: (body: Record<string, unknown>) => post<string>(`${B}/app/coreFlag/approve`, body),
+  // TODO(dev_app-schema): dev_app_repo、dev_app_dependency、核心链路审批已删除，对应接口已移除。
   saveWizardStep: (body: Record<string, unknown>) => post<string>(`${B}/app/wizard/saveStep`, body),
   wizardProgress: (id: string) => get<WizardProgress>(`${B}/app/wizard/progress`, { id }),
   overview: (id: string) => get<AppOverview>(`${B}/app/aggregate/overview`, { id }),
@@ -63,22 +58,16 @@ export const pipelineApi = {
   deleted: (ids: string[]) => post<string>(`${B}/pipeline/deleted`, ids),
   changeStatus: (id: string, status: number) =>
     post<string>(`${B}/pipeline/changeStatus`, {}, { params: { id, status } }),
-  triggerPrecheck: (body: Record<string, unknown>) => post<PrecheckResult>(`${B}/run/trigger/precheck`, body),
   triggerBranches: (appId: string) => get<string[]>(`${B}/run/trigger/branches`, { appId }, { silent: true }),
   triggerCommits: (appId: string, branch: string, limit = 10) =>
     get<RepoCommitOption[]>(`${B}/run/trigger/commits`, { appId, branch, limit }, { silent: true }),
   trigger: (body: Record<string, unknown>, requestId: string) => post<TriggerResult>(`${B}/run/trigger`, { ...body, requestId }),
-  triggerRecords: (appId: string, current = 1, size = 20) => get<ApiPage<RunTrigger>>(`${B}/run/trigger/records`, { appId, current, size }),
 }
 
 
 export const runApi = {
   pageList: (body: Record<string, unknown>) => post<ApiPage<Run>>(`${B}/run/pageList`, body),
   detail: (id: string) => get<RunDetail>(`${B}/run/detail`, { id }),
-  stages: (id: string) => get<Array<Record<string, unknown>>>(`${B}/run/stage/list`, { id }),
-  tasks: (runStageId: string) => get<Array<Record<string, unknown>>>(`${B}/run/task/list`, { runStageId }),
-  log: (taskId: string) => get<Array<Record<string, unknown>>>(`${B}/run/log`, { taskId }),
-  logSearch: (body: Record<string, unknown>) => post<Array<Record<string, unknown>>>(`${B}/run/log/search`, body),
   pause: (body: Record<string, unknown>) => post<string>(`${B}/run/pause`, body),
   resume: (id: string) => post<string>(`${B}/run/resume`, { id }),
   abort: (body: Record<string, unknown>) => post<string>(`${B}/run/abort`, body),

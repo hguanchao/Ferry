@@ -65,7 +65,7 @@ final class PipelineScriptRenderer {
         List<PipelineStageDTO> ciStages = new ArrayList<>();
         if (definition != null && definition.getStages() != null) {
             for (PipelineStageDTO stage : definition.getStages()) {
-                if (stage.getType() != null && stage.getType() <= CI_STAGE_TYPE_MAX) {
+                if (stage.getType() != null && stage.getType() >= 1 && stage.getType() <= CI_STAGE_TYPE_MAX) {
                     ciStages.add(stage);
                 }
             }

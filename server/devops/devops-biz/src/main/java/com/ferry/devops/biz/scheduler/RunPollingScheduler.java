@@ -14,7 +14,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * <p>按运行状态分频：
  *
  * <ul>
- *   <li>排队中/运行中：每 60 秒，同步阶段与运行终态</li>
+ *   <li>排队中/运行中：每 5 秒，用 wfapi 逐阶段同步状态与运行终态（Jenkins wfapi 在运行中即返回 stage 状态，
+ *       高频轮询可实现阶段级准实时推进；状态更新幂等）</li>
  *   <li>结果待确认：每 300 秒，等待触发结果收敛，无高频变化需求</li>
  * </ul>
  *
@@ -29,7 +30,7 @@ public class RunPollingScheduler {
     /** 两个分频任务共用一把互斥标记：同一时刻最多一个轮询线程访问 Jenkins */
     private final AtomicBoolean running = new AtomicBoolean(false);
 
-    @Scheduled(fixedDelay = 60000, initialDelay = 10000)
+    @Scheduled(fixedDelay = 5000, initialDelay = 5000)
     public void pollActiveRuns() {
         runGuarded(runPollService::pollActiveRuns);
     }

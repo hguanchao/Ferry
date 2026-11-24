@@ -61,7 +61,7 @@ export default function AppList() {
   const [form] = Form.useForm()
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<AppRow | null>(null)
-  const [draft, setDraft] = useState<{ code?: string; name?: string; repoTypes?: number[]; coreLink?: number }>({})
+  const [draft, setDraft] = useState<{ code?: string; name?: string; repoTypes?: number[] }>({})
   const [filters, setFilters] = useState<Record<string, unknown>>({})
   const [page, setPage] = useState({ current: 1, size: 30 })
 
@@ -169,7 +169,6 @@ export default function AppList() {
         name: record.name,
         deptId: record.deptId,
         ownerId,
-        coreLink: record.coreLink,
         repoType: record.repoType,
         repoUrl: record.repoUrl,
         repoBranch: record.repoBranch,
@@ -186,12 +185,7 @@ export default function AppList() {
       render: (value: string) => <span className="ferry-mono" style={{ fontSize: 12 }}>{value}</span>,
     },
     { title: '应用名称', dataIndex: 'name',
-      render: (value: string, record) => (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ fontWeight: 500, color: 'var(--text-1)' }}>{value}</span>
-          {record.coreLink === 1 && <Tag color="red" style={{ fontSize: 10 }}>核心</Tag>}
-        </div>
-      ),
+      render: (value: string) => <span style={{ fontWeight: 500, color: 'var(--text-1)' }}>{value}</span>,
     },
     { title: '所属团队', dataIndex: 'deptName',
       render: (value?: string) => value || '—',
@@ -255,10 +249,6 @@ export default function AppList() {
           <Select allowClear placeholder="代码平台" style={{ width: 130 }} value={draft.repoTypes?.[0]}
             onChange={(value) => setDraft((prev) => ({ ...prev, repoTypes: value == null ? undefined : [value] }))}
             options={[{ value: 1, label: 'GitLab' }, { value: 2, label: 'GitHub' }, { value: 3, label: 'Gitee' }]}
-          />
-          <Select allowClear placeholder="核心链路" style={{ width: 120 }} value={draft.coreLink}
-            onChange={(value) => setDraft((prev) => ({ ...prev, coreLink: value }))}
-            options={[{ value: 1, label: '是' }, { value: 0, label: '否' }]}
           />
           <Button type="primary" icon={<Search size={15} />}
             onClick={() => { setFilters(draft); setPage((p) => ({ ...p, current: 1 })) }}>查询</Button>
@@ -340,9 +330,6 @@ export default function AppList() {
 
           <SectionTitle title="补充信息" />
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '0 16px' }}>
-            <Form.Item name="coreLink" label="核心链路">
-              <Select options={[{ value: 0, label: '否' }, { value: 1, label: '是' }]} />
-            </Form.Item>
             <Form.Item
               name="repoCommitId"
               label="指定提交 Id"

@@ -2,10 +2,10 @@ import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
-  App, Button, Descriptions, Input, InputNumber, Modal, Space, Steps, Table, Tag, Tooltip,
+  App, Button, Descriptions, Input, InputNumber, Modal, Popover, Space, Steps, Table, Tag, Tooltip,
   type TableColumnsType,
 } from 'antd'
-import { CirclePause, CirclePlay, OctagonX, RotateCcw, Search } from 'lucide-react'
+import { CirclePause, CirclePlay, OctagonX, RotateCcw } from 'lucide-react'
 import PageHeader from '@/components/PageHeader'
 import { gateApi, runApi } from '@/api/devops'
 import type { RunStageGate, RunDetail, Run } from '@/api/types-devops'
@@ -47,6 +47,21 @@ function elapsedSeconds(start?: string, end?: string): number | null {
   const value = (new Date(end).getTime() - new Date(start).getTime()) / 1000
   return Number.isFinite(value) && value >= 0 ? value : null
 }
+/** 预检阶段的 result 是 PrecheckItemVO[]：type/conclusion/detail */
+function parsePrecheckItems(result?: string): { type: number; conclusion: number; detail?: string }[] {
+  if (!result) return []
+  try {
+    const parsed = JSON.parse(result)
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
+}
+const PRECHECK_CONCLUSION: Record<number, { label: string; color: string }> = {
+  1: { label: '通过', color: 'green' },
+  2: { label: '不通过', color: 'red' },
+  3: { label: '合并', color: 'blue' },
+}
 interface StageExt {
   id: string
   runId: string
@@ -72,14 +87,6 @@ interface TaskExt {
   startTime?: string
   endTime?: string
 }
-interface LogSegment {
-  segmentNo: number
-  startLine: number
-  endLine: number
-  content: string
-  isTruncated: number
-}
-
 function runIdFromHash(): string | null {
   const m = window.location.hash.match(/\/run\/(\d+)/)
   return m ? m[1] : null
@@ -94,9 +101,6 @@ export default function RunDetail() {
   const [runId, setRunId] = useState<string | null>(() => routeRunId ?? runIdFromHash())
   const [inputId, setInputId] = useState('')
   const [runPage, setRunPage] = useState({ current: 1, size: 20 })
-  const [logTask, setLogTask] = useState<TaskExt | null>(null)
-  const [keyword, setKeyword] = useState('')
-  const [searchOpen, setSearchOpen] = useState(false)
   const [abortOpen, setAbortOpen] = useState(false)
   const [abortReason, setAbortReason] = useState('')
   const [rerunOpen, setRerunOpen] = useState(false)
@@ -125,20 +129,10 @@ export default function RunDetail() {
       return status === 1 || status === 2 || status === 3 || status === 8 ? 5000 : false
     },
   })
-  const stagesQuery = useQuery({
-    queryKey: ['run-stages', runId],
-    queryFn: () => runApi.stages(runId!),
-    enabled: !!runId,
-  })
   const rerunPlanQuery = useQuery({
     queryKey: ['rerun-plan', runId],
     queryFn: () => runApi.rerunPlan(runId!),
     enabled: rerunOpen && !!runId,
-  })
-  const logQuery = useQuery({
-    queryKey: ['run-log', logTask?.id],
-    queryFn: () => runApi.log(logTask!.id),
-    enabled: !!logTask,
   })
   const gateQuery = useQuery({
     queryKey: ['run-gate', runId],
@@ -149,7 +143,6 @@ export default function RunDetail() {
 
   const invalidate = () => {
     void queryClient.invalidateQueries({ queryKey: ['run-detail'] })
-    void queryClient.invalidateQueries({ queryKey: ['run-stages'] })
     void queryClient.invalidateQueries({ queryKey: ['run-gate'] })
   }
   const pauseMutation = useMutation({
@@ -168,10 +161,6 @@ export default function RunDetail() {
     mutationFn: (body: Record<string, unknown>) => runApi.rerun(body),
     onSuccess: () => { message.success('断点重跑已创建'); setRerunOpen(false); invalidate() }, onError: showError,
   })
-  const searchMutation = useMutation({
-    mutationFn: (body: Record<string, unknown>) => runApi.logSearch(body),
-    onSuccess: () => setSearchOpen(true), onError: showError,
-  })
   const exemptMutation = useMutation({
     mutationFn: () => gateApi.exempt({
       resultId: exemptTarget!.id,
@@ -189,7 +178,7 @@ export default function RunDetail() {
 
   const detail = detailQuery.data
   const run = detail?.run
-  const stages = ((detail?.stages ?? stagesQuery.data ?? []) as unknown as StageExt[])
+  const stages = ((detail?.stages ?? []) as unknown as StageExt[])
   const tasks = (detail?.tasks ?? []) as unknown as TaskExt[]
   const gateResults = (gateQuery.data ?? []) as unknown as RunStageGate[]
   const stageNameById = new Map(stages.map((stage) => [String(stage.id), stage.name]))
@@ -202,12 +191,6 @@ export default function RunDetail() {
     { title: '脚本引用', dataIndex: 'scriptRef', width: 200, ellipsis: true, render: (v?: string) => v || '—' },
     { title: '状态', dataIndex: 'status', width: 110, align: 'center',
       render: (v: number) => <Tag color={STAGE_STATUS_COLOR[v] ?? 'default'}>{STAGE_STATUS[v] ?? v}</Tag> },
-    { title: '操作', width: 80, align: 'center',
-      render: (_: unknown, r) => can('devops:run:detail') && (
-        <Tooltip title="查看日志">
-          <Button type="link" size="small" icon={<Search size={14} />} onClick={() => setLogTask(r)} />
-        </Tooltip>
-      ) },
   ]
 
   const gateColumns: TableColumnsType<RunStageGate> = [
@@ -367,16 +350,38 @@ export default function RunDetail() {
                 current={stages.findIndex((stage) => stage.status === 2 || stage.status === 10)}
                 items={stages.map((stage) => {
                   const duration = elapsedSeconds(stage.startTime, stage.endTime)
+                  const precheckItems = stage.type === 0 ? parsePrecheckItems(stage.result) : []
+                  const description = (
+                    <span>
+                      {STAGE_STATUS[stage.status] ?? stage.status}
+                      {duration != null && ` · ${duration.toFixed(1)}s`}
+                      {stage.status === 8 && <Tag color="purple" style={{ marginLeft: 4 }}>复用</Tag>}
+                    </span>
+                  )
                   return {
                     title: stage.name,
                     status: stepStatus(stage.status),
-                    description: (
-                      <span>
-                        {STAGE_STATUS[stage.status] ?? stage.status}
-                        {duration != null && ` · ${duration.toFixed(1)}s`}
-                        {stage.status === 8 && <Tag color="purple" style={{ marginLeft: 4 }}>复用</Tag>}
-                      </span>
-                    ),
+                    description: precheckItems.length ? (
+                      <Popover
+                        placement="bottom"
+                        content={
+                          <div style={{ minWidth: 260 }}>
+                            {precheckItems.map((item) => (
+                              <div key={item.type} style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
+                                <Tag color={PRECHECK_CONCLUSION[item.conclusion]?.color ?? 'default'}>
+                                  {PRECHECK_CONCLUSION[item.conclusion]?.label ?? item.conclusion}
+                                </Tag>
+                                <span>{item.detail}</span>
+                              </div>
+                            ))}
+                          </div>
+                        }
+                      >
+                        <span style={{ cursor: 'pointer', color: 'var(--color-link, #1677ff)' }}>
+                          {description} · 查看明细
+                        </span>
+                      </Popover>
+                    ) : description,
                   }
                 })}
               />
@@ -415,36 +420,6 @@ export default function RunDetail() {
           </div>
         </>
       )}
-
-      <Modal open={!!logTask} title={`任务日志 - ${logTask?.name ?? ''}`} onCancel={() => setLogTask(null)}
-        footer={null} width={860} destroyOnHidden>
-        <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
-          <Input prefix={<Search size={14} />} placeholder="关键词搜索日志" value={keyword}
-            onChange={(e) => setKeyword(e.target.value)} style={{ width: 280 }} />
-          <Button loading={searchMutation.isPending}
-            onClick={() => searchMutation.mutate({ taskId: logTask?.id, keyword, fromLine: 1 })}>搜索</Button>
-        </div>
-        {(logQuery.data as LogSegment[] | undefined)?.map((seg) => (
-          <div key={seg.segmentNo} style={{ marginBottom: 12 }}>
-            <div style={{ fontSize: 12, color: 'var(--text-2)', marginBottom: 4 }}>
-              段 {seg.segmentNo} · 行 {seg.startLine}-{seg.endLine}
-              {seg.isTruncated === 1 && <Tag color="orange" style={{ marginLeft: 6 }}>日志已截断</Tag>}
-            </div>
-            <pre className="ferry-mono" style={{ background: 'var(--bg-subtle)', padding: 12, borderRadius: 6,
-              maxHeight: 360, overflow: 'auto', whiteSpace: 'pre-wrap', fontSize: 12 }}>{seg.content}</pre>
-          </div>
-        ))}
-        {searchOpen && (
-          <div style={{ marginTop: 12 }}>
-            <div style={{ fontWeight: 500, marginBottom: 4 }}>搜索结果</div>
-            <pre className="ferry-mono" style={{ background: 'var(--bg-subtle)', padding: 12, borderRadius: 6,
-              maxHeight: 240, overflow: 'auto', whiteSpace: 'pre-wrap', fontSize: 12 }}>
-              {(searchMutation.data as Array<{ lineNo: number; content: string }> | undefined)
-                ?.map((h) => `${h.lineNo}: ${h.content}`).join('\n') ?? '无匹配'}
-            </pre>
-          </div>
-        )}
-      </Modal>
 
       <Modal open={abortOpen} title="中止运行" onCancel={() => setAbortOpen(false)}
         onOk={() => abortMutation.mutate({ id: runId, reason: abortReason })} okText="确认中止"

@@ -11,7 +11,6 @@ export interface AppRow {
   deptName?: string
   ownerId?: ID
   ownerName?: string
-  coreLink: number
   repoType: number
   repoUrl?: string
   repoBranch?: string
@@ -21,15 +20,7 @@ export interface AppRow {
   createTime: string
 }
 
-// TODO(dev_app-schema): dev_app_repo 已删除，AppRepoRow 类型已移除。
-export interface AppDependencyRow {
-  id: ID
-  appId: ID
-  depName: string
-  depAppId?: ID
-  versionRange?: string
-}
-
+// TODO(dev_app-schema): dev_app_repo、dev_app_dependency 已删除，对应类型已移除。
 export interface AppOption {
   value: ID
   label: string
@@ -120,9 +111,8 @@ export interface PipelineDetail extends PipelineRow {
   stages?: PipelineStageRow[]
 }
 export interface PrecheckItem { type: number; conclusion: number; detail?: string }
-export interface PrecheckResult { items: PrecheckItem[]; canTrigger: boolean }
+export interface PrecheckResult { items: PrecheckItem[]; canTrigger: boolean; aiPassed?: boolean; aiReason?: string }
 export interface TriggerResult { result: string; runId?: ID; artifactDigest?: string; message: string }
-export interface RunTrigger { id: ID; appId: ID; pipelineId: ID; branch: string; commitId: string; result: number; rejectReason?: string; createTime: string }
 
 /* ------------------------------ 运行 ------------------------------ */
 export interface Run {
@@ -148,7 +138,6 @@ export interface Run {
 }
 export interface RunStage { id: ID; runId: ID; type: number; name: string; status: number; result?: string; sort: number; startTime?: string; endTime?: string }
 export interface RunStageTask { id: ID; runId: ID; runStageId: ID; name: string; executor?: string; scriptRef?: string; status: number; result?: string; sort: number; startTime?: string; endTime?: string }
-export interface RunLogSegment { id: ID; taskId: ID; segmentNo: number; startLine: number; endLine: number; content: string; isTruncated: number }
 /** 运行详情：与后端 RunDetailVO 的 { run, stages, tasks } 嵌套结构一致 */
 export interface RunDetail {
   run: Run

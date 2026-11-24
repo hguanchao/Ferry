@@ -44,27 +44,9 @@
             <artifactId>system-api</artifactId>
             <version>${revision}</version>
         </dependency>
-        <!-- 测试：junit5 + mockito，版本由 spring-boot-dependencies BOM 管理；Jenkins 联调用 Mock -->
-        <dependency>
-            <groupId>org.springframework.ai</groupId>
-            <artifactId>spring-ai-starter-model-openai</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.junit.jupiter</groupId>
-            <artifactId>junit-jupiter</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.mockito</groupId>
-            <artifactId>mockito-core</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.mockito</groupId>
-            <artifactId>mockito-junit-jupiter</artifactId>
-            <scope>test</scope>
-        </dependency>
+        <!-- Spring AI 由 common-ai 以 compile scope 传递，勿在此以 test scope 重复声明：
+             直接声明会覆盖传递依赖的 scope，导致运行时 classpath 缺失 ChatClient，
+             AiAutoConfiguration 的 @ConditionalOnClass 不满足，AI 能力整体降级。 -->
     </dependencies>
 
     <build>
@@ -72,12 +54,6 @@
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
-            </plugin>
-            <!-- Maven 超级 POM 默认 surefire 2.12.4 不支持 JUnit5，固定为 3.x 以运行单元测试 -->
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-surefire-plugin</artifactId>
-                <version>3.6.1</version>
             </plugin>
         </plugins>
     </build>

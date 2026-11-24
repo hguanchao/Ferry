@@ -10,12 +10,6 @@ import org.apache.ibatis.annotations.Select;
 public interface IssueMapper extends BaseMapper<Issue> {
 
     /**
-     * 按(应用,指纹)查问题。
-     */
-    @Select("SELECT * FROM dev_issue WHERE app_id = #{appId} AND fingerprint = #{fingerprint} LIMIT 1")
-    Issue byFingerprint(@Param("appId") Long appId, @Param("fingerprint") String fingerprint);
-
-    /**
      * 统计应用各状态问题数。
      */
     @Select("SELECT status, COUNT(1) AS cnt FROM dev_issue WHERE app_id = #{appId} GROUP BY status")

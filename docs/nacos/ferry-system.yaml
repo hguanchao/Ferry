@@ -1,0 +1,38 @@
+spring:
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://127.0.0.1:3306/ferry?useSSL=false&&allowPublicKeyRetrieval=true
+    username: root
+    password: 123456
+  data:
+    redis:
+      host: 127.0.0.1
+      port: 6379
+      password: 123456
+
+# 交付域外部集成配置：端点留空时各集成走本地模拟，配置后走真实调用
+ferry:
+  devops:
+    jenkins:
+      # Jenkins 基址，留空则下发只记日志；填写后按 buildPath 真实触发 Job
+      base-url: ${FERRY_JENKINS_URL:}
+      build-path: /job/{job}/buildWithParameters
+      user: ${FERRY_JENKINS_USER:}
+      token: ${FERRY_JENKINS_TOKEN:}
+      callback-secret: ${FERRY_JENKINS_SECRET:}
+    repo:
+      # 代码平台 API 基址（如 GitLab http://gitlab/api/v4），留空则预校验只做格式校验
+      api-base: ${FERRY_REPO_API:}
+      token: ${FERRY_REPO_TOKEN:}
+      self-hosted-domain: ${FERRY_REPO_DOMAIN:}
+    ai:
+      # OpenAI 兼容端点（含 /v1），留空则归因返回固定占位文本
+      base-url: ${FERRY_AI_BASE_URL:}
+      model: ${FERRY_AI_MODEL:gpt-4o-mini}
+      api-key: ${FERRY_AI_KEY:}
+      timeout-seconds: 30
+    deploy:
+      # 是否真实执行部署命令（ProcessBuilder 调脚本/ssh/docker/kubectl），false 只记日志
+      execute: ${FERRY_DEPLOY_EXECUTE:false}
+      script-dir: ${FERRY_DEPLOY_SCRIPT_DIR:./deploy-scripts}
+      timeout-seconds: 600

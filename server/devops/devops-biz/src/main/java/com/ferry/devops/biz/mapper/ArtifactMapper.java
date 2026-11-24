@@ -21,12 +21,6 @@ public interface ArtifactMapper extends BaseMapper<Artifact> {
     long countByVersion(@Param("appId") Long appId, @Param("version") String version);
 
     /**
-     * 按摘要反查有效制品。
-     */
-    @Select("SELECT COUNT(1) FROM dev_artifact WHERE delete_seq = 0 AND digest = #{digest}")
-    long countByDigest(@Param("digest") String digest);
-
-    /**
      * 查询制品所处的环境类别（去重）。
      */
     @Select("SELECT env_category FROM dev_artifact_env WHERE artifact_id = #{artifactId} ORDER BY env_category")

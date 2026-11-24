@@ -1,6 +1,7 @@
 package com.ferry.devops.biz.service;
 
 import java.util.Date;
+import java.util.Map;
 
 import com.ferry.devops.api.enums.StageStatusEnum;
 
@@ -13,10 +14,20 @@ public interface IRunStageService {
     void onStageRunning(Long runId, Long stageId, Date time);
 
     /** Jenkins 阶段执行成功；单测/静态扫描阶段按门禁配置进入待门禁 */
-    void onStageSucceeded(Long runId, Long stageId, Date time);
+    default void onStageSucceeded(Long runId, Long stageId, Date time) {
+        onStageSucceeded(runId, stageId, time, null);
+    }
+
+    /** Jenkins 阶段执行成功，附带 Jenkins 结果细节写入 result */
+    void onStageSucceeded(Long runId, Long stageId, Date time, Map<String, Object> detail);
 
     /** Jenkins 阶段失败/超时/取消 */
-    void onStageFailed(Long runId, Long stageId, StageStatusEnum terminal, Date time);
+    default void onStageFailed(Long runId, Long stageId, StageStatusEnum terminal, Date time) {
+        onStageFailed(runId, stageId, terminal, time, null);
+    }
+
+    /** Jenkins 阶段失败/超时/取消，附带 Jenkins 结果细节写入 result */
+    void onStageFailed(Long runId, Long stageId, StageStatusEnum terminal, Date time, Map<String, Object> detail);
 
     /** 按状态机迁移阶段状态（供门禁/豁免使用） */
     void transitionStage(Long stageId, StageStatusEnum target, Date time);

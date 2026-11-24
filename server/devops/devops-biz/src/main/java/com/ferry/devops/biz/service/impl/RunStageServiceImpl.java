@@ -2,6 +2,7 @@ package com.ferry.devops.biz.service.impl;
 
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.ferry.common.core.utils.ObjUtil;
@@ -19,6 +20,7 @@ import com.ferry.devops.biz.mapper.RunOperationMapper;
 import com.ferry.devops.biz.mapper.RunStageMapper;
 import com.ferry.devops.biz.mapper.RunStageTaskMapper;
 import com.ferry.devops.biz.service.IRunStageService;
+import com.ferry.devops.biz.utils.StageResultUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -68,7 +70,7 @@ public class RunStageServiceImpl implements IRunStageService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void onStageSucceeded(Long runId, Long stageId, Date time) {
+    public void onStageSucceeded(Long runId, Long stageId, Date time, Map<String, Object> detail) {
         RunStage stage = requireStage(runId, stageId);
         Integer current = stage.getStatus();
         if (StageStatusEnum.isTerminal(current)
@@ -80,17 +82,17 @@ public class RunStageServiceImpl implements IRunStageService {
         StageStatusEnum target = gateStage ? StageStatusEnum.PENDING_GATE : StageStatusEnum.SUCCESS;
         DevopsStateMachine.checkStage(current, target.getCode());
         stage.setStatus(target.getCode());
-        if (stage.getStartTime() == null) {
-            stage.setStartTime(time);
-        }
-        stage.setEndTime(time);
+        applyStageTimes(stage, time, detail);
+        stage.setResult(StageResultUtil.execution(stage.getResult(), target,
+                stage.getStartTime(), stage.getEndTime(), detail));
         stageMapper.updateById(stage);
         refreshRunStatus(runId);
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void onStageFailed(Long runId, Long stageId, StageStatusEnum terminal, Date time) {
+    public void onStageFailed(Long runId, Long stageId, StageStatusEnum terminal, Date time,
+                              Map<String, Object> detail) {
         if (terminal == null || !StageStatusEnum.isTerminal(terminal.getCode())) {
             return;
         }
@@ -101,12 +103,40 @@ public class RunStageServiceImpl implements IRunStageService {
         }
         DevopsStateMachine.checkStage(current, terminal.getCode());
         stage.setStatus(terminal.getCode());
-        if (stage.getStartTime() == null) {
-            stage.setStartTime(time);
-        }
-        stage.setEndTime(time);
+        applyStageTimes(stage, time, detail);
+        stage.setResult(StageResultUtil.execution(stage.getResult(), terminal,
+                stage.getStartTime(), stage.getEndTime(), detail));
         stageMapper.updateById(stage);
         refreshRunStatus(runId);
+    }
+
+    /**
+     * 写入阶段起止时间：优先用 Jenkins 上报的真实时间戳（jenkinsStartTimeMillis +
+     * jenkinsDurationMillis），避免轮询间隔造成的"构建60s、其余0s"失真；Jenkins 未提供时回退轮询时间。
+     */
+    private void applyStageTimes(RunStage stage, Date pollTime, Map<String, Object> detail) {
+        Long startMs = detail == null ? null : asLong(detail.get("jenkinsStartTimeMillis"));
+        Long durationMs = detail == null ? null : asLong(detail.get("jenkinsDurationMillis"));
+        if (startMs != null) {
+            stage.setStartTime(new Date(startMs));
+            if (durationMs != null) {
+                stage.setEndTime(new Date(startMs + durationMs));
+            } else {
+                stage.setEndTime(pollTime);
+            }
+            return;
+        }
+        if (stage.getStartTime() == null) {
+            stage.setStartTime(pollTime);
+        }
+        stage.setEndTime(pollTime);
+    }
+
+    private Long asLong(Object value) {
+        if (value instanceof Number number) {
+            return number.longValue();
+        }
+        return null;
     }
 
     @Override
@@ -133,6 +163,10 @@ public class RunStageServiceImpl implements IRunStageService {
             if (stage.getEndTime() == null) {
                 stage.setEndTime(time);
             }
+        }
+        if (target != StageStatusEnum.RUNNING && target != StageStatusEnum.NOT_STARTED) {
+            stage.setResult(StageResultUtil.execution(stage.getResult(), target,
+                    stage.getStartTime(), stage.getEndTime(), null));
         }
         stageMapper.updateById(stage);
         refreshRunStatus(stage.getRunId());
@@ -228,7 +262,7 @@ public class RunStageServiceImpl implements IRunStageService {
             return RunStatusEnum.RUNNING.getCode();
         }
         List<RunStage> ciStages = stages.stream()
-                .filter(stage -> stage.getType() != null && stage.getType() <= CI_STAGE_TYPE_MAX)
+                .filter(stage -> stage.getType() != null && stage.getType() >= 1 && stage.getType() <= CI_STAGE_TYPE_MAX)
                 .toList();
         boolean allCiDone = !ciStages.isEmpty() && ciStages.stream().allMatch(stage ->
                 ObjUtil.equals(stage.getStatus(), StageStatusEnum.SUCCESS.getCode())
@@ -269,10 +303,13 @@ public class RunStageServiceImpl implements IRunStageService {
                     && ObjUtil.equals(stage.getStatus(), StageStatusEnum.NOT_STARTED.getCode())) {
                 stage.setStatus(StageStatusEnum.SKIPPED.getCode());
                 stage.setEndTime(now);
+                stage.setResult(StageResultUtil.execution(stage.getResult(), StageStatusEnum.SKIPPED,
+                        stage.getStartTime(), now, null));
                 stageMapper.updateById(stage);
                 for (RunStageTask task : taskMapper.selectByStage(stage.getId())) {
                     if (!ObjUtil.equals(task.getStatus(), StageStatusEnum.SKIPPED.getCode())) {
                         task.setStatus(StageStatusEnum.SKIPPED.getCode());
+                        task.setResult(StageResultUtil.task(StageStatusEnum.SKIPPED, task, now, null));
                         taskMapper.updateById(task);
                     }
                 }

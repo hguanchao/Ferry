@@ -5,6 +5,7 @@ import com.ferry.common.core.utils.StrUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.model.openai.autoconfigure.OpenAiChatProperties;
+import org.springframework.ai.model.openai.autoconfigure.OpenAiCommonProperties;
 import org.springframework.core.ParameterizedTypeReference;
 
 /**
@@ -22,17 +23,16 @@ import org.springframework.core.ParameterizedTypeReference;
 @Slf4j
 @SuppressWarnings("unchecked")
 public class AiUtil {
-
     private static ChatClient chatClient;
-    private static OpenAiChatProperties chatProperties;
     private static AiProperties properties;
+    private static OpenAiChatProperties chatProperties;
 
     /**
      * 构造器注入依赖，仅在首次赋值，避免多容器场景相互覆盖。
      *
-     * @param builder        Spring AI 自动装配的 ChatClient 构造器
-     * @param chatProperties OpenAI Chat 配置，用于判断凭据与读取模型名
-     * @param properties     渡口侧 AI 配置
+     * @param builder          Spring AI 自动装配的 ChatClient 构造器
+     * @param chatProperties   OpenAI Chat 配置（前缀 spring.ai.openai.chat），用于读取模型名
+     * @param properties       渡口侧 AI 配置
      */
     public AiUtil(ChatClient.Builder builder, OpenAiChatProperties chatProperties, AiProperties properties) {
         if (AiUtil.chatClient == null) {
@@ -95,9 +95,6 @@ public class AiUtil {
      * @return 模型输出；失败时返回 null
      */
     public static <T> T chat(String systemPrompt, String userPrompt, Class<T> type, Object... tools) {
-        if (unavailable() || type == null) {
-            return null;
-        }
         ChatClient.ChatClientRequestSpec spec = prepare(systemPrompt, tools);
         ChatClient.CallResponseSpec call = spec.user(userPrompt == null ? "" : userPrompt).call();
         if (type == String.class) {
@@ -136,9 +133,6 @@ public class AiUtil {
      * @return 模型输出；失败时返回 null
      */
     public static <T> T chat(String systemPrompt, String userPrompt, ParameterizedTypeReference<T> type, Object... tools) {
-        if (unavailable() || type == null) {
-            return null;
-        }
         return prepare(systemPrompt, tools)
                 .user(userPrompt == null ? "" : userPrompt)
                 .call().entity(type, AiUtil::entityParamSpec);
@@ -176,14 +170,5 @@ public class AiUtil {
             spec.tools(tools);
         }
         return spec;
-    }
-
-    /** 未启用、未初始化或无 api-key 时视为不可用，避免无凭据请求白白消耗超时预算 */
-    private static boolean unavailable() {
-        if (properties == null || !properties.isEnabled()) {
-            return true;
-        }
-        String apiKey = chatProperties == null ? null : chatProperties.getApiKey();
-        return StrUtil.isBlank(apiKey);
     }
 }

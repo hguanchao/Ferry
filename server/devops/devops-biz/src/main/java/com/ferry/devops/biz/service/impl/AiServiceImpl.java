@@ -2,10 +2,12 @@ package com.ferry.devops.biz.service.impl;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import tools.jackson.databind.JsonNode;
 import com.ferry.common.core.constant.IntConst;
 import com.ferry.common.core.exception.ServiceException;
 import com.ferry.common.core.utils.BeanUtil;
 import com.ferry.common.core.utils.CollUtil;
+import com.ferry.common.core.utils.JsonUtil;
 import com.ferry.common.core.utils.ObjUtil;
 import com.ferry.common.core.utils.StrUtil;
 import com.ferry.common.jdbc.base.ServiceImpl;
@@ -25,7 +27,8 @@ import com.ferry.devops.api.entity.RunStageGate;
 import com.ferry.devops.api.entity.ReleaseArtifact;
 import com.ferry.devops.api.entity.ReleaseCandidate;
 import com.ferry.devops.api.entity.Run;
-import com.ferry.devops.api.entity.RunLogSegment;
+import com.ferry.devops.api.entity.RunStage;
+import com.ferry.devops.api.entity.RunStageTask;
 import com.ferry.devops.api.enums.AiConfidenceEnum;
 import com.ferry.devops.api.enums.AiOutputStatusEnum;
 import com.ferry.devops.api.enums.AiOutputTypeEnum;
@@ -44,8 +47,9 @@ import com.ferry.devops.biz.mapper.ArtifactMapper;
 import com.ferry.devops.biz.mapper.RunStageGateMapper;
 import com.ferry.devops.biz.mapper.ReleaseArtifactMapper;
 import com.ferry.devops.biz.mapper.ReleaseCandidateMapper;
-import com.ferry.devops.biz.mapper.RunLogSegmentMapper;
 import com.ferry.devops.biz.mapper.RunMapper;
+import com.ferry.devops.biz.mapper.RunStageMapper;
+import com.ferry.devops.biz.mapper.RunStageTaskMapper;
 import com.ferry.devops.biz.service.IAiService;
 import com.ferry.devops.biz.wrapper.AiOutputWrapper;
 import lombok.RequiredArgsConstructor;
@@ -77,8 +81,9 @@ public class AiServiceImpl extends ServiceImpl<AiOutputMapper, AiOutput> impleme
     private final AiEvalSampleMapper evalSampleMapper;
     private final AppAiLevelMapper appAiLevelMapper;
     // 真实证据链依赖：四个入口据此从库里取证据，analyze 里逐条回查校验
-    private final RunLogSegmentMapper runLogSegmentMapper;
     private final RunMapper runMapper;
+    private final RunStageMapper stageMapper;
+    private final RunStageTaskMapper taskMapper;
     private final ReleaseCandidateMapper releaseCandidateMapper;
     private final ReleaseArtifactMapper releaseArtifactMapper;
     private final ArtifactMapper artifactMapper;
@@ -86,19 +91,24 @@ public class AiServiceImpl extends ServiceImpl<AiOutputMapper, AiOutput> impleme
 
     @Override
     public AiOutputVO attribution(Long runId) {
+        // 归因对象是流水线本次运行：证据取自各阶段/任务的执行结果，而非日志正文
         List<String> evidence = new ArrayList<>();
-        // 1. 该运行的日志分段，取含 ERROR/Exception/FAILED 的行作为日志证据
-        List<RunLogSegment> segments = runLogSegmentMapper.selectList(
-                Wrappers.<RunLogSegment>lambdaQuery().eq(RunLogSegment::getRunId, runId));
-        if (CollUtil.isNotEmpty(segments)) {
-            for (RunLogSegment segment : segments) {
-                if (hasErrorLine(segment.getContent())) {
-                    int startLine = segment.getStartLine() == null ? 0 : segment.getStartLine();
-                    evidence.add("log:" + segment.getId() + ":L" + startLine);
+        List<RunStage> stages = stageMapper.selectByRun(runId);
+        if (CollUtil.isNotEmpty(stages)) {
+            for (RunStage stage : stages) {
+                if (StrUtil.isNotBlank(stage.getResult())) {
+                    evidence.add("stage:" + stage.getId());
                 }
             }
         }
-        // 2. 该运行的分支/提交作为变更证据
+        List<RunStageTask> tasks = taskMapper.selectByRun(runId);
+        if (CollUtil.isNotEmpty(tasks)) {
+            for (RunStageTask task : tasks) {
+                if (StrUtil.isNotBlank(task.getResult())) {
+                    evidence.add("task:" + task.getId());
+                }
+            }
+        }
         Run run = runMapper.selectById(runId);
         if (run != null && StrUtil.isNotBlank(run.getRefValue())) {
             evidence.add("commit:" + run.getRefValue());
@@ -166,7 +176,7 @@ public class AiServiceImpl extends ServiceImpl<AiOutputMapper, AiOutput> impleme
         return analyze(AiOutputTypeEnum.INCIDENT, alertId, alertId, null, null, null, evidence);
     }
 
-    /** 服务端校验通过的证据：定位、原文片段、类型(1日志2指标3变更4历史)、是否强证据 */
+    /** 服务端校验通过的证据：定位、原文片段、类型(1阶段2门禁/指标3变更4历史5任务)、是否强证据 */
     private record ValidEvidence(String locator, String snippet, int type, boolean strong) {
     }
 
@@ -176,7 +186,7 @@ public class AiServiceImpl extends ServiceImpl<AiOutputMapper, AiOutput> impleme
     private AiOutputVO analyze(AiOutputTypeEnum type, String bizId, String alertId, Long appId,
                               Long rcId, Long runId, List<String> rawEvidence) {
         long start = System.currentTimeMillis();
-        // 服务端逐条回查校验：日志行号存在且含错误、commit 非空、门禁/发布单记录存在，无效剔除
+        // 服务端逐条回查校验：阶段/任务执行结果非空、commit 非空、门禁/发布单记录存在，无效剔除
         List<ValidEvidence> effective = new ArrayList<>();
         if (CollUtil.isNotEmpty(rawEvidence)) {
             for (String locator : rawEvidence) {
@@ -274,19 +284,23 @@ public class AiServiceImpl extends ServiceImpl<AiOutputMapper, AiOutput> impleme
             return null;
         }
         try {
-            if (locator.startsWith("log:")) {
-                // log:{segmentId}:L{startLine} —— 分段必须存在且日志含错误行
-                String rest = locator.substring(4);
-                int idx = rest.indexOf(':');
-                if (idx <= 0) {
+            if (locator.startsWith("stage:")) {
+                // stage:{stageId} —— 阶段必须存在且执行结果非空，摘要取 result JSON
+                long stageId = Long.parseLong(locator.substring(6));
+                RunStage stage = stageMapper.selectById(stageId);
+                if (stage == null || StrUtil.isBlank(stage.getResult())) {
                     return null;
                 }
-                long segmentId = Long.parseLong(rest.substring(0, idx));
-                RunLogSegment segment = runLogSegmentMapper.selectById(segmentId);
-                if (segment == null || !hasErrorLine(segment.getContent())) {
+                return new ValidEvidence(locator, stageSnippet(stage), 1, true);
+            }
+            if (locator.startsWith("task:")) {
+                // task:{taskId} —— 任务必须存在且执行结果非空，摘要取 result JSON
+                long taskId = Long.parseLong(locator.substring(5));
+                RunStageTask task = taskMapper.selectById(taskId);
+                if (task == null || StrUtil.isBlank(task.getResult())) {
                     return null;
                 }
-                return new ValidEvidence(locator, snippetOf(segment.getContent()), 1, true);
+                return new ValidEvidence(locator, taskSnippet(task), 5, true);
             }
             if (locator.startsWith("commit:")) {
                 // commit:{commitId} —— 非空即强证据
@@ -344,27 +358,55 @@ public class AiServiceImpl extends ServiceImpl<AiOutputMapper, AiOutput> impleme
         return null;
     }
 
-    /** 日志内容是否含错误行（大小写不敏感） */
-    private boolean hasErrorLine(String content) {
-        if (content == null) {
-            return false;
-        }
-        String upper = content.toUpperCase();
-        return upper.contains("ERROR") || upper.contains("EXCEPTION") || upper.contains("FAILED");
-    }
-
-    /** 取日志中第一条错误行作为原文片段，过长截断 */
-    private String snippetOf(String content) {
-        if (content == null) {
-            return "";
-        }
-        for (String line : content.split("\\R")) {
-            String upper = line.toUpperCase();
-            if (upper.contains("ERROR") || upper.contains("EXCEPTION") || upper.contains("FAILED")) {
-                return line.length() > 500 ? line.substring(0, 500) : line;
+    /** 阶段执行结果摘要：类型 + 名称 + 状态 + 耗时 + Jenkins/门禁结论 */
+    private String stageSnippet(RunStage stage) {
+        String json = stage.getResult();
+        StringBuilder sb = new StringBuilder("阶段[").append(stage.getName()).append("] ");
+        appendResult(sb, json);
+        JsonNode gate = JsonUtil.getNode(json, "gate");
+        if (gate != null && !gate.isNull()) {
+            String conclusion = JsonUtil.getStr(gate.toString(), "gate");
+            if (StrUtil.isNotBlank(conclusion)) {
+                sb.append(" 门禁结论=").append(conclusion);
             }
         }
-        return content.length() > 500 ? content.substring(0, 500) : content;
+        return oneLine(sb.toString());
+    }
+
+    /** 任务执行结果摘要：名称 + 状态 + 执行器 + 脚本 + 耗时 */
+    private String taskSnippet(RunStageTask task) {
+        String json = task.getResult();
+        StringBuilder sb = new StringBuilder("任务[").append(task.getName()).append("] ");
+        appendResult(sb, json);
+        String executor = JsonUtil.getStr(json, "executor");
+        if (StrUtil.isNotBlank(executor)) {
+            sb.append(" 执行器=").append(executor);
+        }
+        String scriptRef = JsonUtil.getStr(json, "scriptRef");
+        if (StrUtil.isNotBlank(scriptRef)) {
+            sb.append(" 脚本=").append(scriptRef);
+        }
+        return oneLine(sb.toString());
+    }
+
+    /** 提取 result 共性字段：status/desc/durationMs/jenkinsStatus */
+    private void appendResult(StringBuilder sb, String json) {
+        String status = JsonUtil.getStr(json, "status");
+        if (StrUtil.isNotBlank(status)) {
+            sb.append("状态=").append(status);
+        }
+        String desc = JsonUtil.getStr(json, "desc");
+        if (StrUtil.isNotBlank(desc) && !desc.equals(status)) {
+            sb.append("(").append(desc).append(")");
+        }
+        Long durationMs = JsonUtil.getLong(json, "durationMs");
+        if (durationMs != null) {
+            sb.append(" 耗时=").append(durationMs).append("ms");
+        }
+        String jenkinsStatus = JsonUtil.getStr(json, "jenkinsStatus");
+        if (StrUtil.isNotBlank(jenkinsStatus)) {
+            sb.append(" Jenkins=").append(jenkinsStatus);
+        }
     }
 
     /** 换行/制表符压成空格，避免污染单行证据文本 */
@@ -389,9 +431,10 @@ public class AiServiceImpl extends ServiceImpl<AiOutputMapper, AiOutput> impleme
 
     private String sourceName(int type) {
         return switch (type) {
-            case 1 -> "日志";
-            case 2 -> "指标";
+            case 1 -> "阶段";
+            case 2 -> "门禁";
             case 3 -> "变更";
+            case 5 -> "任务";
             default -> "历史";
         };
     }

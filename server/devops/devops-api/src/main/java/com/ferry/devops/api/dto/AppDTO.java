@@ -31,8 +31,6 @@ public class AppDTO {
     @NotNull(message = "应用负责人不能为空")
     private Long ownerId;
 
-    @Schema(description = "核心链路 0否 1是")
-    private Integer coreLink;
 
     @Schema(description = "代码平台 1GitLab 2GitHub 3Gitee")
     @NotNull(message = "代码平台不能为空")

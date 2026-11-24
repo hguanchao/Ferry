@@ -12,6 +12,7 @@ import java.util.Arrays;
 @Getter
 @AllArgsConstructor
 public enum StageTypeEnum {
+    PRECHECK(0, "预检"),
     BUILD(1, "构建"),
     UNIT_TEST(2, "单元测试"),
     STATIC_SCAN(3, "静态扫描"),
