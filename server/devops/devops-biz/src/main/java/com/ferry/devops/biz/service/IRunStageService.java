@@ -1,14 +1,20 @@
 package com.ferry.devops.biz.service;
 
 import java.util.Date;
+import java.util.List;
 import java.util.Map;
 
+import com.ferry.common.jdbc.base.IService;
+import com.ferry.devops.api.dto.query.RunStageQuery;
+import com.ferry.devops.api.entity.Run;
+import com.ferry.devops.api.entity.RunStage;
 import com.ferry.devops.api.enums.StageStatusEnum;
+import com.ferry.devops.api.vo.RunStageVO;
 
 /**
  * 运行/阶段状态服务：统一阶段迁移与运行状态收敛。
  */
-public interface IRunStageService {
+public interface IRunStageService extends IService<RunStage> {
 
     /** Jenkins 阶段开始执行 */
     void onStageRunning(Long runId, Long stageId, Date time);
@@ -43,4 +49,6 @@ public interface IRunStageService {
 
     /** 是否允许人工继续（无门禁阻塞、无阻塞/待门禁阶段、最近操作为暂停） */
     boolean canResumeManually(Long runId);
+
+    List<RunStageVO> list(RunStageQuery body);
 }

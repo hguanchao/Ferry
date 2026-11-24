@@ -23,12 +23,6 @@ public class RunQuery extends Query {
     @Schema(description = "运行状态")
     private List<Integer> statuses;
 
-    @Schema(description = "分支")
-    private String branch;
-
-    @Schema(description = "开始时间起")
-    private String startFrom;
-
-    @Schema(description = "开始时间止")
-    private String startTo;
+    @Schema(description = "关键字")
+    private String keyword;
 }

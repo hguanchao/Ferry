@@ -43,12 +43,7 @@ public class RedisUtil {
      * @return 值，不存在或异常时为 null
      */
     public static <T> T get(@NonNull String key) {
-        try {
-            return (T) redisTemplate.opsForValue().get(key);
-        } catch (Exception e) {
-            log.error("Failed to read cache entry, key={}", key, e);
-            return null;
-        }
+        return (T) redisTemplate.opsForValue().get(key);
     }
 
     /**
@@ -110,13 +105,8 @@ public class RedisUtil {
      * @param value 值
      * @return true 写入成功（键原本不存在），false 键已存在或写入异常
      */
-    public static Boolean setNx(@NonNull String key, Object value) {
-        try {
-            return Boolean.TRUE.equals(redisTemplate.opsForValue().setIfAbsent(key, value));
-        } catch (Exception e) {
-            log.error("Failed to write cache entry if absent, key={}", key, e);
-            return false;
-        }
+    public static boolean setNx(@NonNull String key, Object value) {
+        return redisTemplate.opsForValue().setIfAbsent(key, value);
     }
 
     /**
@@ -128,37 +118,11 @@ public class RedisUtil {
      * @param timeUnit 时间单位
      * @return true 写入成功（键原本不存在），false 键已存在或写入异常
      */
-    public static Boolean setNx(@NonNull String key, Object value, long time, TimeUnit timeUnit) {
+    public static boolean setNx(@NonNull String key, Object value, long time, TimeUnit timeUnit) {
         if (time <= 0L) {
             return setNx(key, value);
         }
-        try {
-            return Boolean.TRUE.equals(redisTemplate.opsForValue().setIfAbsent(key, value, time, timeUnit));
-        } catch (Exception e) {
-            log.error("Redis SETNX failed, key={}", key, e);
-            return false;
-        }
-    }
-
-    /**
-     * 仅当键不存在时写入并设置过期时间，异常时返回 null 以便调用方区分“重复”和“Redis 不可用”。
-     *
-     * @param key      键
-     * @param value    值
-     * @param time     过期时间，小于等于 0 表示不过期
-     * @param timeUnit 时间单位
-     * @return true=写入成功；false=键已存在；null=Redis 异常
-     */
-    public static Boolean trySetNx(@NonNull String key, Object value, long time, TimeUnit timeUnit) {
-        try {
-            if (time <= 0L) {
-                return redisTemplate.opsForValue().setIfAbsent(key, value);
-            }
-            return redisTemplate.opsForValue().setIfAbsent(key, value, time, timeUnit);
-        } catch (Exception e) {
-            log.error("Redis SETNX failed, key={}", key, e);
-            return null;
-        }
+        return redisTemplate.opsForValue().setIfAbsent(key, value, time, timeUnit);
     }
 
     /**
@@ -210,7 +174,7 @@ public class RedisUtil {
      * @param time 过期时间(秒)，需大于 0
      * @return 是否设置成功
      */
-    public static Boolean expire(@NonNull String key, long time) {
+    public static boolean expire(@NonNull String key, long time) {
         return expire(key, time, TimeUnit.SECONDS);
     }
 
@@ -222,18 +186,13 @@ public class RedisUtil {
      * @param timeUnit 时间单位
      * @return 是否设置成功
      */
-    public static Boolean expire(@NonNull String key, long time, TimeUnit timeUnit) {
+    public static boolean expire(@NonNull String key, long time, TimeUnit timeUnit) {
         if (time <= 0L) {
             // Redis 中 EXPIRE 0 会直接删除键，与"永久有效"的语义相反，这里直接拒绝
             log.warn("Expiration skipped, ttl must be positive, key={}, ttl={}", key, time);
             return false;
         }
-        try {
-            return redisTemplate.expire(key, time, timeUnit);
-        } catch (Exception e) {
-            log.error("Failed to set expiration, key={}, ttl={}, unit={}", key, time, timeUnit, e);
-            return false;
-        }
+        return redisTemplate.expire(key, time, timeUnit);
     }
 
     /**
@@ -257,20 +216,15 @@ public class RedisUtil {
      * @param keys 键，可传一个或多个
      * @return 是否至少删除成功一个键
      */
-    public static Boolean del(@NonNull String... keys) {
+    public static boolean del(@NonNull String... keys) {
         if (keys.length == 0) {
             return false;
         }
-        try {
-            if (keys.length == 1) {
-                return redisTemplate.delete(keys[0]);
-            }
-            Long count = redisTemplate.delete(Arrays.asList(keys));
-            return count > 0L;
-        } catch (Exception e) {
-            log.error("Failed to delete cache keys, keys={}", Arrays.toString(keys), e);
-            return false;
+        if (keys.length == 1) {
+            return redisTemplate.delete(keys[0]);
         }
+        Long count = redisTemplate.delete(Arrays.asList(keys));
+        return count > 0L;
     }
 
     /**

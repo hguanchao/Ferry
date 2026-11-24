@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ferry.devops.biz.mapper.RunMapper">
+
+    <select id="selectPageList" resultType="com.ferry.devops.api.vo.RunVO">
+        SELECT r.id          AS id,
+               r.code        AS code,
+               a.name        AS appName,
+               p.name        AS pipelineName,
+               r.branch      AS branch,
+               r.ref_value   AS refValue,
+               r.status      AS status,
+               r.start_time  AS startTime,
+               r.end_time    AS endTime,
+               r.create_time AS createTime
+        FROM dev_run r
+                 LEFT JOIN dev_pipeline p ON p.id = r.pipeline_id AND p.is_deleted = 0
+                 LEFT JOIN dev_app a ON a.id = r.app_id AND a.is_deleted = 0
+        <where>
+            r.is_deleted = 0
+            <if test="query.keyword != null and query.keyword != ''">
+                AND (r.code LIKE CONCAT('%', #{query.keyword}, '%')
+                    OR a.name LIKE CONCAT('%', #{query.keyword}, '%')
+                    OR p.name LIKE CONCAT('%', #{query.keyword}, '%'))
+            </if>
+            <if test="query.appId != null">
+                AND r.app_id = #{query.appId}
+            </if>
+            <if test="query.pipelineId != null">
+                AND r.pipeline_id = #{query.pipelineId}
+            </if>
+            <if test="query.statuses != null and query.statuses.size() > 0">
+                AND r.status IN
+                <foreach collection="query.statuses" item="status" open="(" separator="," close=")">
+                    #{status}
+                </foreach>
+            </if>
+        </where>
+        ORDER BY r.create_time DESC, r.id DESC
+    </select>
+</mapper>

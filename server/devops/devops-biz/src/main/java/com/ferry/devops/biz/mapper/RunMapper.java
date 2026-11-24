@@ -4,13 +4,21 @@ import java.util.Date;
 import java.util.List;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.ferry.devops.api.dto.query.RunQuery;
 import com.ferry.devops.api.entity.Run;
+import com.ferry.devops.api.vo.RunVO;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 
 @Mapper
 public interface RunMapper extends BaseMapper<Run> {
+
+    /**
+     * 运行分页列表：SQL 内联表回填流水线名/应用名，条件与分页见 RunMapper.xml。
+     */
+    IPage<RunVO> selectPageList(IPage<RunVO> page, @Param("query") RunQuery query);
 
     /**
      * 同一应用/引用/流水线版本是否已有活动运行（排队/运行/阻塞）

@@ -6,7 +6,6 @@ import com.ferry.common.core.http.R;
 import com.ferry.common.security.annotation.PreAuthorize;
 import com.ferry.devops.api.dto.RunTriggerDTO;
 import com.ferry.devops.api.dto.query.RunQuery;
-import com.ferry.devops.api.vo.RunDetailVO;
 import com.ferry.devops.api.vo.RunStageVO;
 import com.ferry.devops.api.vo.RunVO;
 import com.ferry.devops.api.vo.RepoCommitVO;
@@ -45,8 +44,16 @@ public class RunController {
     @GetMapping("/detail")
     @PreAuthorize("devops:run:detail")
     @Operation(summary = "运行-详情", parameters = @Parameter(name = "id", description = "运行id", required = true))
-    public R<RunDetailVO> detail(@RequestParam("id") Long id) {
+    public R<RunVO> detail(@RequestParam("id") Long id) {
         return R.data(service.detail(id));
+    }
+
+    @PostMapping("/trigger")
+    @PreAuthorize("devops:run:trigger")
+    @Idempotent(key = "#body.appId + ':' + #body.pipelineId + ':' + (#body.commitId ?: '')")
+    @Operation(summary = "运行-手动触发（幂等）")
+    public R<TriggerResultVO> trigger(@RequestBody @Valid RunTriggerDTO body) {
+        return R.data(service.trigger(body));
     }
 
     @PostMapping("/pause")
@@ -99,13 +106,5 @@ public class RunController {
                                                 @RequestParam("branch") String branch,
                                                 @RequestParam(value = "limit", required = false) Integer limit) {
         return R.data(repoQueryService.commits(appId, branch, limit));
-    }
-
-    @PostMapping("/trigger")
-    @PreAuthorize("devops:run:trigger")
-    @Idempotent(key = "#body.appId + ':' + #body.pipelineId + ':' + (#body.commitId ?: '')")
-    @Operation(summary = "运行-手动触发（幂等）")
-    public R<TriggerResultVO> trigger(@RequestBody @Valid RunTriggerDTO body) {
-        return R.data(service.trigger(body));
     }
 }

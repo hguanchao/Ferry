@@ -2,13 +2,13 @@ import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
-  App, Button, Descriptions, Input, InputNumber, Modal, Popover, Space, Steps, Table, Tag, Tooltip,
+  App, Button, Descriptions, Input, InputNumber, Modal, Popover, Select, Space, Steps, Table, Tag, Tooltip,
   type TableColumnsType,
 } from 'antd'
-import { CirclePause, CirclePlay, OctagonX, RotateCcw } from 'lucide-react'
+import { CirclePause, CirclePlay, OctagonX, RefreshCw, RotateCcw } from 'lucide-react'
 import PageHeader from '@/components/PageHeader'
 import { gateApi, runApi } from '@/api/devops'
-import type { RunStageGate, RunDetail, Run } from '@/api/types-devops'
+import type { RunStageGate, Run } from '@/api/types-devops'
 import { useAuthStore } from '@/stores/auth'
 import { showError } from '@/lib/notify'
 
@@ -46,6 +46,13 @@ function elapsedSeconds(start?: string, end?: string): number | null {
   if (!start || !end) return null
   const value = (new Date(end).getTime() - new Date(start).getTime()) / 1000
   return Number.isFinite(value) && value >= 0 ? value : null
+}
+/** 秒数转为易读耗时：秒级显示 x.xs，分钟级显示 Xm Ys，小时级显示 Xh Ym */
+function formatDuration(seconds: number | null): string {
+  if (seconds == null) return '—'
+  if (seconds < 60) return `${seconds.toFixed(1)}s`
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ${Math.round(seconds % 60)}s`
+  return `${Math.floor(seconds / 3600)}h ${Math.floor((seconds % 3600) / 60)}m`
 }
 /** 预检阶段的 result 是 PrecheckItemVO[]：type/conclusion/detail */
 function parsePrecheckItems(result?: string): { type: number; conclusion: number; detail?: string }[] {
@@ -99,8 +106,11 @@ export default function RunDetail() {
   const can = useAuthStore((state) => state.can)
   const routeRunId = useParams().id
   const [runId, setRunId] = useState<string | null>(() => routeRunId ?? runIdFromHash())
-  const [inputId, setInputId] = useState('')
   const [runPage, setRunPage] = useState({ current: 1, size: 20 })
+  const [filterStatus, setFilterStatus] = useState<number | undefined>()
+  const [draftStatus, setDraftStatus] = useState<number | undefined>()
+  const [keywordInput, setKeywordInput] = useState('')
+  const [filterKeyword, setFilterKeyword] = useState('')
   const [abortOpen, setAbortOpen] = useState(false)
   const [abortReason, setAbortReason] = useState('')
   const [rerunOpen, setRerunOpen] = useState(false)
@@ -110,14 +120,16 @@ export default function RunDetail() {
 
   useEffect(() => {
     setRunId(routeRunId ?? null)
-    if (routeRunId) setInputId(routeRunId)
   }, [routeRunId])
 
   const listQuery = useQuery({
-    queryKey: ['run-list', runPage],
-    queryFn: () => runApi.pageList({ ...runPage }),
+    queryKey: ['run-list', runPage, filterStatus, filterKeyword],
+    queryFn: () => runApi.pageList({
+      ...runPage,
+      keyword: filterKeyword || undefined,
+      statuses: filterStatus === undefined ? undefined : [filterStatus],
+    }),
     enabled: !runId,
-    refetchInterval: 5000,
   })
 
   const detailQuery = useQuery({
@@ -125,7 +137,7 @@ export default function RunDetail() {
     queryFn: () => runApi.detail(runId!),
     enabled: !!runId,
     refetchInterval: (q) => {
-      const status = (q.state.data as RunDetail | undefined)?.run?.status
+      const status = (q.state.data as Run | undefined)?.status
       // 1排队 2运行中 3阻塞为活跃态；8预检未通过是终态，不再轮询
       return status === 1 || status === 2 || status === 3 ? 5000 : false
     },
@@ -140,7 +152,7 @@ export default function RunDetail() {
     queryFn: () => gateApi.resultList(runId!),
     enabled: !!runId,
     refetchInterval: () => {
-      const status = detailQuery.data?.run?.status
+      const status = detailQuery.data?.status
       return status === 1 || status === 2 || status === 3 ? 5000 : false
     },
   })
@@ -180,10 +192,11 @@ export default function RunDetail() {
     onError: showError,
   })
 
-  const detail = detailQuery.data
-  const run = detail?.run
-  const stages = ((detail?.stages ?? []) as unknown as StageExt[])
-  const tasks = (detail?.tasks ?? []) as unknown as TaskExt[]
+  // detail 接口返回扁平 RunVO：概要字段在顶层，阶段列表（含各自 tasks）在 stages
+  const run = detailQuery.data
+  const stages = ((run?.stages ?? []) as unknown as StageExt[])
+  // 全量任务由各阶段内嵌的 tasks 聚合，供「全部任务」表格展示
+  const tasks = stages.flatMap((stage) => (stage.tasks ?? [])) as TaskExt[]
   const gateResults = (gateQuery.data ?? []) as unknown as RunStageGate[]
   const stageNameById = new Map(stages.map((stage) => [String(stage.id), stage.name]))
 
@@ -217,6 +230,13 @@ export default function RunDetail() {
   const finishedStages = stages.filter((stage) => [3, 4, 6, 7, 8, 9].includes(stage.status)).length
   const totalDuration = elapsedSeconds(run?.startTime, run?.endTime)
 
+  // 所有筛选条件统一在点击「查询」后提交，避免输入过程中反复请求
+  const applyFilters = () => {
+    setFilterKeyword(keywordInput.trim())
+    setFilterStatus(draftStatus)
+    setRunPage((p) => ({ ...p, current: 1 }))
+  }
+
   const openRun = (id: string) => {
     const next = id.trim()
     if (!next) return
@@ -246,6 +266,8 @@ export default function RunDetail() {
         : '—' },
     { title: '状态', dataIndex: 'status', width: 110, align: 'center',
       render: (v: number) => <Tag color={STATUS_COLOR[v] ?? 'default'}>{RUN_STATUS[v] ?? v}</Tag> },
+    { title: '总耗时', width: 100, align: 'center',
+      render: (_: unknown, record: Run) => formatDuration(elapsedSeconds(record.startTime, record.endTime)) },
     { title: '触发时间', dataIndex: 'createTime', width: 170 },
     { title: '操作', width: 80, align: 'center',
       render: (_: unknown, record: Run) => (
@@ -256,16 +278,36 @@ export default function RunDetail() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <PageHeader
-        title={runId ? '运行详情' : '运行记录'}
+        title={runId ? '运行详情' : '流水线运行'}
         tag={runId && run?.code ? <Tag className="ferry-mono">{String(run.code)}</Tag> : undefined}
         description={runId
           ? '运行概要、阶段进度、任务与门禁结果；支持暂停、继续、中止与断点重跑'
-          : '最近运行列表，每 5 秒刷新；点击查看进入详情，也可输入运行 ID 快速查询'}
+          : '按关键字（运行编号 / 应用 / 流水线）与状态筛选；点击查看进入详情'}
         extra={
-          <Space>
-            <Input placeholder="运行 ID" value={inputId} onChange={(e) => setInputId(e.target.value)}
-              onPressEnter={() => openRun(inputId)} style={{ width: 180 }} />
-            <Button onClick={() => openRun(inputId)}>查询</Button>
+          <Space wrap>
+            {!runId && (
+              <>
+                <Input
+                  allowClear
+                  placeholder="关键字：运行编号 / 应用 / 流水线"
+                  value={keywordInput}
+                  onChange={(e) => setKeywordInput(e.target.value)}
+                  onPressEnter={applyFilters}
+                  style={{ width: 240 }}
+                />
+                <Select
+                  allowClear
+                  placeholder="全部状态"
+                  value={draftStatus}
+                  onChange={setDraftStatus}
+                  options={Object.entries(RUN_STATUS).map(([code, label]) => ({ value: Number(code), label }))}
+                  style={{ width: 130 }}
+                />
+                <Button icon={<RefreshCw size={14} />} onClick={() => void listQuery.refetch()}
+                  loading={listQuery.isFetching}>刷新</Button>
+                <Button type="primary" onClick={applyFilters}>查询</Button>
+              </>
+            )}
             {runId && <Button onClick={backToList}>返回列表</Button>}
             {can('devops:run:pause') && (status === 1 || status === 2) && (
               <Button icon={<CirclePause size={14} />} onClick={() => pauseMutation.mutate({ id: runId, reason: '页面暂停' })}>暂停</Button>
@@ -316,7 +358,7 @@ export default function RunDetail() {
         </div>
       )}
 
-      {runId && detail && (
+      {runId && run && (
         <>
           <div className="ferry-panel">
             <div className="ferry-panel__head">

@@ -21,13 +21,7 @@ public class Run extends BaseEntity implements Serializable {
     @TableId
     private Long id;
 
-    /** 应用id */
-    private Long appId;
-
-    /** 流水线id */
-    private Long pipelineId;
-
-    /** 运行编号 RUN-yyyyMMdd-序号 */
+    /** 运行编号 */
     private String code;
 
     /** 分支 */
@@ -36,7 +30,7 @@ public class Run extends BaseEntity implements Serializable {
     /** 引用类型 1=Commit 2=Tag/Ref */
     private Integer refType;
 
-    /** 引用值（触发输入或应用登记的默认值） */
+    /** 引用值 */
     private String refValue;
 
     /** 触发类型 1=手动 2=自动 */
@@ -48,8 +42,14 @@ public class Run extends BaseEntity implements Serializable {
     /** 触发说明 */
     private String triggerNote;
 
-    /** 状态 1=排队中 2=运行中 3=阻塞 4=成功 5=失败 6=超时 7=已取消 8=结果待确认 */
+    /** 状态 0=待确认 1=排队中 2=运行中 3=阻塞 4=成功 5=失败 6=超时 7=已取消 8=预检未通过 */
     private Integer status;
+
+    /** 应用id */
+    private Long appId;
+
+    /** 流水线id */
+    private Long pipelineId;
 
     /** 流水线版本号 */
     private Integer pipelineVersion;
@@ -63,7 +63,7 @@ public class Run extends BaseEntity implements Serializable {
     /** Jenkins队列项id */
     private Long jenkinsQueueId;
 
-    /** 预检结果：五项校验摘要与 AI 研判理由 */
+    /** 预检结果 */
     private String preCheckResult;
 
     /** 开始时间 */

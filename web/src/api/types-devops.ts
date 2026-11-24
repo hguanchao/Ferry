@@ -133,15 +133,11 @@ export interface Run {
   startTime?: string
   endTime?: string
   createTime: string
+  /** 详情接口返回：阶段列表（每个阶段内嵌 tasks）；列表接口不返回此字段 */
+  stages?: RunStage[]
 }
-export interface RunStage { id: ID; runId: ID; type: number; name: string; status: number; result?: string; sort: number; startTime?: string; endTime?: string }
-export interface RunStageTask { id: ID; runId: ID; runStageId: ID; name: string; executor?: string; scriptRef?: string; status: number; result?: string; sort: number; startTime?: string; endTime?: string }
-/** 运行详情：与后端 RunDetailVO 的 { run, stages, tasks } 嵌套结构一致 */
-export interface RunDetail {
-  run: Run
-  stages: RunStage[]
-  tasks: RunStageTask[]
-}
+export interface RunStage { id: ID; runId: ID; type: number; name: string; status: number; result?: string; sort: number; startTime?: string; endTime?: string; tasks?: RunStageTask[] }
+export interface RunStageTask { id: ID; runId: ID; runStageId: ID; name: string; executor?: string; scriptRef?: string; result?: string; status: number; startTime?: string; endTime?: string }
 
 /* ------------------------------ 制品 ------------------------------ */
 export interface ArtifactRow {

@@ -9,7 +9,7 @@ import type {
   RunStageGate, GateRule, ImpactResult, MetricRow, NotifyChannelRow, NotifyTemplateRow,
   OpenTokenRow, PipelineDetail, PipelineRow, PrecheckResult,
   PrecheckResultVO, ReleaseDetail, ReleaseRecordRow, ReleaseRow, ReleaseStrategyRow,
-  RepoCommitOption, RiskResult, RollbackCandidate, RollbackRow, RunDetail, Run, StageStat, StoragePolicyRow,
+  RepoCommitOption, RiskResult, RollbackCandidate, RollbackRow, Run, StageStat, StoragePolicyRow,
   TechDebtRow, TriggerResult, VersionResult,
 } from './types-devops'
 
@@ -64,7 +64,7 @@ export const pipelineApi = {
 
 export const runApi = {
   pageList: (body: Record<string, unknown>) => post<ApiPage<Run>>(`${B}/run/pageList`, body),
-  detail: (id: string) => get<RunDetail>(`${B}/run/detail`, { id }),
+  detail: (id: string) => get<Run>(`${B}/run/detail`, { id }),
   pause: (body: Record<string, unknown>) => post<string>(`${B}/run/pause`, body),
   resume: (id: string) => post<string>(`${B}/run/resume`, { id }),
   abort: (body: Record<string, unknown>) => post<string>(`${B}/run/abort`, body),

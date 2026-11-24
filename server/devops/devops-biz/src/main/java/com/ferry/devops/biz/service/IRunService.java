@@ -5,7 +5,6 @@ import com.ferry.common.jdbc.base.IService;
 import com.ferry.devops.api.dto.RunTriggerDTO;
 import com.ferry.devops.api.dto.query.RunQuery;
 import com.ferry.devops.api.entity.Run;
-import com.ferry.devops.api.vo.RunDetailVO;
 import com.ferry.devops.api.vo.RunStageVO;
 import com.ferry.devops.api.vo.TriggerResultVO;
 import com.ferry.devops.api.vo.RunVO;
@@ -19,7 +18,7 @@ public interface IRunService extends IService<Run> {
 
     IPage<RunVO> pageList(RunQuery body);
 
-    RunDetailVO detail(Long id);
+    RunVO detail(Long id);
 
     TriggerResultVO trigger(RunTriggerDTO body);
 

@@ -1,11 +1,18 @@
 package com.ferry.devops.biz.service.impl;
 
+import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.ferry.common.core.utils.BeanUtil;
+import com.ferry.common.core.utils.CollUtil;
 import com.ferry.common.core.utils.ObjUtil;
+import com.ferry.common.jdbc.base.ServiceImpl;
+import com.ferry.devops.api.dto.query.RunStageQuery;
 import com.ferry.devops.api.entity.Run;
 import com.ferry.devops.api.entity.RunOperation;
 import com.ferry.devops.api.entity.RunStage;
@@ -13,6 +20,8 @@ import com.ferry.devops.api.entity.RunStageTask;
 import com.ferry.devops.api.enums.DevopsStateMachine;
 import com.ferry.devops.api.enums.RunStatusEnum;
 import com.ferry.devops.api.enums.StageStatusEnum;
+import com.ferry.devops.api.vo.RunStageTaskVO;
+import com.ferry.devops.api.vo.RunStageVO;
 import com.ferry.devops.biz.config.DevopsProperties;
 import com.ferry.devops.biz.mapper.RunStageGateMapper;
 import com.ferry.devops.biz.mapper.RunMapper;
@@ -20,6 +29,7 @@ import com.ferry.devops.biz.mapper.RunOperationMapper;
 import com.ferry.devops.biz.mapper.RunStageMapper;
 import com.ferry.devops.biz.mapper.RunStageTaskMapper;
 import com.ferry.devops.biz.service.IRunStageService;
+import com.ferry.devops.biz.service.IRunStageTaskService;
 import com.ferry.devops.biz.utils.StageResultUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -35,7 +45,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class RunStageServiceImpl implements IRunStageService {
+public class RunStageServiceImpl extends ServiceImpl<RunStageMapper, RunStage> implements IRunStageService {
 
     private static final int CI_STAGE_TYPE_MAX = 4;
     private static final int OPERATION_PAUSE = 1;
@@ -46,6 +56,27 @@ public class RunStageServiceImpl implements IRunStageService {
     private final RunOperationMapper operationMapper;
     private final RunStageGateMapper gateResultMapper;
     private final DevopsProperties properties;
+    private final IRunStageTaskService runStageTaskService;
+
+    @Override
+    public List<RunStageVO> list(RunStageQuery body) {
+        Long runId = body.getRunId();
+        List<RunStage> runStages = list(Wrappers.<RunStage>lambdaQuery()
+                .eq(ObjUtil.isNotEmpty(runId), RunStage::getRunId, runId));
+        if (CollUtil.isEmpty(runStages)) {
+            return Collections.emptyList();
+        }
+        Set<Long> runStageIds = runStages.stream().map(RunStage::getId).collect(Collectors.toSet());
+        List<RunStageTask> runStageTasks = runStageTaskService.list(Wrappers.<RunStageTask>lambdaQuery()
+                .in(RunStageTask::getRunStageId, runStageIds));
+        Map<Long, List<RunStageTaskVO>> runStageTaskVOMap = runStageTasks.stream().collect(Collectors.groupingBy(
+                RunStageTask::getRunStageId,
+                Collectors.mapping(task -> BeanUtil.copy(task, RunStageTaskVO.class), Collectors.toList())
+        ));
+        List<RunStageVO> runStageVOList = BeanUtil.copy(runStages, RunStageVO.class);
+        runStageVOList.forEach(vo -> vo.setTasks(runStageTaskVOMap.get(vo.getId())));
+        return runStageVOList;
+    }
 
     @Override
     @Transactional(rollbackFor = Exception.class)

@@ -21,6 +21,7 @@ import org.springframework.expression.spel.standard.SpelExpressionParser;
 import org.springframework.expression.spel.support.StandardEvaluationContext;
 
 import java.lang.reflect.Method;
+import java.util.Arrays;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -38,13 +39,15 @@ public class IdempotentAspect {
         Method method = ((MethodSignature) joinPoint.getSignature()).getMethod();
         String key = buildKey(method, joinPoint.getArgs(), idempotent);
         int ttl = idempotent.ttl() > 0 ? idempotent.ttl() : IntConst.SIXTY;
-        Boolean acquired = RedisUtil.trySetNx(key, "1", ttl, TimeUnit.SECONDS);
-        if (Boolean.FALSE.equals(acquired)) {
-            throw new ServiceException(idempotent.message());
-        }
-        if (acquired == null) {
+        boolean setNx;
+        try {
+             setNx = RedisUtil.setNx(key, "1", ttl, TimeUnit.SECONDS);
+        } catch (Exception e) {
             log.warn("Redis unavailable, idempotent check rejected: key={}", key);
             throw new ServiceException("幂等校验失败，请稍后重试");
+        }
+        if (!setNx) {
+            throw new ServiceException(idempotent.message());
         }
         try {
             return joinPoint.proceed();
@@ -60,7 +63,7 @@ public class IdempotentAspect {
             try {
                 raw = JsonUtil.toJson(args);
             } catch (Exception e) {
-                raw = String.valueOf(java.util.Arrays.deepToString(args));
+                raw = Arrays.deepToString(args);
             }
         }
         String logical = method.getDeclaringClass().getSimpleName() + "." + method.getName()
